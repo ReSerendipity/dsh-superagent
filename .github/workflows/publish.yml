@@ -29,6 +29,21 @@ jobs:
           node-version: 24
           registry-url: https://registry.npmjs.org
 
+      - name: Require an npm and Node that support trusted publishing
+        run: |
+          npm install --global "npm@^11.5.1"
+          node_version="$(node --version | sed 's/^v//')"
+          npm_version="$(npm --version)"
+          echo "node $node_version, npm $npm_version"
+          if [ "$(printf '%s\n22.14.0\n' "$node_version" | sort -V | head -n1)" != "22.14.0" ]; then
+            echo "::error::Node $node_version is below 22.14.0"
+            exit 1
+          fi
+          if [ "$(printf '%s\n11.5.1\n' "$npm_version" | sort -V | head -n1)" != "11.5.1" ]; then
+            echo "::error::npm $npm_version is below 11.5.1"
+            exit 1
+          fi
+
       - run: pnpm install --frozen-lockfile
 
       - name: Check that the tag matches package.json
