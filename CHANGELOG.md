@@ -13,11 +13,11 @@
 - 交付形态：GitHub 派单与本地收件目录；`mode: local` 下 `executor.prepare` 为空时自动建立内置本地工作区（`git init`、基座提交、`agent/<工单短名>` 分支，无远端）。
 - 多实例：一个 `stateDir` 只允许一个后端（锁保护）；多 profile / 多 `stateDir` 各自独立。
 - 配置：保存即生效的热加载；声明式设置文件；JSON Schema；提示词覆盖层与团队提示词默认值。
-- 分发：仓库自带 `lib/` 构建产物，支持 `git+https` 安装；tarball 由 `pnpm pack:plugin` 产出。
+- 分发：已发布 npm 包 `@reserendipity/dsh-superagent`；仓库自带 `lib/` 构建产物，同时支持 `git+https` 安装；tarball 由 `pnpm pack:plugin` 产出。
 
 ### Notes
 
 - 插件，非官方产品；上游归属与许可见 [NOTICE](NOTICE) 与 [LICENSE](LICENSE)。
 - 当前支持 Windows 10/11；macOS / Linux 尚未验证。
 - 安装后必须为 profile 配置 `stateDir`（无默认值，避免两个 profile 抢同一把锁）。
-- npm 尚未发布（计划包名 `@reserendipity/dsh-superagent`）；按名字安装需等发布成功后才能写进安装文档。
+- npm 已发布 `@reserendipity/dsh-superagent@0.1.0`；按名字安装与 Git 地址安装并存。npm 包与 Release tarball 内容一致，但由不同打包器生成，字节不同。

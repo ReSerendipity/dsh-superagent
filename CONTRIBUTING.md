@@ -37,7 +37,7 @@
 
 ## 发布到 npm（runbook）
 
-发布形态与 Git 安装并存：`git+https://…#<commit>` 与 `@reserendipity/dsh-superagent@<version>` 是两条来源，必须指向同一次提交、同一个版本号。**只有 `npm view @reserendipity/dsh-superagent@<version>` 能返回该版本之后**，README 才可以写 `dsh plugin add @reserendipity/dsh-superagent`；在此之前不得宣传「按名字安装」。
+发布形态与 Git 安装并存：`git+https://…#<commit>` 与 `@reserendipity/dsh-superagent@<version>` 是两条来源，必须指向同一次提交、同一个版本号。**只有 `npm view @reserendipity/dsh-superagent@<version>` 能返回该版本之后**，README 才可以写 `dsh plugin add @reserendipity/dsh-superagent`；在此之前不得宣传「按名字安装」。（`0.1.0` 已满足该条件并写入 README。）
 
 ### 版本规则
 
@@ -80,13 +80,13 @@ npm view @reserendipity/dsh-superagent version dist.tarball dist.integrity --reg
 npm view @reserendipity/dsh-superagent@<version> dist.integrity --registry https://registry.npmjs.org/
 ```
 
-把 `dist.integrity` 与本地 `dist/dsh-superagent-<version>.tgz` 的 `sha256` 对比。npmmirror 有同步延迟，用 `--registry https://registry.npmmirror.com` 复查前先等一段时间。
+`dist.integrity` 只用于校验 npm 上这个版本自身的下载完整性，**不要**拿它和本地 `dist/dsh-superagent-<version>.tgz` 的 `sha256` 对比：npm 的包由 npm 打包器生成，Release 资产由 `pnpm pack` 生成，两者**内容一致但字节不同**（`0.1.0`：npm 431.1 kB，Release 432,086 B）。核对应以解包后的文件清单与内容为准。npmmirror 有同步延迟，用 `--registry https://registry.npmmirror.com` 复查前先等一段时间。
 
 ### 两条来源的对齐
 
 - `v<version>` tag、`package.json` 的 `version`、npm 上的版本三者相同，且出自同一次提交。
-- README 的默认安装命令仍是 Git 地址；确认 npm 版本可解析之后，才追加「或 `dsh plugin add @reserendipity/dsh-superagent`」。
-- 插件运行时只认 `lib/`，两条来源装出来的行为必须一致；发版后对比 `npm pack` 出的 `.tgz` 与 Release 资产的文件清单。
+- README 同时给出 npm 包名与 Git 地址；只有 `npm view @reserendipity/dsh-superagent@<version>` 能返回该版本，才可写「按名字安装」。
+- 插件运行时只认 `lib/`，两条来源装出来的行为必须一致；发版后对比 `npm pack` 出的 `.tgz` 与 Release 资产的文件清单与内容（打包器不同，字节不必相同）。
 
 ## 行为准则
 
