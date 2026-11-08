@@ -1425,7 +1425,7 @@ title: 首单只读验证（勿改文件）
 
 | 名称 | 路径 |
 | --- | --- |
-| 本 checkout（源码 / 插件） | `<checkout>`（独立历史，0.1.0 为公开基线；与上游的差量与升级流程见 `WINDOWS-DELTA.md`，基线 SHA 在 `.upstream-baseline`） |
+| 本 checkout（源码 / 插件） | `<checkout>`（独立历史，自 0.1.0 起为公开基线；与上游的差量与升级流程见 `WINDOWS-DELTA.md`，基线 SHA 在 `.upstream-baseline`） |
 | 桌面应用源码（已移除） | 原 `<checkout>\windows-app\`（2026-11-07 删除；历史随公开基线归档） |
 | 安装根目录（默认，已移除） | `%LOCALAPPDATA%\Programs\Superagent`（历史；`install.cmd -Root` / `SUPERAGENT_HOME` 已不存在） |
 | 已安装的 exe（已移除） | 原 `<安装根目录>\Superagent.exe`（历史） |
@@ -1508,7 +1508,7 @@ Get-NetTCPConnection -LocalPort 3082 -ErrorAction SilentlyContinue | Select-Obje
 
 ### 13.3 升级
 
-> **本仓库是一条独立历史**（2026-11-06 重建，公开基线为 `0.1.0`）。`upstream` 远端仍指向官方原型，但**没有共同祖先**，所以升级不是 `git merge`，而是"取上游 diff、按 `WINDOWS-DELTA.md` §3 的 L1 清单逐处移植、把新基线 SHA 写回该文件"。完整流程见 `<checkout>\WINDOWS-DELTA.md` §5，这里是操作摘要。
+> **本仓库是一条独立历史**（2026-11-06 重建，自 `0.1.0` 起为公开基线）。`upstream` 远端仍指向官方原型，但**没有共同祖先**，所以升级不是 `git merge`，而是"取上游 diff、按 `WINDOWS-DELTA.md` §3 的 L1 清单逐处移植、把新基线 SHA 写回该文件"。完整流程见 `<checkout>\WINDOWS-DELTA.md` §5，这里是操作摘要。
 
 1. 等到没有执行器正在干活（面板 Execution 里没有 working 的工单）。
 2. 备份数据库：复制 `<stateDir>\orchestrator.sqlite` 到安全位置。

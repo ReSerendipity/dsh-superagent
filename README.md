@@ -17,7 +17,7 @@
 dsh plugin --profile superagent add "@reserendipity/dsh-superagent"
 ```
 
-装的是 npm 上已发布的版本（当前 `0.1.0`）。**也可以从本仓的 Git 地址安装**：
+装的是 npm 上已发布的最新版本。**也可以从本仓的 Git 地址安装**：
 
 ```powershell
 dsh plugin --profile superagent add "git+https://github.com/ReSerendipity/dsh-superagent.git"
@@ -54,7 +54,7 @@ Git 方式装的是 `main` 当前最新提交；`dsh plugin add` 把 spec 原样
 
 收件准入名单也必须非空（面板 设置 → 评估 → 谁可以派活，加一行 `local`），否则投单会被判 `not_a_member` 并静默归档，不写回信。
 
-tarball、本地目录、独立 profile 与常驻服务见 [WINDOWS-SETUP.md](docs/WINDOWS-SETUP.md)。发布状态：本仓以 `v0.1.0` 为公开基线，已发布到 npm 为 `@reserendipity/dsh-superagent`（版本以本版 `package.json` 为准）；离线跑 `pnpm release:check -SkipOnline`（被跳过的在线检查会标成 `NOT VERIFIED`）。
+tarball、本地目录、独立 profile 与常驻服务见 [WINDOWS-SETUP.md](docs/WINDOWS-SETUP.md)。发布状态：本仓自 `v0.1.0` 起建立公开基线，已发布到 npm 为 `@reserendipity/dsh-superagent`（当前版本以 npm 上的最新发布为准）；离线跑 `pnpm release:check -SkipOnline`（被跳过的在线检查会标成 `NOT VERIFIED`）。
 
 ![插件管理器「已安装插件」：DSH-Superagent 开关为启用](https://gcore.jsdelivr.net/gh/ReSerendipity/dsh-superagent@main/docs/assets/readme-plugin-installed-20261108.png)
 
@@ -125,13 +125,13 @@ tarball、本地目录、独立 profile 与常驻服务见 [WINDOWS-SETUP.md](do
 
 It is built on the [deepseek-ai/dsh-superagent-prototype](https://github.com/deepseek-ai/dsh-superagent-prototype) and is **not an official DeepSeek product**; additions in this repository are MIT as well — the upstream license and copyright notice are in [NOTICE](NOTICE), the repository license in [LICENSE](LICENSE).
 
-**Install.** *Plugins → Add plugin* in the app and paste `@reserendipity/dsh-superagent`, or run `dsh plugin --profile <name> add "@reserendipity/dsh-superagent"` (the published version, currently `0.1.0`). To install the latest `main` commit instead, use `git+https://github.com/ReSerendipity/dsh-superagent.git`; `dsh plugin add` hands the spec to pnpm verbatim, and the lockfile records the commit it resolved.
+**Install.** *Plugins → Add plugin* in the app and paste `@reserendipity/dsh-superagent`, or run `dsh plugin --profile <name> add "@reserendipity/dsh-superagent"` (the latest published version on npm). To install the latest `main` commit instead, use `git+https://github.com/ReSerendipity/dsh-superagent.git`; `dsh plugin add` hands the spec to pnpm verbatim, and the lockfile records the commit it resolved.
 
 **One step after installing:** add `stateDir` to `%USERPROFILE%\.dsh\profiles\<profile>\cordis.patch.yml` — it is required and deliberately has no default, because one `stateDir` allows one backend at a time and a shared default would make two profiles fight over the same lock. Without it the home plugin reports `$.stateDir missing required value`. A copyable example is in [`examples/profile.cordis.patch.yml`](examples/profile.cordis.patch.yml), which ships in the package.
 
 **Optional — pin a build.** For a team-wide version, reproducing an issue or CI, append `#<full 40-character commit>` to the URL (`...git#<commit>`); the cost is that upgrading means editing the sha, otherwise the install stays on that old build. The repo ships built artifacts in `lib/`, so no build step is needed at install time. Requirements: Node `^22.19.0 || >=24`, DeepSeek Harness `>=0.2.1-alpha.2 <0.3.0`; one backend per state directory (lock-protected).
 
-**Honest limits.** Windows only, no macOS/Linux support; executors run with full OS access by design (an operator-trust model, not a sandbox); the public baseline is v0.1.0, published on npm as `@reserendipity/dsh-superagent`; the project is maintained by one person. Differences from upstream are enumerated in [docs/WINDOWS-DELTA.md](docs/WINDOWS-DELTA.md).
+**Honest limits.** Windows only, no macOS/Linux support; executors run with full OS access by design (an operator-trust model, not a sandbox); the public baseline starts at v0.1.0, published on npm as `@reserendipity/dsh-superagent`; the project is maintained by one person. Differences from upstream are enumerated in [docs/WINDOWS-DELTA.md](docs/WINDOWS-DELTA.md).
 
 ## 文档索引
 
