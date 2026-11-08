@@ -162,7 +162,7 @@ It is built on the [deepseek-ai/dsh-superagent-prototype](https://github.com/dee
 | [`docs/014`](docs/014-chain-of-recall.md) | 链式召回（§3.3）对照 |
 | [`docs/015`](docs/015-multi-instance.md) | 多实例：一边界一实例 |
 | [`docs/017`](docs/017-independent-layer.md) | 独立实现层：补上游未做的机制 |
-| [`docs/019`](docs/019-video-script.md) | 发布视频脚本（分镜 + 旁白） |
+| [`019`](_archive/执行记录/2026-11/019-video-script.md) | 发布视频脚本（分镜 + 旁白） |
 | [`docs/020`](docs/020-release-checklist.md) | 发布检查清单：发布前逐项验证与回滚 |
 | [`docs/026`](docs/026-local-delivery.md) | `mode: local` 交付形态：选入路径（内置本地工作区）与默认值决策备忘、影响面与回滚 |
 
@@ -201,7 +201,7 @@ tests/           单元与面板测试（文档与代码一致性也在其中）
 ## 开发与发布
 
 - 开发与提交约定见 [CONTRIBUTING.md](CONTRIBUTING.md)；本地跑 `pnpm typecheck` 与 `pnpm vitest run`。
-- 发布前跑 `pnpm release:check`（逐项 PASS/FAIL，失败退出码非 0）；在线两项核对 `releases/tags/v<版本>` 的资产与本地打出的 `.tgz` digest——改过打包内容（`package.json`、`files`）之后对已发布版本必然不一致，这是预期的「不要用旧资产冒充新构建」，新版本要等新 tag 与新资产。细则见 [`docs/020`](docs/020-release-checklist.md)，视频脚本见 [`docs/019`](docs/019-video-script.md)。
+- 发布前跑 `pnpm release:check`（逐项 PASS/FAIL，失败退出码非 0）；在线两项核对 `releases/tags/v<版本>` 的资产与本地打出的 `.tgz` digest——改过打包内容（`package.json`、`files`）之后对已发布版本必然不一致，这是预期的「不要用旧资产冒充新构建」，新版本要等新 tag 与新资产。细则见 [`docs/020`](docs/020-release-checklist.md)，视频脚本见 [`019`](_archive/执行记录/2026-11/019-video-script.md)。
 - 变更历史见 [CHANGELOG](CHANGELOG.md)。
 
 ## 致谢与归属
