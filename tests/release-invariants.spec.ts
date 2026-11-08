@@ -78,8 +78,8 @@ it('points the package metadata at this repository while crediting upstream', ()
   expect(String(pkg.description)).toContain(UPSTREAM)
   expect(String(pkg.homepage)).toContain(BUILD)
   expect(String(pkg.description)).toMatch(/适配版|adaptation/i)
-  // The install contract is the package id; renaming it would break installed instances.
-  expect(pkg.name).toBe('dsh-superagent')
+  // The install contract is the package id, scope included: a profile resolves the plugin by this name.
+  expect(pkg.name).toBe('@reserendipity/dsh-superagent')
 })
 
 it('has a changelog with the published version', () => {

@@ -20,4 +20,4 @@
 - 插件，非官方产品；上游归属与许可见 [NOTICE](NOTICE) 与 [LICENSE](LICENSE)。
 - 当前支持 Windows 10/11；macOS / Linux 尚未验证。
 - 安装后必须为 profile 配置 `stateDir`（无默认值，避免两个 profile 抢同一把锁）。
-- npm 尚未发布；按名字安装需等发布成功后才能写进安装文档。
+- npm 尚未发布（计划包名 `@reserendipity/dsh-superagent`）；按名字安装需等发布成功后才能写进安装文档。
