@@ -1,5 +1,18 @@
 # DSH-Superagent Changelog
 
+## [0.1.3] — 2026-11-08
+
+缺陷修复版。0.1.2 在 DeepSeek Harness 桌面端（DSH 0.2.2-rc.1）启动直接失败：`lib/client.js` 的客户端模块注册 id 仍是裸名 `dsh-superagent`，而桌面端按 scoped 包名组合客户端模块，报 `duplicate factory registration for "dsh-superagent"` 与 `1 entry did not activate @reserendipity/dsh-superagent: import failed`。CLI 宿主（0.2.1）容忍这种不一致，所以此前都只在 CLI 或一次性验证里通过。
+
+### Fixed
+
+- `lib/client.js` 的客户端模块注册 id 改为 `@reserendipity/dsh-superagent`；该 id 由 `tsdown.config.ts` 从 `package.json` 的 `name` 派生，不再手写，避免与包名再次漂移。
+- 新增 `tests/client-module-id.spec.ts`：断言构建后的客户端注册 id 与 `package.json` 的 `name` 一致，CI 上会拦截回归。
+
+### Docs
+
+- README（中英文）与 CONTRIBUTING 说明 pnpm 的 `minimumReleaseAge` 策略：pnpm 11 起默认开启（默认 1 天），刚发布的版本在成熟前不会被裸包名解析到，需要显式写版本号才能装到。
+
 ## [0.1.2] — 2026-11-08
 
 文档修正版，无功能变更。README 里写死「当前 0.1.0」的表述改为版本无关（npm 上已发布的最新版本 / 自 v0.1.0 起建立公开基线），其余文档同步去掉会随下次发版失效的版本锚点。

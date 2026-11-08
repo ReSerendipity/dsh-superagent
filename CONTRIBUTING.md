@@ -75,6 +75,8 @@ npm publish --registry https://registry.npmjs.org/
 
 ### 发布后验证
 
+刚发布的版本有一个可见的滞后：pnpm 11 起默认启用 `minimumReleaseAge`（默认 1 天），成熟期内的版本不会被裸包名解析到，所以按裸包名安装拿到的是上一个成熟版本，**这不是发布失败**。要验证新版本本身，安装与核对都用显式版本号 `@reserendipity/dsh-superagent@<version>`。
+
 ```sh
 npm view @reserendipity/dsh-superagent version dist.tarball dist.integrity --registry https://registry.npmjs.org/
 npm view @reserendipity/dsh-superagent@<version> dist.integrity --registry https://registry.npmjs.org/
