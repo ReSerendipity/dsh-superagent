@@ -1,5 +1,18 @@
 # DSH-Superagent Changelog
 
+## [0.1.1] — 2026-11-08
+
+文档修正版，无功能变更。0.1.0 的 npm tarball 内含发布前写的 README（安装段只有 Git 地址、并标注 npm 尚未发布），npm 页面因此显示过期信息；本版只更新文档并重新打包。
+
+### Changed
+
+- README：安装段以 `dsh plugin add "@reserendipity/dsh-superagent"` 为主、Git 地址为备选；发布状态与英文 Honest limits 改为已发布；FAQ 只描述当前包名。
+- CONTRIBUTING / CHANGELOG：发布后验证改为比对内容而非字节（npm 打包器与 `pnpm pack` 产出的 tarball 字节不同）。
+
+### Notes
+
+- 无代码、无 `lib/` 变更；功能与 0.1.0 相同。
+
 ## [0.1.0] — 2026-11-08
 
 首个公开基线。此前内部迭代的版本记录已随公开基线归档，不再列入本文件。
