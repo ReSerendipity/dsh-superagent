@@ -193,7 +193,7 @@ It is built on the [deepseek-ai/dsh-superagent-prototype](https://github.com/dee
 src/             插件本体（TypeScript）：来源、核心、执行器、面板服务
 locale/          面板与插件页的显示名、描述（中英）
 prompts/         提示词段落
-docs/            编号设计文档（当前保留 000–015、017、019、020、026）与 Windows 操作说明
+docs/            编号设计文档（当前保留 000–015、017、020、026；019 已归档至 _archive/执行记录/2026-11/）与 Windows 操作说明
 scripts/         启动/停止/状态脚本
 tests/           单元与面板测试（文档与代码一致性也在其中）
 ```
