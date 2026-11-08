@@ -28,7 +28,7 @@ flowchart TB
 
 ### Runtime
 
-`Runtime` is the composition root; it contains no domain rules. Its constructor locks the state directory, opens the Store and builds each component. If construction fails, it closes the Store and releases the lock.
+`Runtime` is the composition root; it contains no domain rules. Its constructor locks the state directory, opens the Store and builds each component. If construction fails, it closes the Store and releases the lock. The lock keeps one backend per state directory, and a lock whose recorded holder is no longer alive is reclaimed at once rather than waiting out `stale`, because a Host that is stopped and restarted within that window would otherwise leave the plugin entry inactive and its routes unregistered.
 
 Startup registers management routes and runs Setup. After setup resolves, it installs Session and Executor hooks, ensures the main Session exists, starts Policy syncs, resumes interrupted Assignments, and starts passes and effects. `ready` marks completion of startup.
 
@@ -301,6 +301,7 @@ Some generic modules still refer directly to GitHub or Feishu:
 | `src/app/instance-roots.ts` | Where an instance's workspace registry and Session log live: `instanceRoots` keeps DSH's shared `storages` and `sessions` under the profile's default state directory and puts both under a custom one, and `dataHomeProblem` is the one-time warning the runtime logs when `SUPERAGENT_DATA_HOME` is absent or disagrees |
 | `src/app/instance-status.ts` | The per-instance status file another instance's viewer reads: the versioned `schema: 1` document of health, load, pause, Watchdog schedule and Ticket counts; its atomic replacement through a temporary file and rename with mode 0600 and validation before writing; and the mtime heartbeat used when the content did not change |
 | `src/app/instances-view.ts` | The read-only aggregator and its CLI (`lib/instances-view.js`, `--instances-status` / `--json`): one report per record in the instance registry (`config/instances.json`), derived from each state directory's status file, lock directory and pid, with a read-only HTTP fallback for instances older than the status file. It never writes, opens the database, takes the lock or starts anything |
+| `src/app/state-lock.ts` | The state directory's one-backend lock: `acquireStateLock` takes the lock and records its holder pid beside the status file, and a lock left by a holder that no longer runs is removed and taken again; a live holder's lock still refuses acquisition |
 | `src/app/watchdog.ts` | The external control loop of the official design (§6): builds the scheduled digest of Tickets, load and unhealthy parts, and drives a separate Session that observes and intervenes but never takes work |
 | `src/app/state-store.ts` | The durable key/value seam (docs/017 P4, article §5): the interface a future remote store would implement, and an adapter that delegates to the local store with an optional namespace prefix |
 | `src/app/shards.ts` | Router sharding placement (article §2.1): FNV-1a Thread placement, Session ids per shard, and the load spread; wiring and the opt-in flag are separate |
@@ -485,6 +486,7 @@ Some generic modules still refer directly to GitHub or Feishu:
 | `tests/portability.spec.ts` | Portability: no tracked text file names the development machine (absolute path, user name or checkout name) |
 | `tests/release-invariants.spec.ts` | Release invariants: upstream attribution in README/NOTICE/LICENSE/locale/package metadata, the changelog, the package id and the absence of credential shapes |
 | `tests/client-module-id.spec.ts` | The built client module registers under the package name, which is what DSH's desktop host composes client modules by; a bare id fails to boot |
+| `tests/state-lock.spec.ts` | The state directory's one-backend lock: a lock left by a dead holder is reclaimed without waiting out `stale`, a live holder's lock still refuses acquisition, and the holder record is written and cleared with the lock |
 
 `tests/fixtures/` holds what several tests share: `host.ts`, a simulated DeepSeek Harness host; `panel-server.ts` and `panel.tsx`, the fake management API and the panel around a page; `deployment.ts`, a resolved deployment; `git.ts`, the environment of every git the tests start, which names no repository; and `async.ts`.
 

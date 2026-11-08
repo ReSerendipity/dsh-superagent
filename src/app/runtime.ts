@@ -12,7 +12,6 @@ import type {} from '@deepseek-ai/dsh-skill'
 import type {} from '@deepseek-ai/dsh-subprocess'
 import { mkdirSync } from 'node:fs'
 import { join } from 'node:path'
-import { lockSync } from 'proper-lockfile'
 import { Engine, key, reasonText, type EngineForSettings, type ReceiveResult, type Ticket, type Trigger } from '../core/index.ts'
 import { allowedSender, settingsPolicy } from '../policy.ts'
 import { SourceRegistry } from '../sources/registry.ts'
@@ -30,6 +29,7 @@ import { Store } from './store.ts'
 import { evalsHealth } from './views/overview.ts'
 import { executorLoad } from './views/tickets.ts'
 import { INSTANCE_STATUS_INTERVAL_MS, INSTANCE_STATUS_SCHEMA, touchInstanceStatus, writeInstanceStatus, type InstanceStatus } from './instance-status.ts'
+import { acquireStateLock } from './state-lock.ts'
 import { dataHomeProblem } from './instance-roots.ts'
 import { TextCache } from './cache.ts'
 import { Effects } from './effects.ts'
@@ -136,7 +136,7 @@ export class Runtime extends Service implements SourceHost {
     const sharedRoots = dataHomeProblem(machine.stateDir)
     if (sharedRoots) ctx.logger.warn('dsh-superagent: %s', sharedRoots)
     const compromised = (error: Error) => { this.runtimeHealth.set({ state: 'error', detail: error.message }); this.stopped.abort() }
-    const release = lockSync(machine.stateDir, { stale: 30_000, onCompromised: compromised })
+    const release = acquireStateLock(machine.stateDir, { onCompromised: compromised })
     this.releaseLock = async () => { release() }
     let opened: Store | undefined
     try {
