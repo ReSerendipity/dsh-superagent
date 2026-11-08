@@ -11,13 +11,19 @@
 
 ## 安装
 
-**在 DeepSeek Harness 应用里**：插件 → 添加插件，粘贴本仓库地址；等价的命令行是：
+**在 DeepSeek Harness 应用里**：插件 → 添加插件，粘贴包名 `@reserendipity/dsh-superagent`；等价的命令行是：
+
+```powershell
+dsh plugin --profile superagent add "@reserendipity/dsh-superagent"
+```
+
+装的是 npm 上已发布的版本（当前 `0.1.0`）。**也可以从本仓的 Git 地址安装**：
 
 ```powershell
 dsh plugin --profile superagent add "git+https://github.com/ReSerendipity/dsh-superagent.git"
 ```
 
-装的是 `main` 当前最新提交；`dsh plugin add` 把 spec 原样交给 pnpm，锁文件会记下解析到的具体 commit。
+Git 方式装的是 `main` 当前最新提交；`dsh plugin add` 把 spec 原样交给 pnpm，锁文件会记下解析到的具体 commit。
 
 **可选：锁定某个提交。** 团队统一版本、复现问题或 CI 需要固定构建时，在地址末尾加 `#<40 位 commit>`：`dsh plugin --profile superagent add "git+https://github.com/ReSerendipity/dsh-superagent.git#<40 位 commit>"`。代价是升级要手动换 sha，否则会一直停在旧版。
 
@@ -48,7 +54,7 @@ dsh plugin --profile superagent add "git+https://github.com/ReSerendipity/dsh-su
 
 收件准入名单也必须非空（面板 设置 → 评估 → 谁可以派活，加一行 `local`），否则投单会被判 `not_a_member` 并静默归档，不写回信。
 
-tarball、本地目录、独立 profile 与常驻服务见 [WINDOWS-SETUP.md](docs/WINDOWS-SETUP.md)。发布状态：本仓以 `v0.1.0` 为公开基线；npm 尚未发布（计划包名 `@reserendipity/dsh-superagent`）；离线跑 `pnpm release:check -SkipOnline`（被跳过的在线检查会标成 `NOT VERIFIED`）。
+tarball、本地目录、独立 profile 与常驻服务见 [WINDOWS-SETUP.md](docs/WINDOWS-SETUP.md)。发布状态：本仓以 `v0.1.0` 为公开基线，已发布到 npm 为 `@reserendipity/dsh-superagent@0.1.0`；离线跑 `pnpm release:check -SkipOnline`（被跳过的在线检查会标成 `NOT VERIFIED`）。
 
 ![插件管理器「已安装插件」：DSH-Superagent 开关为启用](https://gcore.jsdelivr.net/gh/ReSerendipity/dsh-superagent@main/docs/assets/readme-plugin-installed-20261108.png)
 
@@ -119,13 +125,13 @@ tarball、本地目录、独立 profile 与常驻服务见 [WINDOWS-SETUP.md](do
 
 It is built on the [deepseek-ai/dsh-superagent-prototype](https://github.com/deepseek-ai/dsh-superagent-prototype) and is **not an official DeepSeek product**; additions in this repository are MIT as well — the upstream license and copyright notice are in [NOTICE](NOTICE), the repository license in [LICENSE](LICENSE).
 
-**Install.** *Plugins → Add plugin* in the app and paste this repository's GitHub URL, or run `dsh plugin --profile <name> add "git+https://github.com/ReSerendipity/dsh-superagent.git"`. This installs the latest commit on `main`; `dsh plugin add` hands the spec to pnpm verbatim, and the lockfile records the commit it resolved.
+**Install.** *Plugins → Add plugin* in the app and paste `@reserendipity/dsh-superagent`, or run `dsh plugin --profile <name> add "@reserendipity/dsh-superagent"` (the published version, currently `0.1.0`). To install the latest `main` commit instead, use `git+https://github.com/ReSerendipity/dsh-superagent.git`; `dsh plugin add` hands the spec to pnpm verbatim, and the lockfile records the commit it resolved.
 
 **One step after installing:** add `stateDir` to `%USERPROFILE%\.dsh\profiles\<profile>\cordis.patch.yml` — it is required and deliberately has no default, because one `stateDir` allows one backend at a time and a shared default would make two profiles fight over the same lock. Without it the home plugin reports `$.stateDir missing required value`. A copyable example is in [`examples/profile.cordis.patch.yml`](examples/profile.cordis.patch.yml), which ships in the package.
 
 **Optional — pin a build.** For a team-wide version, reproducing an issue or CI, append `#<full 40-character commit>` to the URL (`...git#<commit>`); the cost is that upgrading means editing the sha, otherwise the install stays on that old build. The repo ships built artifacts in `lib/`, so no build step is needed at install time. Requirements: Node `^22.19.0 || >=24`, DeepSeek Harness `>=0.2.1-alpha.2 <0.3.0`; one backend per state directory (lock-protected).
 
-**Honest limits.** Windows only, no macOS/Linux support; executors run with full OS access by design (an operator-trust model, not a sandbox); the public baseline is v0.1.0 and npm publication is pending (planned package name `@reserendipity/dsh-superagent`); the project is maintained by one person. Differences from upstream are enumerated in [docs/WINDOWS-DELTA.md](docs/WINDOWS-DELTA.md).
+**Honest limits.** Windows only, no macOS/Linux support; executors run with full OS access by design (an operator-trust model, not a sandbox); the public baseline is v0.1.0, published on npm as `@reserendipity/dsh-superagent`; the project is maintained by one person. Differences from upstream are enumerated in [docs/WINDOWS-DELTA.md](docs/WINDOWS-DELTA.md).
 
 ## 文档索引
 
@@ -177,7 +183,7 @@ It is built on the [deepseek-ai/dsh-superagent-prototype](https://github.com/dee
 
 **安装时报 `UNABLE_TO_VERIFY_LEAF_SIGNATURE`？** 这台机器或网络边界有 TLS 中间盒（公司代理、杀毒软件的 HTTPS 扫描），git 不认它的根证书。这与插件无关，克隆任何 GitHub 仓库都一样。把代理根证书导入系统信任区，或 `git config --global http.sslCAInfo <ca-bundle.pem>` 指向它的 CA 包；Node 侧需要时设 `NODE_EXTRA_CA_CERTS`。不要用 `http.sslVerify false` 绕过。详见 [`WINDOWS-DELTA.md`](docs/WINDOWS-DELTA.md) §8.5。
 
-**为什么显示名和包名不一样？** 显示名是 DSH-Superagent；npm 包名带 scope，是 `@reserendipity/dsh-superagent`——裸名 `dsh-superagent` 与 npm 上已有的 `dsh-super-agent` 相似，被注册表按近似名拦截，因此挂在本人 scope 下。包名是安装契约（插件 id、profile 依赖、内部路径），改动会破坏已安装实例；显示名只是给人看的。
+**为什么显示名和包名不一样？** 显示名是 DSH-Superagent；npm 包名是 `@reserendipity/dsh-superagent`（npm 公开包按作者 scope 归类）。包名是安装契约（插件 id、profile 依赖、内部路径），改动会破坏已安装实例；显示名只是给人看的。
 
 ## 目录结构
 
