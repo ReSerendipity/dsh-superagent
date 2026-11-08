@@ -17,7 +17,9 @@
 dsh plugin --profile superagent add "@reserendipity/dsh-superagent"
 ```
 
-装的是 npm 上已发布的最新版本。**也可以从本仓的 Git 地址安装**：
+装的是 npm 上已发布的最新版本。**刚发布的新版本可能还装不到。** pnpm 11 起默认启用 `minimumReleaseAge` 供应链策略（默认 1 天）：发布时间不满阈值的版本不会被裸包名解析到，按上面的包名安装会拿到上一个已成熟的版本。要立刻装到刚发布的新版本，显式写版本号：`dsh plugin --profile superagent add "@reserendipity/dsh-superagent@<version>"`。
+
+**也可以从本仓的 Git 地址安装**：
 
 ```powershell
 dsh plugin --profile superagent add "git+https://github.com/ReSerendipity/dsh-superagent.git"
@@ -125,7 +127,7 @@ tarball、本地目录、独立 profile 与常驻服务见 [WINDOWS-SETUP.md](do
 
 It is built on the [deepseek-ai/dsh-superagent-prototype](https://github.com/deepseek-ai/dsh-superagent-prototype) and is **not an official DeepSeek product**; additions in this repository are MIT as well — the upstream license and copyright notice are in [NOTICE](NOTICE), the repository license in [LICENSE](LICENSE).
 
-**Install.** *Plugins → Add plugin* in the app and paste `@reserendipity/dsh-superagent`, or run `dsh plugin --profile <name> add "@reserendipity/dsh-superagent"` (the latest published version on npm). To install the latest `main` commit instead, use `git+https://github.com/ReSerendipity/dsh-superagent.git`; `dsh plugin add` hands the spec to pnpm verbatim, and the lockfile records the commit it resolved.
+**Install.** *Plugins → Add plugin* in the app and paste `@reserendipity/dsh-superagent`, or run `dsh plugin --profile <name> add "@reserendipity/dsh-superagent"` (the latest published version on npm). **A just-published version may not resolve yet:** pnpm 11 enables the `minimumReleaseAge` supply-chain policy by default (1 day), so a version younger than that threshold is not selected by a bare package name and the command installs the previous mature release. To install a fresh release immediately, name the version: `dsh plugin --profile <name> add "@reserendipity/dsh-superagent@<version>"`. To install the latest `main` commit instead, use `git+https://github.com/ReSerendipity/dsh-superagent.git`; `dsh plugin add` hands the spec to pnpm verbatim, and the lockfile records the commit it resolved.
 
 **One step after installing:** add `stateDir` to `%USERPROFILE%\.dsh\profiles\<profile>\cordis.patch.yml` — it is required and deliberately has no default, because one `stateDir` allows one backend at a time and a shared default would make two profiles fight over the same lock. Without it the home plugin reports `$.stateDir missing required value`. A copyable example is in [`examples/profile.cordis.patch.yml`](examples/profile.cordis.patch.yml), which ships in the package.
 
