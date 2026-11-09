@@ -19,6 +19,9 @@ import { SKILL_PREFIX, type PromptVersion, type Prompts } from './prompts.ts'
 import type { Store } from './store.ts'
 import { KV } from '../kv.ts'
 import type { RegisterTool, Tool } from './tools/tool.ts'
+import { allowedChatTools, CHAT_TOOLS } from '../chat-router/config.ts'
+import { isChatRouterSession } from '../chat-router/match.ts'
+import type { ChatRouterHost } from '../chat-router/host.ts'
 
 /** Host dependencies used by `Sessions`. */
 export interface SessionsHost {
@@ -38,6 +41,8 @@ export interface SessionsHost {
   environment(ticket: Ticket): Variable[]
   /** Tools to register on the main Session (`ticket === undefined`) or on `ticket`'s worker Session. */
   tools(agent: Agent, ticket?: Ticket): Tool[]
+  /** Optional chief-of-staff feature: decorates newly created ordinary main chats with a restricted tool set. */
+  readonly chatRouter?: ChatRouterHost
 }
 
 /**
@@ -240,7 +245,14 @@ export class Sessions {
     // Any Router Session gets the Router treatment: the master, and each shard when sharding is on.
     const master = host.routerIds().includes(agent.id)
     const ticket = master ? undefined : this.ticketOf(agent)
-    if (!master && !ticket) { this.limitSubagent(agent); return }
+    if (!master && !ticket) {
+      const chat = host.chatRouter
+      if (!chat || !isChatRouterSession(agent, { routerIds: host.routerIds(), settings: chat.settings() })) {
+        this.limitSubagent(agent); return
+      }
+      this.decorateChatRouter(agent, chat)
+      return
+    }
     const binding: SessionBinding = { disposers: [] }
     this.bindings.set(agent, binding)
     this.retryHealth.restore(agent.id, agent.session.snapshotEvents())
@@ -278,6 +290,31 @@ export class Sessions {
       binding.disposers.push(...this.workOnly(agent, ticket!.id))
     }
   }
+  /**
+   * An ordinary, newly created main chat becomes a chief of staff. It keeps only the locally registered dispatch tools
+   * plus optional inherited read-only tools; a guard refuses anything else with an instruction to dispatch. Registration
+   * order matters: `tools.restrict` cannot name local tools, so those are registered first and are never masked.
+   */
+  private decorateChatRouter(agent: Agent, chat: ChatRouterHost): void {
+    const settings = chat.settings()
+    const binding: SessionBinding = { disposers: [] }
+    this.bindings.set(agent, binding)
+    binding.disposers.push(agent.ctx.systemPrompt.section({
+      name: 'dsh-superagent-chat-router', order: 9999, interpolate: false, complete: true,
+      text: () => chat.prompt(),
+    }))
+    const register = this.registerTool(agent, binding)
+    for (const item of chat.tools(agent)) register(item.name, item.description, item.schema, item.execute)
+    const parentScope = scopeParentOf(agent)
+    const allow = allowedChatTools(settings).filter(name => agent.ctx.tools.get(name, parentScope))
+    binding.disposers.push(agent.ctx.tools.restrict({ allow }))
+    if (settings.forceDispatch) {
+      const permitted = new Set<string>([...CHAT_TOOLS, ...allow])
+      binding.disposers.push(agent.ctx.tools.guard(execution => permitted.has(execution.name)
+        ? undefined : 'You must dispatch this task with chat_dispatch; this conversation has no permission to do the work itself.'))
+    }
+  }
+
   /**
    * Whether a Session runs the router preset: as DSH's preset registry last selected it, read through the session projection
    * on a DSH whose registry has no `presetForSession`, else as it was created; `standard`, the safer caps, when unreadable.

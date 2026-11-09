@@ -328,6 +328,114 @@
       },
       "additionalProperties": false
     },
+    "chatRouter": {
+      "default": {
+        "enabled": false,
+        "scope": "allNewChats",
+        "tools": {
+          "preset": "standard",
+          "allow": []
+        },
+        "forceDispatch": true,
+        "worker": {
+          "preset": "standard",
+          "maxParallel": 3
+        },
+        "reply": {
+          "mode": "brief",
+          "onProgress": false
+        }
+      },
+      "type": "object",
+      "properties": {
+        "enabled": {
+          "default": false,
+          "type": "boolean"
+        },
+        "scope": {
+          "default": "allNewChats",
+          "type": "string",
+          "enum": [
+            "allNewChats"
+          ]
+        },
+        "tools": {
+          "default": {
+            "preset": "standard",
+            "allow": []
+          },
+          "type": "object",
+          "properties": {
+            "preset": {
+              "default": "standard",
+              "type": "string",
+              "enum": [
+                "strict",
+                "standard",
+                "custom"
+              ]
+            },
+            "allow": {
+              "default": [],
+              "maxItems": 100,
+              "type": "array",
+              "items": {
+                "type": "string",
+                "minLength": 1,
+                "maxLength": 80
+              }
+            }
+          }
+        },
+        "forceDispatch": {
+          "default": true,
+          "type": "boolean"
+        },
+        "worker": {
+          "default": {
+            "preset": "standard",
+            "maxParallel": 3
+          },
+          "type": "object",
+          "properties": {
+            "preset": {
+              "default": "standard",
+              "type": "string",
+              "minLength": 1,
+              "maxLength": 80
+            },
+            "maxParallel": {
+              "default": 3,
+              "type": "integer",
+              "minimum": 1,
+              "maximum": 8
+            }
+          }
+        },
+        "reply": {
+          "default": {
+            "mode": "brief",
+            "onProgress": false
+          },
+          "type": "object",
+          "properties": {
+            "mode": {
+              "default": "brief",
+              "type": "string",
+              "enum": [
+                "brief",
+                "none"
+              ]
+            },
+            "onProgress": {
+              "default": false,
+              "type": "boolean"
+            }
+          }
+        }
+      },
+      "additionalProperties": false
+    },
     "$prune": {
       "type": "object",
       "description": "Names stored items the file must delete before the declared blocks merge. Without it a file could only add and override, so a Source an earlier file declared could never be removed.",
