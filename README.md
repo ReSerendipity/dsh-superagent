@@ -2,7 +2,7 @@
 
 [![License: MIT](https://img.shields.io/badge/License-MIT-blue.svg)](LICENSE)
 [![Upstream](https://img.shields.io/badge/upstream-dsh--superagent--prototype-0969da)](https://github.com/deepseek-ai/dsh-superagent-prototype)
-[![Platform](https://img.shields.io/badge/platform-Windows%2010%2F11-lightgrey)](#安装)
+[![Platform](https://img.shields.io/badge/platform-Windows%2010%2F11%20%C2%B7%20macOS%20%2F%20Linux%20planned-lightgrey)](#安装)
 [![Node](https://img.shields.io/badge/node-%5E22.19.0%20%7C%7C%20%3E%3D24-3fb950)](#安装)
 
 > **DSH-Superagent 是 DeepSeek Harness 的一个非官方插件**：把 GitHub 仓库（issue / PR / 评论 / CI）、本地收件目录或飞书群聊里的事件，变成一条条可执行的工单——每条工单在上下文隔离的 DSH 会话里完成，再把结果回贴到原处。
@@ -30,6 +30,8 @@ Git 方式装的是 `main` 当前最新提交；`dsh plugin add` 把 spec 原样
 **可选：锁定某个提交。** 团队统一版本、复现问题或 CI 需要固定构建时，在地址末尾加 `#<40 位 commit>`：`dsh plugin --profile superagent add "git+https://github.com/ReSerendipity/dsh-superagent.git#<40 位 commit>"`。代价是升级要手动换 sha，否则会一直停在旧版。
 
 仓库自带 `lib/` 构建产物，安装时不需要再构建。要求 Node `^22.19.0 || >=24`、DeepSeek Harness `>=0.2.1-alpha.2 <0.3.0`；一个 `stateDir` 只允许一个后端（锁保护）。
+
+**平台路线：** Windows 10/11 已完整验证；macOS 与 Linux 在支持路线上（后续适配与验证），bundle 未设平台门槛，三个平台均可安装。
 
 **装完还要做一步？0.1.5 起不用了。** `stateDir` 现在是可选项：不配置时插件按 profile 派生独立目录 `<DSH home>/state/<profile>-superagent`（名为 `superagent` 的 profile 沿用历史的 `state/superagent`），「一个 `stateDir` 只允许一个后端」（`<stateDir>.lock`）的锁隔离语义原样保留，新装即用。要把状态目录放在别处（自定义位置、迁移旧数据、多实例）时，再在 `%USERPROFILE%\.dsh\profiles\<profile>\cordis.patch.yml` 显式覆盖：
 
@@ -133,7 +135,7 @@ It is built on the [deepseek-ai/dsh-superagent-prototype](https://github.com/dee
 
 **Optional — pin a build.** For a team-wide version, reproducing an issue or CI, append `#<full 40-character commit>` to the URL (`...git#<commit>`); the cost is that upgrading means editing the sha, otherwise the install stays on that old build. The repo ships built artifacts in `lib/`, so no build step is needed at install time. Requirements: Node `^22.19.0 || >=24`, DeepSeek Harness `>=0.2.1-alpha.2 <0.3.0`; one backend per state directory (lock-protected).
 
-**Honest limits.** Windows only, no macOS/Linux support; executors run with full OS access by design (an operator-trust model, not a sandbox); the public baseline starts at v0.1.0, published on npm as `@reserendipity/dsh-superagent`; the project is maintained by one person. Differences from upstream are enumerated in [docs/WINDOWS-DELTA.md](docs/WINDOWS-DELTA.md).
+**Honest limits.** Windows 10/11 is fully validated; macOS and Linux are on the support roadmap (adaptation and validation to follow) — the bundle sets no platform gate, so all three platforms install, with Windows the tested one. The plugin's POSIX branches exist but are not yet verified end to end. Executors run with full OS access by design (an operator-trust model, not a sandbox); the public baseline starts at v0.1.0, published on npm as `@reserendipity/dsh-superagent`; the project is maintained by one person. Differences from upstream are enumerated in [docs/WINDOWS-DELTA.md](docs/WINDOWS-DELTA.md).
 
 ## 文档索引
 
