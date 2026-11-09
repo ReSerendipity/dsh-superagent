@@ -29,7 +29,7 @@
    dsh.cmd plugin --profile team-b add "link:D:/path/to/dsh-superagent"
    ```
 
-2. **给新 profile 一份机器配置**（`$DSH_HOME/profiles/team-b/cordis.patch.yml`），关键是**不同的 `stateDir` 与端口**：
+2. **给新 profile 一份机器配置**（`$DSH_HOME/profiles/team-b/cordis.patch.yml`），关键是**不同的 `stateDir` 与端口**（0.1.5 起 `stateDir` 也可不写：插件按 profile 派生 `state/team-b-superagent`，隔离同样成立；下面的显式写法用于沿用旧目录或自定义命名）：
 
    ```yaml
    - id: webserver
