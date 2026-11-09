@@ -1,9 +1,9 @@
 # Example profile configuration: %USERPROFILE%\.dsh\profiles\<profile>\cordis.patch.yml
 # Replace <placeholders> before first start; see docs/006-deployment.md.
 #
-# `stateDir` is required and deliberately has no default: one stateDir allows one backend at a
-# time (`<stateDir>.lock`), so every profile needs its own directory. Without it the plugin
-# fails with `$.stateDir missing required value`.
+# `stateDir` is optional since 0.1.5: unconfigured, the plugin derives `<DSH home>/state/<profile>-superagent`
+# (a profile named `superagent` keeps `state/superagent`), so one backend per state directory
+# (`<stateDir>.lock`) still holds. Set it explicitly to choose a different directory instead.
 - id: webserver
   config:
     host: 127.0.0.1

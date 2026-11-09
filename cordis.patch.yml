@@ -20,12 +20,12 @@
     # out: questions to a person, presenting, plan mode, the plugin manager and market, scheduling, goals, workflows, web fetch,
     # and forked subagents, which would run under this preset; spawned subagents run under `standard`, whose shell moves a
     # command to a background job only after 60 seconds, as a subagent's jobs are killed when it ends. A preset row has no
-    # setting that hides it from the preset picker, so its name and description say whom it is for.
+    # setting that hides it from the preset picker, so its description says whom it is for.
     - id: dsh-superagent-worker-preset
       name: '@deepseek-ai/dsh-agent-preset'
       config:
         id: dsh-superagent-worker
-        name: '[内部] dsh-superagent 执行器'
+        name: 'dsh-superagent 执行器'
         description: 仅供插件为工单开启的执行器 Session 使用，普通对话请选「标准模式」。前台命令超 5 秒转入后台，只含执行工作所需的工具。
         order: 90
         plugins:
@@ -130,7 +130,7 @@
       name: '@deepseek-ai/dsh-agent-preset'
       config:
         id: dsh-superagent-router
-        name: '[内部] dsh-superagent 主 Session'
+        name: 'dsh-superagent 主 Session'
         description: 仅供插件自己的主 Session 使用，普通对话请选「标准模式」。这里只有路由工具（文件只读、命令限 5 秒、不许等待）。
         order: 91
         plugins:

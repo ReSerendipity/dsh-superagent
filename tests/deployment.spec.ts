@@ -1,10 +1,10 @@
 import { execFile } from 'node:child_process'
 import { chmodSync, mkdirSync, mkdtempSync, rmSync, symlinkSync, writeFileSync } from 'node:fs'
-import { tmpdir } from 'node:os'
+import { homedir, tmpdir } from 'node:os'
 import { join } from 'node:path'
 import { promisify } from 'node:util'
 import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest'
-import { Config, executable, localDeployment, machineOf, resolveDeployment, resolveFeishuBot, type Machine, type Probe } from '../src/deployment.ts'
+import { Config, defaultStateDir, executable, localDeployment, machineOf, resolveDeployment, resolveFeishuBot, type Machine, type Probe } from '../src/deployment.ts'
 import { gitEnv } from './fixtures/git.ts'
 
 // These assert POSIX path rules or symlinks; Windows uses drive-qualified paths and needs a privilege for symlinks.
@@ -43,8 +43,7 @@ afterEach(() => { rmSync(dir, { recursive: true, force: true }) })
 vi.setConfig({ testTimeout: 30_000 })
 
 describe('configuration schema', () => {
-  it.skipIf(WINDOWS)('requires only the state directory and reads the editable fields through references', () => {
-    expect(() => Config({})).toThrow('stateDir')
+  it.skipIf(WINDOWS)('reads the editable fields through references, and still rejects a malformed state directory', () => {
     const read = machineOf(Config({ stateDir: join(dir, 'state') }))
     // Limits are volatile references that the loader updates in place and callers read when used.
     expect({ ...read, promptMaxChars: read.promptMaxChars.get(), admissionContextMaxPages: read.admissionContextMaxPages.get(),
@@ -56,6 +55,27 @@ describe('configuration schema', () => {
   it.skipIf(WINDOWS)('names keys the configuration does not define, and where the values of older keys live now', () => {
     const raw = minimal({ repository: 'acme/widgets', repositoryPath: '/srv/widgets', blockedCommands: [], author: { name: 'Alice' }, extra: 1 })
     expect(() => machineOf(Config(raw))).toThrow('keys it does not use: repository (now on the GitHub Source), repositoryPath (now in the prepare command of the Execution settings), blockedCommands (now in the Execution settings), author (now prompt text), extra;')
+  })
+})
+
+describe('derived state directory', () => {
+  // The default exists so a fresh install runs without the profile patch step, while each profile still locks its own
+  // directory (docs/006). An explicit `stateDir` must keep winning, and the historical `superagent` leaf must not move.
+  it('derives per profile, keeps the historical leaf, and loses to an explicit configuration', () => {
+    vi.stubEnv('DSH_HOME', dir)
+    try {
+      expect(machineOf(Config({})).stateDir).toBe(join(dir, 'state', 'superagent'))
+      expect(defaultStateDir('desktop')).toBe(join(dir, 'state', 'desktop-superagent'))
+      expect(defaultStateDir('superagent')).toBe(join(dir, 'state', 'superagent'))
+      expect(defaultStateDir()).toBe(join(dir, 'state', 'superagent'))
+      expect(machineOf(Config({}), defaultStateDir('desktop')).stateDir).toBe(join(dir, 'state', 'desktop-superagent'))
+      expect(machineOf(Config({ stateDir: join(dir, 'explicit') }), defaultStateDir('desktop')).stateDir).toBe(join(dir, 'explicit'))
+    } finally { vi.unstubAllEnvs() }
+  })
+  it('honors DSH_HOME the way dsh-home-paths does, falling back to the OS home', () => {
+    vi.stubEnv('DSH_HOME', '')
+    try { expect(defaultStateDir('desktop')).toBe(join(homedir(), '.dsh', 'state', 'desktop-superagent')) }
+    finally { vi.unstubAllEnvs() }
   })
 })
 

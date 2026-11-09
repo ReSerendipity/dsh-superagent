@@ -1,5 +1,23 @@
 # DSH-Superagent Changelog
 
+## [0.1.5] — 2026-11-09
+
+### Changed
+
+- `stateDir` 由必填改为**可选**：未配置时插件按 profile 派生 `<DSH home>/state/<profile>-superagent`（名为 `superagent` 的 profile 与无 profile 上下文沿用历史的 `state/superagent`）；显式配置始终优先，既有部署的数据目录不会移动。「一个 `stateDir` 只允许一个后端」的锁隔离语义原样保留。这消除了新装用户跳过配置步骤时的**静默失败**陷阱（该 entry 非必需、启动审计只警告、桌面端 host 的 stderr 被 Electron 吞进缓冲，用户只见「没有响应」）。
+- README（中英）、`docs/006-deployment.md`、`docs/WINDOWS-SETUP.md`、`examples/profile.cordis.patch.yml` 同步改为「可选覆盖 + 派生默认」。
+- 新增派生规则测试：`tests/deployment.spec.ts`（`defaultStateDir` 与 `machineOf` 回退、`DSH_HOME` 语义）、`tests/index.spec.ts`（`apply` 按 `profileContext` 派生并记日志）。
+
+## [0.1.4] — 2026-11-09
+
+### Fixed
+
+- 状态目录锁回收（PR #18，已合并）：`Runtime` 在注册 HTTP 之前先对 `stateDir` 加锁，持锁者进程已死时立即回收（`src/app/state-lock.ts`），修复桌面端 `/orchestrator/api/state` 404 与面板「没有响应」的静默失败。新增 `tests/state-lock.spec.ts`。
+
+### Changed
+
+- 模式选择器中两个插件 preset 的显示名去掉「[内部]」前缀：`dsh-superagent 执行器`、`dsh-superagent 主 Session`（`cordis.patch.yml`）。DSH 的 preset 行没有从选择器隐藏的设置，名字不是功能开关；两个 preset 分别被执行器 Session 与主 Session 按 id 引用，用途警示继续由 description 承担。
+
 ## [0.1.3] — 2026-11-08
 
 缺陷修复版。0.1.2 在 DeepSeek Harness 桌面端（DSH 0.2.2-rc.1）启动直接失败：`lib/client.js` 的客户端模块注册 id 仍是裸名 `dsh-superagent`，而桌面端按 scoped 包名组合客户端模块，报 `duplicate factory registration for "dsh-superagent"` 与 `1 entry did not activate @reserendipity/dsh-superagent: import failed`。CLI 宿主（0.2.1）容忍这种不一致，所以此前都只在 CLI 或一次性验证里通过。

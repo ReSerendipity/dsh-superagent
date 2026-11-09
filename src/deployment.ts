@@ -1,6 +1,7 @@
 /** Plugin configuration and startup verification for repository access and agent CLI identities. */
 import { LIMITS } from './limits.ts'
 import { accessSync, constants, statSync } from 'node:fs'
+import { homedir } from 'node:os'
 import { delimiter, isAbsolute, join } from 'node:path'
 import type { Volatile } from '@deepseek-ai/cordis'
 import s from '@deepseek-ai/schemastery'
@@ -15,7 +16,9 @@ const reason = (error: unknown): string => error instanceof Error ? error.messag
 const absolute = (description: string) => s.string().pattern(/^(?:[A-Za-z]:[\\/]|\/)/).description(`${description} Absolute path.`)
 /** Plugin configuration of the dsh-superagent entry. Volatile fields apply without a restart because dsh-superagent reads them on each use; changing `stateDir` remounts the plugin. */
 export const Config = s.object({
-  stateDir: absolute('Directory for the database, locks, worker shims, the agent\'s git configuration and, by default, the ticket directories.').required(),
+  // Optional since 0.1.5: an unconfigured install derives one state directory per profile (defaultStateDir below), so a fresh
+  // install works without a patch step while a second profile still cannot contend for the first one's lock.
+  stateDir: absolute('Directory for the database, locks, worker shims, the agent\'s git configuration and, by default, the ticket directories. Omitted, the plugin uses `<DSH home>/state/<profile>-superagent` (`state/superagent` for a profile named `superagent`).'),
   // Optional: a JSON or YAML file of declarative settings applied at startup, so a team can keep them in version control.
   configPath: s.string().description('Path to a declarative settings file (JSON or YAML) applied at startup; omitted blocks keep the stored settings.'),
   promptMaxChars: s.number().min(LIMITS.promptMaxChars.min).max(LIMITS.promptMaxChars.max).step(1).default(100000)
@@ -49,12 +52,21 @@ const MOVED: Record<string, string> = {
   watchdogGuidance: 'in the Execution settings (control loop)', routerShards: 'in the Execution settings (Router shards)',
 }
 
+/**
+* The state directory the plugin derives when the configuration names none: one per profile, so a second profile never
+* contends for the first one's lock. Mirrors `@deepseek-ai/dsh-home-paths` (`DSH_HOME`, else `~/.dsh`) without taking the
+* dependency for one path; a profile named `superagent` (and an unknown profile) keeps the historical `state/superagent`.
+*/
+export function defaultStateDir(profileName?: string): string {
+  const home = process.env.DSH_HOME || join(homedir(), '.dsh')
+  return join(home, 'state', !profileName || profileName === 'superagent' ? 'superagent' : `${profileName}-superagent`)
+}
 /** Read machine settings and reject unknown configuration keys (naming where deprecated keys moved). */
-export function machineOf(config: DeploymentConfig): Machine {
+export function machineOf(config: DeploymentConfig, stateDir = defaultStateDir()): Machine {
   const unknown = Object.keys(config).filter(key => !(key in (Config.dict ?? {})))
   if (unknown.length) throw new Error(`dsh-superagent configuration has keys it does not use: ${unknown.map(key => MOVED[key] ? `${key} (now ${MOVED[key]})` : key).join(', ')}; docs/006-deployment.md lists the keys`)
-  const { stateDir, configPath, promptMaxChars, admissionContextMaxPages, admissionContextTimeoutMs, mode } = config
-  return { stateDir, mode, configPath, promptMaxChars, admissionContextMaxPages, admissionContextTimeoutMs }
+  const { stateDir: configured, configPath, promptMaxChars, admissionContextMaxPages, admissionContextTimeoutMs, mode } = config
+  return { stateDir: configured ?? stateDir, mode, configPath, promptMaxChars, admissionContextMaxPages, admissionContextTimeoutMs }
 }
 
 export const GithubAccountsSchema = z.object({

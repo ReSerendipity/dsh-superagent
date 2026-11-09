@@ -231,13 +231,15 @@ Windows 的系统代理在注册表 `HKCU\...\Internet Settings` 里，而 **git
 
 ## 9. 框架层增量（与 Windows 无关）
 
-除了平台适配，本适配版还包含两处**框架层**扩展。它们同样遵循「新增文件 + 最小侵入」的原则，上游更新时按 §3 的方式合并。
+除了平台适配，本适配版还包含以下**框架层**扩展。它们同样遵循「新增文件 + 最小侵入」的原则，上游更新时按 §3 的方式合并。
 
 | 增量 | 位置 | 上游行为 | 本项目的做法 | 状态 |
 |---|---|---|---|---|
 | 声明式配置 | `src/app/config-file.ts`、`src/app/config-yaml.ts`、`deployment.ts` 的 `configPath` | 配置只在面板/`orchestrator.sqlite` | 新增 `configPath` 指向 JSON 或 YAML（扩展名决定解析器）；启动时按块覆盖已存设置，未声明的块保持不变，格式错误 fail-open 并带行号 | ✅ 已实施，`docs/009` |
 | Mode A 单人收件目录 | `src/sources/inbox.ts`（新增）、`tsdown.config.ts`/`package.json`/`cordis.patch.yml` 各加一行、`tests/inbox.spec.ts` | 事件入口只有 GitHub/飞书，二者都靠通知，而 GitHub Source 会丢弃智能体账号自己的事件（`sources/github.ts` 的 sameName 过滤），因此**派单者必须与智能体是两个账号** | 新增第三个 Source：本地收件目录里的 `.md` 文件即工单，归档移动本身是读游标，结果写 `done/*.reply.md`。上游过滤一行未改——Mode A 不走通知入口。**双账号由此从使用前提降为 Mode B（团队语义）的配置项** | ✅ 已实施，默认 `disabled: true`，profile 里启用；契约测试 1196 全绿 |
 | Source 实例命名 kind | `policy.ts` 的 `SourceInstanceSchema.kind`、`sources/registry.ts` | 设置里 Source 的 key 被当作 kind，一个 kind 只能一个实例 | Schema 增加可选 `kind`（缺省=id，旧配置语义不变）；registry 按实例解析 kind；**超过一个 deployment 实例时 setup 明确报错**而非静默用错仓库 | ✅ C1，C2/C3 见 `docs/010` |
+| `stateDir` 派生默认 | `src/deployment.ts` 的 `defaultStateDir()` 与 `machineOf` 回退参数、`src/index.ts` 按 `profileContext` 派生 | `stateDir` 为 schema 必填（`.required()`），bundle patch 头注释明确「the plugin refuses to start without stateDir」；缺失时 entry FAILED——但该 entry 非必需，启动审计只警告，桌面端 host 的 stderr 又被 Electron 吞掉，新用户只见面板「没有响应」（静默失败） | schema 改为可选：未配置时派生 `<DSH home>/state/<profile>-superagent`（`superagent` profile 与无 profile 上下文沿用 `state/superagent`），显式配置永远优先；锁隔离语义（一个 `stateDir` 一个后端）不变，新装免配置 | ✅ 0.1.5 已实施；上游若跟进，删除 `defaultStateDir` 与回退参数即可切回 |
+| preset 显示名回归上游 | `cordis.patch.yml` 两处 `name` | 上游本就是 `dsh-superagent 执行器` / `dsh-superagent 主 Session`（无 `[内部]` 前缀；description 为「专用，不供手动选择」） | 移植期曾自加 `[内部]` 前缀；0.1.4 删除、回归上游命名。description 保留更友好的「普通对话请选『标准模式』」提示，属措辞差异非结构差异 | ✅ 0.1.4 已对齐；preset id、结构、caps 与上游逐条一致 |
 
 两条都要保持：**新增可选字段 + 明确拒绝未支持组合**，这样既向前推进，也不会让运行中的单实例部署悄悄行为改变。
 | 项目 | 文件 | 内容 | 与上游的关系 |
