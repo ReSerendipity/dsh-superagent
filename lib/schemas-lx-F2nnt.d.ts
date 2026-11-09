@@ -1,4 +1,4 @@
-//#region ../dsh-superagent/node_modules/.pnpm/zod@4.4.3/node_modules/zod/v4/core/json-schema.d.cts
+//#region node_modules/.pnpm/zod@4.4.3/node_modules/zod/v4/core/json-schema.d.cts
 type _JSONSchema = boolean | JSONSchema;
 type JSONSchema = {
   [k: string]: unknown;
@@ -66,7 +66,7 @@ type JSONSchema = {
 };
 type BaseSchema = JSONSchema;
 //#endregion
-//#region ../dsh-superagent/node_modules/.pnpm/zod@4.4.3/node_modules/zod/v4/core/standard-schema.d.cts
+//#region node_modules/.pnpm/zod@4.4.3/node_modules/zod/v4/core/standard-schema.d.cts
 /** The Standard interface. */
 interface StandardTypedV1<Input = unknown, Output = Input> {
   /** The Standard properties. */
@@ -185,7 +185,7 @@ declare namespace StandardJSONSchemaV1 {
 }
 interface StandardSchemaWithJSONProps<Input = unknown, Output = Input> extends StandardSchemaV1.Props<Input, Output>, StandardJSONSchemaV1.Props<Input, Output> {}
 //#endregion
-//#region ../dsh-superagent/node_modules/.pnpm/zod@4.4.3/node_modules/zod/v4/core/registries.d.cts
+//#region node_modules/.pnpm/zod@4.4.3/node_modules/zod/v4/core/registries.d.cts
 declare const $output: unique symbol;
 type $output = typeof $output;
 declare const $input: unique symbol;
@@ -212,7 +212,7 @@ interface JSONSchemaMeta {
 }
 interface GlobalMeta extends JSONSchemaMeta {}
 //#endregion
-//#region ../dsh-superagent/node_modules/.pnpm/zod@4.4.3/node_modules/zod/v4/core/to-json-schema.d.cts
+//#region node_modules/.pnpm/zod@4.4.3/node_modules/zod/v4/core/to-json-schema.d.cts
 type Processor<T extends $ZodType = $ZodType> = (schema: T, ctx: ToJSONSchemaContext, json: BaseSchema, params: ProcessParams) => void;
 interface JSONSchemaGeneratorParams {
   processors: Record<string, Processor>;
@@ -301,7 +301,7 @@ interface ZodStandardJSONSchemaPayload<T> extends BaseSchema {
   "~standard": ZodStandardSchemaWithJSON$1<T>;
 }
 //#endregion
-//#region ../dsh-superagent/node_modules/.pnpm/zod@4.4.3/node_modules/zod/v4/core/util.d.cts
+//#region node_modules/.pnpm/zod@4.4.3/node_modules/zod/v4/core/util.d.cts
 type JWTAlgorithm = "HS256" | "HS384" | "HS512" | "RS256" | "RS384" | "RS512" | "ES256" | "ES384" | "ES512" | "PS256" | "PS384" | "PS512" | "EdDSA" | (string & {});
 type MimeTypes = "application/json" | "application/xml" | "application/x-www-form-urlencoded" | "application/javascript" | "application/pdf" | "application/zip" | "application/vnd.ms-excel" | "application/vnd.openxmlformats-officedocument.spreadsheetml.sheet" | "application/msword" | "application/vnd.openxmlformats-officedocument.wordprocessingml.document" | "application/vnd.ms-powerpoint" | "application/vnd.openxmlformats-officedocument.presentationml.presentation" | "application/octet-stream" | "application/graphql" | "text/html" | "text/plain" | "text/css" | "text/javascript" | "text/csv" | "image/png" | "image/jpeg" | "image/gif" | "image/svg+xml" | "image/webp" | "audio/mpeg" | "audio/ogg" | "audio/wav" | "audio/webm" | "video/mp4" | "video/webm" | "video/ogg" | "font/woff" | "font/woff2" | "font/ttf" | "font/otf" | "multipart/form-data" | (string & {});
 type IsAny<T> = 0 extends 1 & T ? true : false;
@@ -342,14 +342,14 @@ declare abstract class Class {
   constructor(..._args: any[]);
 }
 //#endregion
-//#region ../dsh-superagent/node_modules/.pnpm/zod@4.4.3/node_modules/zod/v4/core/versions.d.cts
+//#region node_modules/.pnpm/zod@4.4.3/node_modules/zod/v4/core/versions.d.cts
 declare const version: {
   readonly major: 4;
   readonly minor: 4;
   readonly patch: number;
 };
 //#endregion
-//#region ../dsh-superagent/node_modules/.pnpm/zod@4.4.3/node_modules/zod/v4/core/schemas.d.cts
+//#region node_modules/.pnpm/zod@4.4.3/node_modules/zod/v4/core/schemas.d.cts
 interface ParseContext<T extends $ZodIssueBase = never> {
   /** Customize error messages. */
   readonly error?: $ZodErrorMap<T>;
@@ -1342,7 +1342,7 @@ interface $ZodCustom<O = unknown, I = unknown> extends $ZodType {
 declare const $ZodCustom: $constructor<$ZodCustom>;
 type $ZodTypes = $ZodString | $ZodNumber | $ZodBigInt | $ZodBoolean | $ZodDate | $ZodSymbol | $ZodUndefined | $ZodNullable | $ZodNull | $ZodAny | $ZodUnknown | $ZodNever | $ZodVoid | $ZodArray | $ZodObject | $ZodUnion | $ZodIntersection | $ZodTuple | $ZodRecord | $ZodMap | $ZodSet | $ZodLiteral | $ZodEnum | $ZodFunction | $ZodPromise | $ZodLazy | $ZodOptional | $ZodDefault | $ZodPrefault | $ZodTemplateLiteral | $ZodCustom | $ZodTransform | $ZodNonOptional | $ZodReadonly | $ZodNaN | $ZodPipe | $ZodSuccess | $ZodCatch | $ZodFile;
 //#endregion
-//#region ../dsh-superagent/node_modules/.pnpm/zod@4.4.3/node_modules/zod/v4/core/checks.d.cts
+//#region node_modules/.pnpm/zod@4.4.3/node_modules/zod/v4/core/checks.d.cts
 interface $ZodCheckDef {
   check: string;
   error?: $ZodErrorMap<never> | undefined;
@@ -1524,7 +1524,7 @@ interface $ZodCheckEndsWith extends $ZodCheckInternals<string> {
 }
 declare const $ZodCheckEndsWith: $constructor<$ZodCheckEndsWith>;
 //#endregion
-//#region ../dsh-superagent/node_modules/.pnpm/zod@4.4.3/node_modules/zod/v4/core/errors.d.cts
+//#region node_modules/.pnpm/zod@4.4.3/node_modules/zod/v4/core/errors.d.cts
 interface $ZodIssueBase {
   readonly code?: string;
   readonly input?: unknown;
@@ -1649,7 +1649,7 @@ type $ZodFormattedError<T, U = string> = {
   _errors: U[];
 } & Flatten<_ZodFormattedError<T, U>>;
 //#endregion
-//#region ../dsh-superagent/node_modules/.pnpm/zod@4.4.3/node_modules/zod/v4/core/core.d.cts
+//#region node_modules/.pnpm/zod@4.4.3/node_modules/zod/v4/core/core.d.cts
 type ZodTrait = {
   _zod: {
     def: any;
@@ -1692,7 +1692,7 @@ type output<T> = T extends {
   };
 } ? T["_zod"]["output"] : unknown;
 //#endregion
-//#region ../dsh-superagent/node_modules/.pnpm/zod@4.4.3/node_modules/zod/v4/core/api.d.cts
+//#region node_modules/.pnpm/zod@4.4.3/node_modules/zod/v4/core/api.d.cts
 type Params<T extends $ZodType | $ZodCheck, IssueTypes extends $ZodIssueBase, OmitKeys extends keyof T["_zod"]["def"] = never> = Flatten<Partial<EmptyToNever<Omit<T["_zod"]["def"], OmitKeys> & ([IssueTypes] extends [never] ? {} : {
   error?: string | $ZodErrorMap<IssueTypes> | undefined;
   /** @deprecated This parameter is deprecated. Use `error` instead. */
@@ -1764,7 +1764,7 @@ interface $ZodSuperRefineParams {
   when?: ((payload: ParsePayload) => boolean) | undefined;
 }
 //#endregion
-//#region ../dsh-superagent/node_modules/.pnpm/zod@4.4.3/node_modules/zod/v4/classic/errors.d.cts
+//#region node_modules/.pnpm/zod@4.4.3/node_modules/zod/v4/classic/errors.d.cts
 /** An Error-like class used to store Zod validation issues.  */
 interface ZodError<T = unknown> extends $ZodError<T> {
   /** @deprecated Use the `z.treeifyError(err)` function instead. */
@@ -1782,7 +1782,7 @@ interface ZodError<T = unknown> extends $ZodError<T> {
 }
 declare const ZodError: $constructor<ZodError>;
 //#endregion
-//#region ../dsh-superagent/node_modules/.pnpm/zod@4.4.3/node_modules/zod/v4/classic/parse.d.cts
+//#region node_modules/.pnpm/zod@4.4.3/node_modules/zod/v4/classic/parse.d.cts
 type ZodSafeParseResult<T> = ZodSafeParseSuccess<T> | ZodSafeParseError<T>;
 type ZodSafeParseSuccess<T> = {
   success: true;
@@ -1795,7 +1795,7 @@ type ZodSafeParseError<T> = {
   error: ZodError<T>;
 };
 //#endregion
-//#region ../dsh-superagent/node_modules/.pnpm/zod@4.4.3/node_modules/zod/v4/classic/schemas.d.cts
+//#region node_modules/.pnpm/zod@4.4.3/node_modules/zod/v4/classic/schemas.d.cts
 type ZodStandardSchemaWithJSON<T> = StandardSchemaWithJSONProps<input<T>, output<T>>;
 interface ZodType<out Output = unknown, out Input = unknown, out Internals extends $ZodTypeInternals<Output, Input> = $ZodTypeInternals<Output, Input>> extends $ZodType<Output, Input, Internals> {
   def: Internals["def"];
