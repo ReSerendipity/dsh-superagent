@@ -4,14 +4,14 @@ import "@deepseek-ai/dsh-subprocess";
 //#region src/deployment.d.ts
 /** Plugin configuration of the dsh-superagent entry. Volatile fields apply without a restart because dsh-superagent reads them on each use; changing `stateDir` remounts the plugin. */
 declare const Config: s<Schemastery.ObjectS<NoInfer<{
-  stateDir: s<string, string, "defined">;
+  stateDir: s<string, string, "plain">;
   configPath: s<string, string, "plain">;
   promptMaxChars: s<number, number, "volatile-defined">;
   admissionContextMaxPages: s<number, number, "volatile-defined">;
   admissionContextTimeoutMs: s<number, number, "volatile-defined">;
   mode: s<"local" | "github", "local" | "github", "defined">;
 }>>, Schemastery.ObjectT<NoInfer<{
-  stateDir: s<string, string, "defined">;
+  stateDir: s<string, string, "plain">;
   configPath: s<string, string, "plain">;
   promptMaxChars: s<number, number, "volatile-defined">;
   admissionContextMaxPages: s<number, number, "volatile-defined">;

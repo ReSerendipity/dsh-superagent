@@ -96,7 +96,7 @@ Copy [examples/profile.cordis.patch.yml](../examples/profile.cordis.patch.yml) t
 
 | Key | Required | Meaning |
 | --- | --- | --- |
-| `stateDir` | yes | Absolute path: the database, the lock, the command shims in `worker-bin`, the agent's git configuration and, by default, the Ticket directories in `work`. Back it up before upgrades |
+| `stateDir` | no | Absolute path: the database, the lock, the command shims in `worker-bin`, the agent's git configuration and, by default, the Ticket directories in `work`. Omitted, the plugin derives `<DSH home>/state/<profile>-superagent` (`state/superagent` for a profile named `superagent`, or when no profile context is available), keeping one locked directory per profile. An explicit value always wins, so existing deployments never move. Back it up before upgrades |
 | `mode` | no | `github` (default) polls the repository and delivers a branch, push and pull request; `local` installs no GitHub Source at all, takes tickets from the inbox, and delivers a commit on the ticket branch for a person to merge. See `docs/026` |
 | `configPath` | no | A JSON or YAML declarative settings file applied at startup and on save; omitted blocks keep the stored settings (`docs/009`) |
 | `promptMaxChars`, `admissionContextMaxPages`, `admissionContextTimeoutMs` | no | The largest saved prompt configuration, and how many Thread pages one assessment reads within what time |

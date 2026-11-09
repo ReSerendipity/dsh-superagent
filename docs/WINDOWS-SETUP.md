@@ -414,15 +414,15 @@ gh --version                                                       # 2.48 以上
    **不想每次拉 git 的话**：`pnpm pack:plugin` 产出 `dist\dsh-superagent-<version>.tgz`，用命令行 `dsh plugin --profile <name> add "file:<abs>.tgz"` 装（本机验证过落盘形态与启动）。**插件页那个框不收 `.tgz` 路径**——要在应用里用 tarball，先把它解包到一个目录，再把**目录路径**填进框（记成 `link:`，当前版本产物自带依赖所以能跑）。
 2. 点「安装」。本机装完后的落盘形态（逐项核对过）：`dependencies` 多一条 `dsh-superagent`（不带 `#` 装时记的是不带 ref 的地址，`pnpm-lock.yaml` 记解析出的 sha；钉 sha 装时两处都带 `#<sha>`）；`dsh.profile.bundles` 末尾追加 `dsh-superagent`；`node_modules\dsh-superagent\` 是 `LICENSE/README.md/cordis.patch.yml/lib/locale/package.json/prompts/skills` 的自包含副本；profile 的 `node_modules` 里**没有** `@deepseek-ai\`——对等依赖由应用自带运行时提供。当前版本也**不再有** `proper-lockfile`/`zod`：它们被打进 `lib`，插件的安装期依赖为空（`tests/release-invariants.spec.ts` 锁住这一点）。
 3. **重启应用**，补丁层与 bundle 只在启动时读。注意走菜单「应用 → 退出」再打开：**关窗口不算**，这应用会缩进托盘。
-4. 往 `profiles\desktop\cordis.patch.yml` 追加两条（缺第一条主页件直接「异常」）：
+4. 0.1.5 起 `profiles\desktop\cordis.patch.yml` **可以不写 `stateDir`**：缺省时插件按 profile 派生 `<DSH home>/state/desktop-superagent`，新装即用。要沿用旧数据目录（例如迁移自 `state/superagent`）就显式覆盖；本地收件模式仍需启用 inbox Source：
    ```yaml
    - id: dsh-superagent
      config:
-       stateDir: <you>/.dsh/state/superagent
+       stateDir: <you>/.dsh/state/superagent   # 可选：覆盖派生默认
    - id: dsh-superagent-inbox
      disabled: false
    ```
-   再重启一次。`stateDir` 是插件配置 schema 里的 `.required()`，而 bundle 自带的默认补丁层**故意不含它**（必须由 profile 提供），所以"装上了但主页件异常、github-watch 等待依赖"基本就是这一条。
+   再重启一次。0.1.4 及更早没有派生默认：缺 `stateDir` 时主页件**静默**异常（该 entry 非必需，启动审计只警告，而桌面端 host 的 stderr 被 Electron 吞进缓冲），所以"装上了但主页件异常、github-watch 等待依赖"基本就是这一条。
 
 **两个已经撞过的坑**：
 
