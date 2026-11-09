@@ -1,4 +1,4 @@
-import { _ as output, b as $loose, c as ZodObject, d as ZodRecord, f as ZodString, g as ZodUnknown, i as ZodEnum, l as ZodOptional, m as ZodType, n as ZodBoolean, o as ZodNullable, p as ZodTransform, r as ZodDefault, s as ZodNumber, t as ZodArray, u as ZodPipe, v as $ZodTypeInternals, x as $strict, y as $catchall } from "./schemas-lx-F2nnt.js";
+import { S as $strip, _ as output, b as $loose, c as ZodObject, d as ZodRecord, f as ZodString, g as ZodUnknown, i as ZodEnum, l as ZodOptional, m as ZodType, n as ZodBoolean, o as ZodNullable, p as ZodTransform, r as ZodDefault, s as ZodNumber, t as ZodArray, u as ZodPipe, v as $ZodTypeInternals, x as $strict, y as $catchall } from "./schemas-rsyp-Zry.js";
 import { F as Thread, I as ThreadFact, R as ThreadRef, S as ChannelRef, U as Trigger, h as SourceScope, l as OutboundMessage, lt as Deployment, m as ScopeResult, t as ReceiveResult, v as AdmissionCell, z as Ticket } from "./intake-OhnAYFN6.js";
 import { Context } from "@deepseek-ai/cordis";
 import { DatabaseSync } from "node:sqlite";
@@ -123,6 +123,32 @@ declare const SettingsSchema: ZodObject<{
     watchdogGuidance: ZodDefault<ZodString>;
     routerShards: ZodDefault<ZodNumber>;
   }, $strict>>;
+  chatRouter: ZodDefault<ZodObject<{
+    enabled: ZodDefault<ZodBoolean>;
+    scope: ZodDefault<ZodEnum<{
+      allNewChats: "allNewChats";
+    }>>;
+    tools: ZodDefault<ZodObject<{
+      preset: ZodDefault<ZodEnum<{
+        custom: "custom";
+        strict: "strict";
+        standard: "standard";
+      }>>;
+      allow: ZodDefault<ZodArray<ZodString>>;
+    }, $strip>>;
+    forceDispatch: ZodDefault<ZodBoolean>;
+    worker: ZodDefault<ZodObject<{
+      preset: ZodDefault<ZodString>;
+      maxParallel: ZodDefault<ZodNumber>;
+    }, $strip>>;
+    reply: ZodDefault<ZodObject<{
+      mode: ZodDefault<ZodEnum<{
+        none: "none";
+        brief: "brief";
+      }>>;
+      onProgress: ZodDefault<ZodBoolean>;
+    }, $strip>>;
+  }, $strict>>;
 }, $strict>;
 type Settings = output<typeof SettingsSchema>;
 //#endregion
@@ -206,6 +232,23 @@ declare class SourceRegistry implements SourceScope {
       watchdogGuidance: string;
       routerShards: number;
     };
+    chatRouter: {
+      enabled: boolean;
+      scope: "allNewChats";
+      tools: {
+        preset: "custom" | "strict" | "standard";
+        allow: string[];
+      };
+      forceDispatch: boolean;
+      worker: {
+        preset: string;
+        maxParallel: number;
+      };
+      reply: {
+        mode: "none" | "brief";
+        onProgress: boolean;
+      };
+    };
   }): (SourceInstance & {
     installed: boolean;
   })[];
@@ -255,6 +298,23 @@ declare class SourceRegistry implements SourceScope {
       watchdogStallMinutes: number;
       watchdogGuidance: string;
       routerShards: number;
+    };
+    chatRouter: {
+      enabled: boolean;
+      scope: "allNewChats";
+      tools: {
+        preset: "custom" | "strict" | "standard";
+        allow: string[];
+      };
+      forceDispatch: boolean;
+      worker: {
+        preset: string;
+        maxParallel: number;
+      };
+      reply: {
+        mode: "none" | "brief";
+        onProgress: boolean;
+      };
     };
   }): SourceInstance<C> | undefined;
   validate(id: string, value: {
@@ -318,6 +378,23 @@ declare class SourceRegistry implements SourceScope {
       watchdogGuidance: string;
       routerShards: number;
     };
+    chatRouter: {
+      enabled: boolean;
+      scope: "allNewChats";
+      tools: {
+        preset: "custom" | "strict" | "standard";
+        allow: string[];
+      };
+      forceDispatch: boolean;
+      worker: {
+        preset: string;
+        maxParallel: number;
+      };
+      reply: {
+        mode: "none" | "brief";
+        onProgress: boolean;
+      };
+    };
   }): {
     admission: Record<string, AdmissionRow>;
     allowed: {
@@ -375,6 +452,23 @@ declare class SourceRegistry implements SourceScope {
       watchdogGuidance: string;
       routerShards: number;
     };
+    chatRouter: {
+      enabled: boolean;
+      scope: "allNewChats";
+      tools: {
+        preset: "custom" | "strict" | "standard";
+        allow: string[];
+      };
+      forceDispatch: boolean;
+      worker: {
+        preset: string;
+        maxParallel: number;
+      };
+      reply: {
+        mode: "none" | "brief";
+        onProgress: boolean;
+      };
+    };
   }): boolean;
   /** Environment variable declarations for every installed kind, whether enabled or disabled. */
   declarations(): {
@@ -427,6 +521,23 @@ declare class SourceRegistry implements SourceScope {
       watchdogStallMinutes: number;
       watchdogGuidance: string;
       routerShards: number;
+    };
+    chatRouter: {
+      enabled: boolean;
+      scope: "allNewChats";
+      tools: {
+        preset: "custom" | "strict" | "standard";
+        allow: string[];
+      };
+      forceDispatch: boolean;
+      worker: {
+        preset: string;
+        maxParallel: number;
+      };
+      reply: {
+        mode: "none" | "brief";
+        onProgress: boolean;
+      };
     };
   }): {
     kind: SourceKind<Record<string, unknown>>;
@@ -494,6 +605,23 @@ declare class SourceRegistry implements SourceScope {
       watchdogGuidance: string;
       routerShards: number;
     };
+    chatRouter: {
+      enabled: boolean;
+      scope: "allNewChats";
+      tools: {
+        preset: "custom" | "strict" | "standard";
+        allow: string[];
+      };
+      forceDispatch: boolean;
+      worker: {
+        preset: string;
+        maxParallel: number;
+      };
+      reply: {
+        mode: "none" | "brief";
+        onProgress: boolean;
+      };
+    };
   }): TriggerContext | undefined;
   scope(input: {
     source: string;
@@ -544,6 +672,23 @@ declare class SourceRegistry implements SourceScope {
       watchdogStallMinutes: number;
       watchdogGuidance: string;
       routerShards: number;
+    };
+    chatRouter: {
+      enabled: boolean;
+      scope: "allNewChats";
+      tools: {
+        preset: "custom" | "strict" | "standard";
+        allow: string[];
+      };
+      forceDispatch: boolean;
+      worker: {
+        preset: string;
+        maxParallel: number;
+      };
+      reply: {
+        mode: "none" | "brief";
+        onProgress: boolean;
+      };
     };
   }): ScopeResult;
   /** Falls back to schema defaults and disables the instance when stored configuration fails validation. */

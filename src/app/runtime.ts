@@ -55,6 +55,11 @@ import { sourceContextOf, type SourceContextDeps } from './source-context.ts'
 import type { ResourceHost } from './resources.ts'
 import { mainTools, type MainToolsHost } from './tools/main.ts'
 import { executorTools, type ExecutorToolsHost } from './tools/executor.ts'
+import { CHAT_ROUTER_PROMPT, type ChatRouterHost } from '../chat-router/host.ts'
+import { chatRouterTools } from '../chat-router/tools.ts'
+import { submitChatTicket } from '../chat-router/submit.ts'
+import { ChatReplyWatcher } from '../chat-router/channel.ts'
+import { inboxDir } from '../sources/inbox.ts'
 
 // Source plugins interact with dsh-superagent exclusively through the `SourceHost` service interface.
 declare module '@deepseek-ai/cordis' { interface Context { orchestrator: SourceHost } }
@@ -64,7 +69,7 @@ const now = (): string => new Date().toISOString()
 function changedBlocks(from: SettingsValue, to: SettingsValue): SettingsSave[] {
   const blocks: SettingsSave[] = []
   if (JSON.stringify(from.paused) !== JSON.stringify(to.paused)) blocks.push('pause')
-  for (const block of ['policy', 'eval', 'executor'] as const) {
+  for (const block of ['policy', 'eval', 'executor', 'chatRouter'] as const) {
     if (JSON.stringify(from[block]) !== JSON.stringify(to[block])) blocks.push(block)
   }
   for (const id of new Set([...Object.keys(from.sources), ...Object.keys(to.sources)])) {
@@ -171,12 +176,31 @@ export class Runtime extends Service implements SourceHost {
       const resources: ResourceHost = { store, pages: new TextCache(4_000_000), prompts, commands, masterId, context: ctx,
         promptVersion: id => this.sessions.promptVersion(id), mayRead: (id, revision) => this.sessions.mayRead(id, revision),
         feishuPageSize: () => feishuSettings(sources).readPageSize, sourceLink: link }
+      // The chat chief of staff writes ordinary inbox files, so dispatching uses the exact same Trigger → Ticket →
+      // isolated worker Session path as a dropped .md. Nothing about it depends on a fixed main-chat session id.
+      const chatInboxRoot = (): string => {
+        const inbox = sources.instances().find(instance => (instance.kind ?? instance.id) === 'inbox' && instance.enabled)
+        if (!inbox) throw new Error('No enabled local inbox Source: turn it on under Settings → Source before using the chat chief of staff.')
+        const config = (inbox.config ?? {}) as { inboxDir?: string; actor?: string; pollSeconds?: number }
+        return inboxDir({ stateDir: machine.stateDir }, { inboxDir: config.inboxDir ?? '', actor: config.actor ?? 'local',
+          pollSeconds: config.pollSeconds ?? 10 })
+      }
+      const chatRouter: ChatRouterHost = {
+        settings: () => store.settings().chatRouter,
+        prompt: () => CHAT_ROUTER_PROMPT,
+        tools: agent => chatRouterTools({
+          submit: async (title, request, context) => submitChatTicket(chatInboxRoot(), title, request, agent.id, context),
+          status: async () => ({ tickets: store.tickets.list().slice(0, 20).map(ticketCard) }),
+          answer: async (ticketId, text) => { this.engine.note(ticketId, text); return { noted: true } },
+        }),
+      }
       const sessions = this.sessions = new Sessions({ context: ctx, store, prompts, effects, health: board.claim('models'), masterId,
         routerIds: () => this.routerIdsValue,
 
         lifetime: this.lifetime,
         closing: () => this.closing(), environment,
-        tools: (agent, ticket) => ticket ? executorTools(this.toolHost, ticket) : mainTools(this.toolHost, agent) })
+        tools: (agent, ticket) => ticket ? executorTools(this.toolHost, ticket) : mainTools(this.toolHost, agent),
+        chatRouter })
       const policyChanged: EngineForSettings['policyChanged'] = (from, to, effects) => { this.engine.policyChanged(from, to, effects) }
       this.settings = new Settings({ store, sources, engine: { policyChanged }, health: board, context: ctx, lifetime: this.lifetime, sessions,
         sourceHost: this, setup, requestPass: () => { this.passes.request() }, declarative: this.declarative })
@@ -234,6 +258,16 @@ export class Runtime extends Service implements SourceHost {
       this.publishStatus('starting')
       this.statusTimer = setInterval(() => { this.publishStatus('running') }, INSTANCE_STATUS_INTERVAL_MS)
       this.statusTimer.unref?.()
+      // Mode A reply files are the bridge back to the main chat that dispatched a task: only a bounded brief is sent.
+      const briefs = new ChatReplyWatcher(chatInboxRoot, async (sessionId, text) => {
+        try { await sessions.prompt(sessionId, `chat-brief:${key(text)}`, text, 'steer') }
+        catch { /* The main chat may have been closed; the reply itself stays archived under done/. */ }
+      })
+      const briefTimer = setInterval(() => {
+        if (store.settings().chatRouter.reply.mode === 'brief') void briefs.tick().catch(() => {})
+      }, 5000)
+      briefTimer.unref?.()
+      this.disposers.push(() => clearInterval(briefTimer))
     } catch (error) {
       // Release the database and state lock if initialization fails so an in-process restart can reacquire them.
       try { opened?.close() } finally { release() }

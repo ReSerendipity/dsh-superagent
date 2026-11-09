@@ -1,5 +1,25 @@
 # DSH-Superagent Changelog
 
+## [0.2.0] — 2026-11-09
+
+### Added
+
+- **主对话总管模式（chatRouter，默认关闭）**：新建的普通 DSH 主对话可被剥夺命令、文件写入与子代理等执行工具，只保留派发/状态/只读工具；`forceDispatch` 的 guard 会拒绝越界调用并提示改用 `chat_dispatch`。每个新建主对话独立成为总管，不绑定固定 session id，彼此只共享工单库、不共享对话上下文。
+- 派发链路：`chat_dispatch` 把任务写成普通本地收件目录 `.md`（与面板「派一张单」同一条路径）→ Trigger → Ticket → `worker-<ticket id>` **平级独立会话**（独立 cwd / workspace，不是 DSH `subagent`）；worker 结果以限长简报回投发起派发的主对话，完整 transcript 留在 worker。
+- 插件面板新增「总管模式」设置分组：总开关、三档工具预设（`strict` / `standard` / `custom`）、自定义逐工具矩阵、强制派发、结果回传、并行工单数；`chatRouter` 同步进入声明式设置块与自动生成的 JSON Schema。
+
+### Changed
+
+- `src/app/sessions.ts` 新增 `decorateChatRouter()`，`src/app/runtime.ts` 注册 host 与简报轮询；既有 Router / Worker / Watchdog 会话行为不变。
+- `docs/007-architecture.md` 模块表与测试表、`tests/panel-settings.spec.tsx`、`tests/policy.spec.ts`、`tests/fixtures/panel-server.ts` 同步；新增 `tests/chat-router.spec.ts`（13 例）与 `docs/027-chat-router.md`。
+
+### Notes
+
+- 默认关闭，存量部署零影响；仅对**新建会话**生效，已运行会话沿用创建时的工具白名单。
+- 需要启用本地收件目录 Source 才能派单；建单与简报回投目前走 10s / 5s 轮询而非事件驱动。
+- `chat_answer` 当前以 `engine.note` 简化，`worker.maxParallel` 尚未接到执行器槽位；真机端到端验收待做。详见 `docs/027-chat-router.md` §7。
+- 本版本之前本地误留的 `v0.4.0` tag 与 `dist/` 产物已删除；0.4.0 从未发布到 npm、也没有 GitHub Release。
+
 ## [0.1.5] — 2026-11-09
 
 ### Changed

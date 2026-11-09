@@ -84,6 +84,7 @@ tarball、本地目录、独立 profile 与常驻服务见 [WINDOWS-SETUP.md](do
 | **判断** | 程序层准入（谁能触发、什么算请求）+ 语义层评估（含糊的消息交给模型，必要时来问你） |
 | **执行** | 每个工单一个**上下文隔离**的 DSH 会话，在独立目录里干活；完成后回贴评论或开 Pull Request |
 | **运营** | 面板实时看触发/评估/执行/健康；一行运行判读对应 CLI 退出码；Watchdog 与 Router 分片按需开启 |
+| **总管模式（可选）** | 设置 → 总管模式：新建主对话只保留派发/只读工具，任务**强制**派给独立会话的执行器，避免上下文混在一个窗口里；默认关闭，详见 [`docs/027`](docs/027-chat-router.md) |
 | **边界** | 插件运行期不依赖 WSL/tmux/Python；执行器按设计有完整 OS 权限——这是操作者信任模型，不是沙箱 |
 
 ![概览页：运行判读「正常」，过去 24 小时到达 6 / 接单 6，执行器 2/2](https://gcore.jsdelivr.net/gh/ReSerendipity/dsh-superagent@main/docs/assets/readme-overview-20261108.png)
@@ -172,6 +173,7 @@ It is built on the [deepseek-ai/dsh-superagent-prototype](https://github.com/dee
 | [`docs/019`](docs/019-video-script.md) | 发布视频脚本（分镜 + 旁白） |
 | [`docs/020`](docs/020-release-checklist.md) | 发布检查清单：发布前逐项验证与回滚 |
 | [`docs/026`](docs/026-local-delivery.md) | `mode: local` 交付形态：选入路径（内置本地工作区）与默认值决策备忘、影响面与回滚 |
+| [`docs/027`](docs/027-chat-router.md) | 主对话总管模式：工具剥夺、强制派发、独立会话与上下文隔离（可选功能，默认关闭） |
 
 ## 常见问题
 

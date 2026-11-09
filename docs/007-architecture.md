@@ -419,6 +419,15 @@ Some generic modules still refer directly to GitHub or Feishu:
 
 `src/sources/github.ts`, `src/sources/feishu.ts` and `src/sources/inbox.ts` are also the entries of the three Source plugins, built by `tsdown.config.ts` and exported in `package.json` as `./github-watch`, `./feishu-watch` and `./inbox-watch`. The bundle's `cordis.patch.yml` inserts the four plugins, with Feishu and the inbox disabled.
 
+| `src/chat-router/config.ts` | `chatRouter` settings schema, the three tool presets, `allowedChatTools()` and `briefOf()` |
+| `src/chat-router/tool-groups.ts` | The tool groups the panel offers for the custom preset, with no runtime dependency |
+| `src/chat-router/match.ts` | Which ordinary main chats the feature takes over, and a thread key per chat |
+| `src/chat-router/host.ts` | The Runtime → Sessions seam and the chief-of-staff system prompt |
+| `src/chat-router/tools.ts` | `chat_dispatch`, `chat_status` and `chat_answer` |
+| `src/chat-router/submit.ts` | A dispatched task as an inbox `.md` carrying the originating chat id |
+| `src/chat-router/channel.ts` | A bounded brief from an archived reply back to the chat that dispatched it |
+| `src/client/chat-router.tsx` | The panel settings group for the presets and dispatch switches |
+
 ## Tests
 
 | Test | Covers |
@@ -460,6 +469,7 @@ Some generic modules still refer directly to GitHub or Feishu:
 | `tests/delivery.spec.ts` | `AgentDelivery` |
 | `tests/retry-health.spec.ts`, `tests/role-models.spec.ts` | Model budget retries, and the models of the two roles |
 | `tests/runtime.spec.ts` | The whole application on a simulated DeepSeek Harness host, through tools and HTTP |
+| `tests/chat-router.spec.ts` | Chat chief of staff: presets, session matching, dispatch files and bounded isolated briefs |
 | `tests/tools.spec.ts` | The Sessions' tools: what `orchestrator_read` reads for each role, and the shapes and checks of the other main Session tools |
 | `tests/runtime-concurrency.spec.ts` | Work that overlaps: Triggers during a pass, Tickets that change during deliveries and launches |
 | `tests/http.spec.ts` | The same-origin and loopback checks, the status of each kind of failure, the body limit, path parameters and queries |

@@ -11,7 +11,7 @@ import { z } from 'zod'
 import { SettingsSchema } from '../policy.ts'
 
 /** The blocks a declarative file may declare. `$prune` is the only `$` directive the loader reads before validation. */
-export const DECLARATIVE_BLOCK_NAMES = ['paused', 'sources', 'policy', 'eval', 'executor'] as const
+export const DECLARATIVE_BLOCK_NAMES = ['paused', 'sources', 'policy', 'eval', 'executor', 'chatRouter'] as const
 export const DECLARATIVE_SCHEMA_ID = 'https://github.com/ReSerendipity/dsh-superagent/schema/declarative-settings.schema.json'
 
 /**

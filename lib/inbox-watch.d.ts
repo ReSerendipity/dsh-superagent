@@ -1,6 +1,6 @@
-import { _ as output, c as ZodObject, f as ZodString, r as ZodDefault, s as ZodNumber, x as $strict } from "./schemas-lx-F2nnt.js";
+import { _ as output, c as ZodObject, f as ZodString, r as ZodDefault, s as ZodNumber, x as $strict } from "./schemas-rsyp-Zry.js";
 import { U as Trigger, l as OutboundMessage } from "./intake-OhnAYFN6.js";
-import { n as SourceKind, r as SourceContext, t as DeliveredMessage } from "./kind-bGx4RZB0.js";
+import { n as SourceKind, r as SourceContext, t as DeliveredMessage } from "./kind-nU5ruhmp.js";
 import { Context } from "@deepseek-ai/cordis";
 //#region src/sources/inbox.d.ts
 declare const InboxConfigSchema: ZodObject<{
