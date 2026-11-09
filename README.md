@@ -93,10 +93,13 @@ tarball、本地目录、独立 profile 与常驻服务见 [WINDOWS-SETUP.md](do
 
 ## 第一次使用
 
-1. **接上事件源**：设置 → 来源，填仓库与 GitHub CLI（或指定本地收件目录），确认状态变成「就绪」
-2. **决定谁能触发**：设置 → 评估，把团队成员加入允许名单（名单外的人不会唤起它）
-3. **确认判断策略**：明确请求直接接单；含糊的消息走语义评估，必要时来问你
-4. **看执行与结果**：执行页看待处理工单，原 Thread 看回贴结果；需要介入时停止/继续
+1. **先选路线**：**Mode B（GitHub，默认）** 适合团队与公开仓库——需要专用智能体账号与本机 `gh` 登录（派单账号 ≠ 执行账号）；**Mode A（`mode: local`）** 适合单人零 GitHub——往本地收件目录丢 `.md` 文件即派单，交付是工单分支上的一次本地提交加回信文件，人来合并（见 [`docs/026`](docs/026-local-delivery.md)）。Mode A 有两道**故意不自动翻转**的门槛：GitHub Source 必须 `disabled: true`（否则健康项卡在 `github: starting`），收件准入名单必须非空（加一行 `local`，否则投单判 `not_a_member` 静默归档、不写回信）。
+2. **接上事件源**：设置 → 来源，填仓库与 GitHub CLI（或指定本地收件目录），确认状态变成「就绪」
+3. **决定谁能触发**：设置 → 评估，把团队成员加入允许名单（名单外的人不会唤起它）
+4. **确认判断策略**：明确请求直接接单；含糊的消息走语义评估，必要时来问你
+5. **看执行与结果**：执行页看待处理工单，原 Thread 看回贴结果；需要介入时停止/继续
+
+模式选择器里的 `dsh-superagent 执行器` 与 `dsh-superagent 主 Session` 是插件两个 Session 角色的专用 preset，**普通对话请选「标准模式」**——preset 行没有隐藏设置，名字不是功能开关，两个都必须保留（工单执行器与主 Session 按 id 引用）。
 
 接好来源后，设置 → 来源会逐条显示每个事件源的状态：本机收件目录显示「运行中」并给出 24 小时内的到达数，未装插件的 GitHub 源显示「插件未安装」。
 
@@ -136,6 +139,8 @@ It is built on the [deepseek-ai/dsh-superagent-prototype](https://github.com/dee
 **Optional — pin a build.** For a team-wide version, reproducing an issue or CI, append `#<full 40-character commit>` to the URL (`...git#<commit>`); the cost is that upgrading means editing the sha, otherwise the install stays on that old build. The repo ships built artifacts in `lib/`, so no build step is needed at install time. Requirements: Node `^22.19.0 || >=24`, DeepSeek Harness `>=0.2.1-alpha.2 <0.3.0`; one backend per state directory (lock-protected).
 
 **Honest limits.** Windows 10/11 is fully validated; macOS and Linux are on the support roadmap (adaptation and validation to follow) — the bundle sets no platform gate, so all three platforms install, with Windows the tested one. The plugin's POSIX branches exist but are not yet verified end to end. Executors run with full OS access by design (an operator-trust model, not a sandbox); the public baseline starts at v0.1.0, published on npm as `@reserendipity/dsh-superagent`; the project is maintained by one person. Differences from upstream are enumerated in [docs/WINDOWS-DELTA.md](docs/WINDOWS-DELTA.md).
+
+**First use.** Pick a route first: **Mode B (`github`, default)** needs a dedicated agent account and a signed-in `gh` on the machine (the dispatching account must differ from the agent account); **Mode A (`mode: local`)** needs neither — drop `.md` files into the inbox directory to open tickets, delivered as a local commit on the ticket branch plus a reply file, merged by a person ([`docs/026`](docs/026-local-delivery.md)). Mode A keeps two deliberately unautomated gates: the GitHub Source must be `disabled: true` (otherwise health stays at `github: starting`) and the inbox admission list must be non-empty (add a `local` row, otherwise dropped files are judged `not_a_member` and archived without a reply). Then: Settings → Sources until each source reads ready; Settings → Eval to list who may dispatch; the Execution tab to watch tickets and reply posts; pause/resume whenever you need to intervene. The `dsh-superagent 执行器` / `dsh-superagent 主 Session` entries in the mode picker are presets for the plugin's two session roles — pick **Standard** for ordinary chats; preset rows have no hide setting, and both presets are functionally required.
 
 ## 文档索引
 
