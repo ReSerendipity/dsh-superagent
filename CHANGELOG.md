@@ -1,5 +1,16 @@
 # DSH-Superagent Changelog
 
+## [0.2.4] — 2026-11-10
+
+### Added
+
+- **侧边栏底部「总管任务」快捷按钮**（`sidebar.footer.action`）：点击直接打开插件面板；面板会回到上次停留的页（例如「执行」），从侧边栏到任务/设置少一层跳转。
+- 面板客户端注入 `layout` 服务（`ctx.layout.selectPanel`），用于选中本插件的主面板。
+
+### Notes
+
+- DSH 的侧边栏只提供两种插件入口：`sidebar.panellist`（每个插件一个图标）与 `sidebar.footer.action`（底部按钮）；`sidebar.settings` 由 ui-settings 独占，插件无法把设置项直接铺进侧边栏。这是宿主 slot 契约的限制，不是本插件的取舍。
+
 ## [0.2.3] — 2026-11-10
 
 ### Added
