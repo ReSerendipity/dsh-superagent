@@ -56,6 +56,7 @@ import type { ResourceHost } from './resources.ts'
 import { mainTools, type MainToolsHost } from './tools/main.ts'
 import { executorTools, type ExecutorToolsHost } from './tools/executor.ts'
 import { CHAT_ROUTER_PROMPT, type ChatRouterHost } from '../chat-router/host.ts'
+import { briefOf } from '../chat-router/config.ts'
 import { chatRouterTools, type DispatchedTask } from '../chat-router/tools.ts'
 import { submitChatTicket } from '../chat-router/submit.ts'
 import { ChatReplyWatcher } from '../chat-router/channel.ts'
@@ -104,6 +105,8 @@ export class Runtime extends Service implements SourceHost {
   private readonly sourceLinks = new TextCache(200_000)
   private readonly stopped = new AbortController()
   private readonly disposers: (() => void)[] = []
+  /** Tickets a chief-of-staff chat dispatched, by the chat Session that must hear how they ended. */
+  private readonly chatTickets = new Map<string, string>()
   private releaseLock?: () => Promise<void>
   private closingFlag = false
   /** Whether the declarative settings file is already watched; the watcher lives in `disposers`. */
@@ -230,6 +233,8 @@ export class Runtime extends Service implements SourceHost {
           if (followup) sessions.relay(followup.id, followup.text)
           // Notify the ticket's conversations whenever it ends via a pull request.
           const ended = event.type === 'ticket.ended' ? store.tickets.get(event.data.ticketId) : undefined
+          // A chief-of-staff task reports back to the chat that dispatched it, not to the Router Session.
+          if (event.type === 'ticket.ended') this.reportToChat(event.data.ticketId, event.data.outcome, ended, sessions)
           if (ended && setup.configured()) {
             const request = store.triggers.get(ended.origin.triggerId)?.text ?? ''
             for (const message of pullEndNotices(ended, request, setup.deploymentFor(ended.channels[0]?.source).repository)) outbox.send(message)
@@ -319,7 +324,22 @@ export class Runtime extends Service implements SourceHost {
     if (result !== 'stored') return { triggerId: trigger.id, result }
     const decision = this.engine.decide(trigger.id, { kind: 'accept', title, scope: title,
       reason: 'Dispatched from a chief-of-staff chat' })
+    if (decision.ticketId) this.chatTickets.set(decision.ticketId, sessionId)
     return { triggerId: trigger.id, ...(decision.ticketId ? { ticketId: decision.ticketId } : {}), result }
+  }
+  /**
+   * Report a dispatched task's ending back to the chat that dispatched it, as a bounded brief. The worker's own
+   * transcript stays in its Session; the chat gets the outcome and the report summary, so it never has to poll.
+   */
+  private reportToChat(ticketId: string, outcome: string, ticket: Ticket | undefined, sessions: Sessions): void {
+    const chatSession = this.chatTickets.get(ticketId)
+    if (!chatSession) return
+    this.chatTickets.delete(ticketId)
+    const summary = ticket?.assignments.at(-1)?.report?.summary?.trim()
+    const text = summary
+      ? `Task ${ticketId} ended (${outcome}):\n${briefOf(summary, 400)}`
+      : `Task ${ticketId} ended (${outcome}) without a report.`
+    void sessions.prompt(chatSession, `chat-brief:${ticketId}`, text, 'steer').catch(() => { /* the chat may be gone */ })
   }
   checkSetup(): void { this.setup.check() }
   receive(trigger: Trigger): ReceiveResult { return this.passes.receive(trigger) }
