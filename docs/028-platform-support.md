@@ -1,8 +1,9 @@
 # 平台支持矩阵与差异台账
 
-> 状态：**P0 在研（rev2，2026-11-10）**。本仓是独立维护的跨平台发行版，Windows / macOS / Linux 均为目标平台；
-> Windows 是已验证的 Tier 1 回归基线，macOS / Linux 尚未完成端到端验证，**对外仍按「适配进行中」表述**。
-> CI 通道：三平台 matrix（`ubuntu-latest` / `macos-latest` / `windows-latest`）保留；公开仓的标准 GitHub-hosted
+> 状态：**P1 文档收尾（2026-11-10）**。第三次三平台 CI（run 42837724202）已在
+> `windows-latest` / `ubuntu-latest` / `macos-latest` 全绿：`typecheck`、`build`、`vitest` 与 `lib` 一致性均通过。
+> 本仓是独立维护的跨平台发行版；Windows 是 Tier 1，Linux 按 Tier 2 记录（端到端未验），macOS 仍为 Tier 3。
+> 对外仍按「适配进行中」表述，直到端到端验证完成。CI 通道：三平台 matrix（`ubuntu-latest` / `macos-latest` / `windows-latest`）保留；公开仓的标准 GitHub-hosted
 > runner 免费，不因 macOS 计费删除该平台。macOS 采用双层口径：GitHub `macos-latest` 只验证测试层
 > （`typecheck` / `build` / `vitest` / `lib` 一致性），Mac 真机层只做代码静态审查，二者不混为一谈。
 > 本文档记录支持等级、平台差异与证据索引；它不替代各平台的验收记录。
@@ -15,7 +16,7 @@
 | **Tier 2** 在研支持 | 可安装、可回归，端到端未验 | CI 全绿 + 单元 / 契约测试通过；端到端尚未跑通，文档标注限制 |
 | **Tier 3** 仅可安装 | 无平台门槛，但无验证 | bundle 没有 `os` / `cpu` 门槛；无该平台 CI、无验证、无专属文档 |
 
-P0 的出口判据：Linux 在 CI 首次全绿后升 **Tier 2**；macOS 即使 CI 全绿也只证明测试层，真机层没有验证条件，
+P1 的状态：Linux 已在 run 42837724202 三平台全绿后按 **Tier 2** 记录（端到端未验）；macOS 即使 CI 全绿也只证明测试层，真机层没有验证条件，
 **保持 Tier 3**，不写成 Tier 2 / supported。Tier 1 还需要 `docs/WINDOWS-SETUP.md` §12.1 那种端到端记录，
 属于后续阶段。
 
@@ -23,14 +24,13 @@ P0 的出口判据：Linux 在 CI 首次全绿后升 **Tier 2**；macOS 即使 C
 
 | 平台 | 安装 | CI | 测试 | E2E | 文档 | 当前等级 |
 | --- | --- | --- | --- | --- | --- | --- |
-| **Windows** | Tier 1：官方应用内插件安装、包名 / GitHub / 本地目录三种方式均验证 | Tier 1：`windows-latest` 在 CI matrix 中 | Tier 1：本机全量实测 `1282 passed / 49 skipped`（6f429c3，含 1 条 Windows 侧跳过的 POSIX 对等用例），Windows 契约测试全绿 | Tier 1：`WINDOWS-SETUP.md` §12.1 的 Mode A / Mode B 实跑记录 | Tier 1：`WINDOWS-SETUP.md`、`WINDOWS-DELTA.md` | **Tier 1** |
-| **macOS** | Tier 3：bundle 无平台门槛，未实测安装 | `macos-latest` 在 matrix 中；run 42835530222 仍 1 红（`config-watch` 邻居误触发），待下次 CI 验证（标准 runner 对公开仓免费） | POSIX-only 用例已在 CI 中；macOS 侧仅 `config-watch` 的邻居误触发仍红，其余通过 | 无 Mac 真机条件，未执行 | 本文档静态审查 + 上游 POSIX 手册 | **Tier 3**（CI 全绿仅证明测试层，不足以升 Tier 2） |
-| **Linux** | Tier 3：bundle 无平台门槛，未实测安装 | `ubuntu-latest` 在 matrix 中；run 42835530222 首次全绿 | Tier 3 → 目标 Tier 2：POSIX-only 用例已在 CI 全绿（run 42835530222） | Tier 3：尚未执行 | Tier 3：本文档 + 上游 POSIX 文档，尚缺 Linux 专属安装说明 | **Tier 3**（首次 CI 已全绿；Tier 2 升级待派单方验收确认） |
+| **Windows** | Tier 1：官方应用内插件安装、包名 / GitHub / 本地目录三种方式均验证 | Tier 1：`windows-latest` 在 CI matrix 中，run 42837724202 全绿 | Tier 1：本机全量实测 `1282 passed / 49 skipped`（6f429c3，含 1 条 Windows 侧跳过的 POSIX 对等用例），Windows 契约测试全绿 | Tier 1：`WINDOWS-SETUP.md` §12.1 的 Mode A / Mode B 实跑记录 | Tier 1：`WINDOWS-SETUP.md`、`WINDOWS-DELTA.md` | **Tier 1** |
+| **macOS** | Tier 3：bundle 无平台门槛，未实测安装 | `macos-latest` 在 matrix 中，run 42837724202 全绿（仅 Node 测试层） | POSIX-only 用例已在 CI 全绿（run 42837724202）；不含 Mac 真机 | 无 Mac 真机条件，未执行 | 本文档静态审查 + 上游 POSIX 手册 | **Tier 3**（CI 全绿仅证明测试层，不足以升 Tier 2） |
+| **Linux** | Tier 2：bundle 无平台门槛，可安装；Linux 专属安装尚未实测 | `ubuntu-latest` 在 matrix 中，run 42837724202 全绿 | Tier 2：POSIX-only 用例已在 CI 全绿（run 42837724202） | 尚未执行（Tier 2 不含端到端） | 本文档 + 上游 POSIX 文档，尚缺 Linux 专属安装说明 | **Tier 2**（端到端未验） |
 
-「已加入 matrix」不等于「已通过」：CI 首次三平台全绿之前，macOS / Linux 仍按 Tier 3 记录。
-「CI 全绿」也不等于「macOS 真机可用」：`macos-latest` 只跑 Node 测试层，不加载 Electron 桌面端，
-不经过 Gatekeeper / Keychain，也不跑端到端首单，因此 macOS **不因 CI 全绿升 Tier 2**。
-Linux 验收后可升 Tier 2；等级定义见 §1。
+三平台 CI 已在 run 42837724202 全绿；这证明的是测试层，不是 macOS 真机可用。Linux 按 Tier 2 记录，端到端仍未执行；
+macOS 保持 Tier 3。`macos-latest` 只跑 Node 测试层，不加载 Electron 桌面端，不经过 Gatekeeper / Keychain，也不跑端到端首单。
+Linux 的 Tier 2 不含端到端；等级定义见 §1。
 
 ### 2.1 macOS 代码逻辑静态审查与验证边界
 
@@ -79,7 +79,7 @@ Linux 验收后可升 Tier 2；等级定义见 §1。
 
 **结论**：macOS 与 Linux 共用同一 POSIX 代码分支，逻辑上可安装、bundle 无平台门槛；但 Mac 真机层
 **没有任何运行时验证证据**。因此 macOS 等级保持 **Tier 3**，不得写成 Tier 2 或 supported；对外措辞仍为
-「适配进行中」。Linux 已在 run 42835530222 首次全绿，Tier 2 升级待派单方验收确认。
+「适配进行中」。Linux 已在 run 42837724202 三平台全绿后按 Tier 2 记录，端到端仍未执行。
 
 ## 3. 平台差异台账（按代码归属）
 
@@ -178,9 +178,11 @@ PATH 剥离与幂等性；`tests/environment.spec.ts` 覆盖 POSIX 垫片的执�
 | POSIX 垫片、git 配置、路径剥离、符号链接 | `tests/environment.spec.ts`、`tests/deployment.spec.ts` |
 | Windows 操作者视角的 17 条差异与 E2E 记录 | `WINDOWS-SETUP.md` §11 / §12 |
 | 上游基线与逐处改动、升级流程 | `WINDOWS-DELTA.md` |
-| Windows 本机测试基线 | `1282 passed / 49 skipped`（2026-11-10 全量实测；`AGENTS.md` §4 的 `1226 / 48` 是更早的基线，6f429c3 的用例总数更多） |
+| Windows 本机测试基线 | `1282 passed / 49 skipped`（2026-11-10 全量实测，与 `AGENTS.md` §4 一致；6f429c3 起用例总数为 1331） |
 | 首次三平台 CI（run 42833259273，2026-11-10） | <https://github.com/ReSerendipity/dsh-superagent/actions/runs/42833259273>：`windows-latest` 绿；`ubuntu-latest` / `macos-latest` 红。3 个 POSIX 侧失败：F1 `tests/deployment.spec.ts` 断言未包含当前 `machineOf` 契约的 `mode` / `configPath`（测试断言过期）；F2 `tests/sources.spec.ts` 飞书 health 被迟到的 `[event] ready` 覆盖（产品跨流竞态）；F3 `tests/config-watch.spec.ts` 在 macOS `fs.watch` 空文件名时放行邻居事件（产品缺陷）。修复后待重跑，未提前写成已通过 |
 | 第二次三平台 CI（run 42835530222，2026-11-10） | <https://github.com/ReSerendipity/dsh-superagent/actions/runs/42835530222>：`windows-latest` / `ubuntu-latest` 绿；`macos-latest` 仍 1 红（`tests/config-watch.spec.ts` 邻居误触发，`1 failed / 1325 passed / 5 skipped`）。F1 / F2 已在 Ubuntu 实测通过。F3 的首次修复只拦截了无文件名事件；`fired` 从 0 变 1，但无文件名分支本应因目标指纹未变而返回，反推出 macOS FSEvents 把邻居写入报成了匹配 `names` 的命名事件，`ebba31d` 的 `if (changed)` 分支因此绕过指纹比较。二次修复不再信任 `changed`，每个目录事件都核对被监听文件的 inode/mtime/ctime/size 指纹；邻居写入不改变指纹，原子保存仍改变 inode，待第三次 macOS CI 验证 |
+| POSIX CI 修复提交 | `ebba31d`（F1 `tests/deployment.spec.ts` 断言、F2 `src/sources/feishu-loops.ts` 跨流 health 竞态、F3 首次修复）；`ee39bd8`（F3 二次修复：`src/app/config-watch.ts` 不再信任 `fs.watch` 的 filename，统一核对被监听文件的指纹） |
+| 第三次三平台 CI（run 42837724202，2026-11-10） | <https://github.com/ReSerendipity/dsh-superagent/actions/runs/42837724202>：`windows-latest` / `ubuntu-latest` / `macos-latest` 全绿；P0 的 DoD D1/D2 达成，F1 / F2 / F3 清零。macOS 仍只证明测试层，见 §2.1 |
 
 ### 4.1 只能在 CI 验证的结论
 
@@ -188,12 +190,11 @@ PATH 剥离与幂等性；`tests/environment.spec.ts` 覆盖 POSIX 垫片的执�
 - 约 48 项既有 `skipIf(WINDOWS)` 用例在 POSIX 的首次真跑结果（另有 1 项新增的 POSIX 包装器对等用例）；本机只能跑 Windows 侧。
 - `timeout-minutes: 20` 是否足够，尤其 macOS runner。
 - `tests/portability.spec.ts` 在 CI 账号（`runner` / `runneradmin`）下不误报机器路径。
-- F1 / F2 已由 run 42835530222 的 Ubuntu 侧确认；F3 的二次修复只能由下一次 `macos-latest` CI 验证；本机 Windows 侧这些用例大多跳过，不能据此宣称 macOS 已修复。
+- F1 / F2 / F3 已由 run 42837724202 三平台全绿确认；macOS 真机层仍不在 CI 能力范围内，不能据此宣称 macOS 已支持。
 - macOS 真机层（桌面端注入、Gatekeeper、Keychain、端到端首单）**不在 CI 能力范围内**，见 §2.1；CI 全绿不构成真机证据。
 
-### 4.2 P0 之后的开放项
+### 4.2 P1 之后的开放项
 
-- 重跑 `macos-latest` 验证 F3 二次修复。Linux 已在 run 42835530222 首次全绿，Tier 2 升级待派单方验收确认；macOS 仍保持 Tier 3。
 - macOS 真机的安装、DSH 桌面端、Gatekeeper / Keychain 与端到端首单（Mode A / Mode B）；Linux 的安装说明与端到端首单。
 - `GH_CONFIG_DIR` 与包装器两种账号模型的统一。
 - `executor.prepare` 的跨平台配置策略。
