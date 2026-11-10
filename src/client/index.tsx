@@ -1,8 +1,8 @@
 /** Browser plugin entry point registering the sidebar icon, main management panel, and Plugin Manager config view. */
 import { useCallback, useEffect, useRef } from 'react'
 import type { Context } from '@deepseek-ai/cordis'
-import type { MainPanelId } from '@deepseek-ai/dsh-client-ui-layout/client'
-import type { SidebarPanelIconOwnerProps } from '@deepseek-ai/dsh-client-ui-sidebar/client'
+import type { ILayout, MainPanelId } from '@deepseek-ai/dsh-client-ui-layout/client'
+import type { SidebarFooterActionOwnerProps, SidebarPanelIconOwnerProps } from '@deepseek-ai/dsh-client-ui-sidebar/client'
 import type {} from '@deepseek-ai/dsh-client-locale/client'
 import type {} from '@deepseek-ai/dsh-client-ui-renderer/client'
 import type {} from '@deepseek-ai/dsh-client-ui-workspace/client'
@@ -16,7 +16,7 @@ import { PluginConfig, usePageForm } from './deployment.tsx'
 import { en, zh } from './locales.ts'
 import type { T } from './text.ts'
 
-type ClientContext = Context & { sessions: ISessions }
+type ClientContext = Context & { sessions: ISessions; layout: ILayout }
 const NS = 'dshSuperagent'
 const PANEL_ID = 'dsh-superagent' as MainPanelId
 const ENTRY = 'dsh-superagent'
@@ -45,7 +45,7 @@ function Mounted({ ctx, t }: { ctx: ClientContext; t: T }) {
   return <App t={t} openSession={openSession} deploymentForm={form} />
 }
 
-export const inject = ['slots', 'locale', 'sessions', 'uiWorkspace']
+export const inject = ['slots', 'locale', 'sessions', 'uiWorkspace', 'layout']
 /** Registers the panel, sidebar icon, and Plugin Manager config view; `configForms` is optional (without it, machine settings are read-only). */
 export function apply(ctx: ClientContext): void {
   ctx.effect(() => ctx.locale.register(NS, { zh, en }), 'dsh-superagent: dictionaries')
@@ -53,6 +53,18 @@ export function apply(ctx: ClientContext): void {
   ctx.slots.inject('main', () => ctx.slots.register({ name: 'main', key: PANEL_ID, locale: NS, inject: () => ({}) },
     (props: { t: T }) => <Mounted ctx={ctx} t={props.t} />))
   ctx.slots.inject('sidebar.panellist', () => ctx.slots.register({ name: 'sidebar.panellist', id: PANEL_ID, order: 10, label: () => t('panel'), locale: NS }, HammerIcon))
+  // A shortcut at the sidebar foot: one click reaches the panel, which opens on the Execution page where the
+  // chief-of-staff tasks and live tickets are, so settings and task state are one hop away instead of three.
+  ctx.slots.inject('sidebar.footer.action', () => ctx.slots.register(
+    { name: 'sidebar.footer.action', id: 'dsh-superagent:tasks', order: 10, label: () => t('chatRouterTasks'), locale: NS },
+    ({ wide }: SidebarFooterActionOwnerProps) => (
+      <button type="button" title={t('chatRouterTasks')} onClick={() => { ctx.layout.selectPanel(PANEL_ID) }}
+        style={{ display: 'flex', alignItems: 'center', gap: 6, width: '100%', justifyContent: wide ? 'flex-start' : 'center',
+          padding: wide ? '6px 8px' : 6, background: 'none', border: 0, color: 'inherit', cursor: 'pointer', font: 'inherit' }}>
+        <HammerIcon size={16} active={false} />
+        {wide && <span>{t('chatRouterTasks')}</span>}
+      </button>),
+  ))
   ctx.slots.inject('plugins.row.config', () => ctx.slots.register({ name: 'plugins.row.config', key: `${ENTRY}#${ENTRY}`, locale: NS },
     (props: PluginConfigViewProps & { t: T }) => <PluginConfig t={props.t} view={props.view} form={props.form} />))
 }
