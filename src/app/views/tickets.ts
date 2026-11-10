@@ -49,13 +49,19 @@ export type TicketListView = ReturnType<typeof ticketList>
 export function chatRouterTasks(host: ViewHost) {
   const view = snapshot(host)
   const { store } = view
-  const items = store.tickets.list()
-    .map(ticket => ({ ticket, trigger: store.triggers.get(ticket.origin.triggerId) }))
-    .filter(({ trigger }) => trigger?.meta.dispatchedBy === 'chat-router')
-    .slice(0, 20)
-    .map(({ ticket, trigger }) => ({ ...ticketCard(ticket),
-      chat_session: String(trigger?.meta.chatSession ?? ''),
-      worker_session: workerSessionId(ticket.id) }))
+  // Every ticket is listed, newest first, with the ones a chief-of-staff chat dispatched marked and sorted ahead:
+  // filtering on the trigger's `meta` alone returned an empty list on a host whose trigger reads came back bare,
+  // and a task list that silently drops everything is worse than one that shows the source.
+  const items = store.tickets.list().slice(0, 20).map(ticket => {
+    const meta = store.triggers.get(ticket.origin.triggerId)?.meta
+    const chatSession = meta?.chatSession
+    return { ...ticketCard(ticket),
+      chat_session: typeof chatSession === 'string' ? chatSession : '',
+      worker_session: workerSessionId(ticket.id),
+      dispatched: meta?.dispatchedBy === 'chat-router',
+      // What the worker's latest assignment reports: progress / waiting / ready / blocked / failed / dropped.
+      report_state: ticket.assignments.at(-1)?.report?.state ?? null }
+  }).sort((a, b) => Number(b.dispatched) - Number(a.dispatched))
   return { items }
 }
 export type ChatRouterTasksView = ReturnType<typeof chatRouterTasks>

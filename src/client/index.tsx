@@ -19,12 +19,24 @@ import { PluginConfig, usePageForm } from './deployment.tsx'
 import { en, zh } from './locales.ts'
 import type { T } from './text.ts'
 
-// DSH 0.2.0-rc.1 added the right-pane tab slot; this bundle's devDependencies pin an older type set, so declare
-// the slot here. The host renders it when the slot exists, and the registration is inert otherwise.
-declare module '@deepseek-ai/dsh-client-ui-slots' {
-  interface SlotMap {
-    'sidebar.right.pane.tab': { kind: 'list'; scope: 'root'; owner: Record<never, never> }
-  }
+/**
+ * The host's right-pane tab registry: `sidebarRightTabs` registers a tab TYPE (what the sidebar lists), and the
+ * body is then mounted through the `sidebar.right.pane.tab` slot under a key equal to that type's id. Both are
+ * optional host capabilities, so the shapes are declared locally instead of importing the host's types.
+ */
+interface SidebarTabs {
+  register(definition: {
+    id: string
+    kind: string
+    priority: 'extension'
+    title: () => string
+    guide: readonly { id: string; order: number; title: () => string; description?: () => string }[]
+  }): () => void
+}
+/** A keyed slot: `register` takes `key`, and writing `id` instead makes the pane fall back to its empty state. */
+interface RightPaneSlots {
+  inject(name: string, generator: () => Generator<unknown, void, unknown>): void
+  register(registration: { name: string; key: string; order: number }, component: () => unknown): () => void
 }
 
 // `layout` is read on demand: requiring it at activation blocked the whole entry on hosts where the layout
@@ -66,18 +78,6 @@ export function apply(ctx: ClientContext): void {
   ctx.slots.inject('main', () => ctx.slots.register({ name: 'main', key: PANEL_ID, locale: NS, inject: () => ({}) },
     (props: { t: T }) => <Mounted ctx={ctx} t={props.t} />))
   ctx.slots.inject('sidebar.panellist', () => ctx.slots.register({ name: 'sidebar.panellist', id: PANEL_ID, order: 10, label: () => t('panel'), locale: NS }, HammerIcon))
-  // A shortcut at the sidebar foot: one click reaches the panel, which opens on the Execution page where the
-  // chief-of-staff tasks and live tickets are, so settings and task state are one hop away instead of three.
-  ctx.slots.inject('sidebar.footer.action', () => ctx.slots.register(
-    { name: 'sidebar.footer.action', id: 'dsh-superagent:tasks', order: 10, label: () => t('chatRouterTasks'), locale: NS },
-    ({ wide }: SidebarFooterActionOwnerProps) => (
-      <button type="button" title={t('chatRouterTasks')} onClick={() => { ctx.layout?.selectPanel(PANEL_ID) }}
-        style={{ display: 'flex', alignItems: 'center', gap: 6, width: '100%', justifyContent: wide ? 'flex-start' : 'center',
-          padding: wide ? '6px 8px' : 6, background: 'none', border: 0, color: 'inherit', cursor: 'pointer', font: 'inherit' }}>
-        <HammerIcon size={16} active={false} />
-        {wide && <span>{t('chatRouterTasks')}</span>}
-      </button>),
-  ))
   // A right-pane tab, like a companion plugin's chat pane: the tasks a chief-of-staff chat dispatched, listed
   // beside the conversation instead of behind the panel icon.
   const call = caller(() => messages(t))
@@ -85,11 +85,28 @@ export function apply(ctx: ClientContext): void {
     try { await openKnownSession(ctx.sessions, id as SessionId, target => { ctx.uiWorkspace.openSession(target) }, new AbortController().signal) }
     catch (error) { console.warn('dsh-superagent: cannot open Session', error) }
   }
-  // The right pane may mount after this plugin: wait for the slot declaration before registering, or the tab opens blank.
-  ctx.slots.inject('sidebar.right.pane.tab', function* () {
-    yield ctx.slots.register({ name: 'sidebar.right.pane.tab', id: 'dsh-superagent-tasks', order: 100,
-      label: () => t('chatRouterTasks') }, () => <TasksPane t={t} call={call} openSession={openSession} />)
-  })
+  // The right-pane tab: register the tab TYPE first (what the sidebar lists), then the body under the same key.
+  // Without the type the sidebar has nothing to list, and with `id` instead of `key` the body is never found.
+  const tabs = ctx.get('sidebarRightTabs') as SidebarTabs | undefined
+  if (tabs !== undefined && typeof tabs.register === 'function') {
+    const TAB_ID = 'dsh-superagent-tasks'
+    const TAB_KIND = 'tasks'
+    tabs.register({
+      id: TAB_ID,
+      kind: TAB_KIND,
+      priority: 'extension',
+      title: () => t('chatRouterTasks'),
+      guide: [{ id: TAB_KIND, order: 400, title: () => t('chatRouterTasks'), description: () => t('chatRouterTasksHint') }],
+    })
+    const rightSlots = ctx.slots as unknown as RightPaneSlots
+    // The sidebar may mount after this plugin: wait for the slot declaration before registering the body.
+    rightSlots.inject('sidebar.right.pane.tab', function* () {
+      yield rightSlots.register({ name: 'sidebar.right.pane.tab', key: TAB_ID, order: 100 },
+        () => <TasksPane t={t} call={call} openSession={openSession} />)
+    })
+  } else {
+    console.warn('[dsh-superagent] 右侧栏不可用：没有 sidebarRightTabs 服务，总管任务标签未注册')
+  }
   ctx.slots.inject('plugins.row.config', () => ctx.slots.register({ name: 'plugins.row.config', key: `${ENTRY}#${ENTRY}`, locale: NS },
     (props: PluginConfigViewProps & { t: T }) => <PluginConfig t={props.t} view={props.view} form={props.form} />))
 }

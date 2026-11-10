@@ -1,5 +1,32 @@
 # DSH-Superagent Changelog
 
+## [0.2.7] — 2026-11-10
+
+首个通过端到端 MVP 验收的版本（5/5：派发新单 → 独立工单与 worker → 真实执行 → 右栏可见 → 完成回投）。
+
+### Added
+
+- **右侧栏「总管任务」标签**：`sidebarRightTabs` 注册标签类型 + `sidebar.right.pane.tab` 注册正文，key 与标签 id 一致；宿主无该能力时只告警、不阻塞启动。
+- **卡片式任务面板**：状态配色（completed 绿 / working 蓝 / stopped 红 / person 橙）、hover、摘要两行截断与点击展开、按「进行中 / 已完成」分组。
+- **搜索与筛选**：按标题或摘要搜索；`全部 / 进行中 / 已完成` 切换。
+- **手动刷新**：`⟳` + 「刷新于 HH:MM:SS」，自动轮询仍为 5 秒。
+- **右键菜单**：打开会话 / 重试 / 停止。
+- **主对话跳转**：卡片底部「来自 xxxxxxxx」可点击回到发起派发的主对话。
+- **`report_state`**：卡片显示 worker 最近一次报告状态（progress / waiting / ready / blocked / failed / dropped）。
+
+### Fixed
+
+- **派发被并入旧工单**：`dispatchChatTask` 的 Thread 每个主对话固定，新请求被 Intake 挂到该 Thread 的既有工单（即使已 completed），导致不建新单、旧单被翻活、`outcome` 被覆盖。改为每次派发一个独立 Thread。
+- **完成简报静默丢失**：`reportToChat` 用 `steer`，只送达运行中的回合；主对话派完单即空闲，简报被 `.catch(() => {})` 吞掉。改为 `queue`，失败时 `console.warn` 留痕。
+- **新工单建不出来**：`decide` 的 accept 缺 `name`，`ticketWorktreeName("")` 必抛 `WorktreeNameSchema`。`chat_dispatch` 增加可选 `name`（kebab-case），`dispatchChatTask` 对缺失/中文/非法值兜底 `task-<base36>`。
+- 启动安全：`layout` 按需读取（`ctx.get('layout')`），右栏 slot 缺失不阻塞 entry。
+
+### Notes
+
+- 验收记录：`dsh-superagent-0.2.7-e2e-checklist.md`；实测报告由 Qoder 复测产出（5/5）。
+- 未覆盖：右键「停止/重试」端到端用例——本机 `local-qwen` 的 8081 被 CatPaw 占用、`health.evals=error`，无法制造可停止的 working 窗口。
+- 历史遗留：2026-11-10 17:15–17:17 的 9 个孤儿触发器（无 decision）仍在库中，不影响新派发，需退出 DSH 后清理。
+
 ## [0.2.6] — 2026-11-10
 
 ### Fixed

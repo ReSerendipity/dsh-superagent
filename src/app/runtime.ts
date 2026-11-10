@@ -192,7 +192,7 @@ export class Runtime extends Service implements SourceHost {
         settings: () => store.settings().chatRouter,
         prompt: () => CHAT_ROUTER_PROMPT,
         tools: agent => chatRouterTools({
-          submit: async (title, request, context) => this.dispatchChatTask(agent.id, title, request, context),
+          submit: async (title, request, context, name) => this.dispatchChatTask(agent.id, title, request, context, name),
           status: async () => ({ tickets: store.tickets.list().slice(0, 20).map(ticketCard) }),
           answer: async (ticketId, text) => { this.engine.note(ticketId, text); return { noted: true } },
         }),
@@ -304,7 +304,7 @@ export class Runtime extends Service implements SourceHost {
    * Hand a chief-of-staff task straight to the Engine: an explicit Trigger accepted at once. Dispatch therefore never
    * depends on the Router Session (which may be unavailable) and the worker still gets its own Session.
    */
-  private dispatchChatTask(sessionId: string, title: string, request: string, context?: string): DispatchedTask {
+  private dispatchChatTask(sessionId: string, title: string, request: string, context?: string, name?: string): DispatchedTask {
     const at = new Date().toISOString()
     const text = context?.trim()
       ? `${request.trim()}\n\n## Context from the dispatching conversation\n${context.trim()}`
@@ -312,7 +312,10 @@ export class Runtime extends Service implements SourceHost {
     const trigger: Trigger = {
       id: key('chat-trigger', sessionId, title, text, at),
       source: 'inbox',
-      threads: [{ source: 'inbox', id: key('chat-thread', sessionId) }],
+      // One Thread per dispatch, not per chat: a Thread the chat already used carries its earlier Ticket as the
+      // owner of follow-ups, so a second dispatch on it would be attached to that (even ended) Ticket instead of
+      // starting a new one.
+      threads: [{ source: 'inbox', id: key('chat-thread', sessionId, at) }],
       actor: { source: 'inbox', id: 'local' },
       human: true,
       addressed: 'direct',
@@ -322,7 +325,13 @@ export class Runtime extends Service implements SourceHost {
     }
     const result = this.engine.receive(trigger)
     if (result !== 'stored') return { triggerId: trigger.id, result }
-    const decision = this.engine.decide(trigger.id, { kind: 'accept', title, scope: title,
+    // Accepting a ticket requires a worktree name: its Executor parses `outcome.name` and throws on an empty or
+    // Chinese one before any worker starts, so a dispatch without a legal name still gets a generated one.
+    const legal = /^[a-z]+(?:-[a-z0-9]+){0,3}$/
+    const worktreeName = name !== undefined && name.length <= 32 && legal.test(name)
+      ? name
+      : `task-${Date.now().toString(36)}`
+    const decision = this.engine.decide(trigger.id, { kind: 'accept', title, scope: title, name: worktreeName,
       reason: 'Dispatched from a chief-of-staff chat' })
     if (decision.ticketId) this.chatTickets.set(decision.ticketId, sessionId)
     return { triggerId: trigger.id, ...(decision.ticketId ? { ticketId: decision.ticketId } : {}), result }
@@ -339,7 +348,10 @@ export class Runtime extends Service implements SourceHost {
     const text = summary
       ? `Task ${ticketId} ended (${outcome}):\n${briefOf(summary, 400)}`
       : `Task ${ticketId} ended (${outcome}) without a report.`
-    void sessions.prompt(chatSession, `chat-brief:${ticketId}`, text, 'steer').catch(() => { /* the chat may be gone */ })
+    // `queue`, not `steer`: a chat that dispatched and then finished its turn is idle, and steer only reaches a
+    // running turn — the brief was silently dropped for exactly the normal "dispatch, wait, hear back" sequence.
+    void sessions.prompt(chatSession, `chat-brief:${ticketId}`, text, 'queue')
+      .catch(error => { console.warn('dsh-superagent: cannot deliver the task brief', error) })
   }
   checkSetup(): void { this.setup.check() }
   receive(trigger: Trigger): ReceiveResult { return this.passes.receive(trigger) }
