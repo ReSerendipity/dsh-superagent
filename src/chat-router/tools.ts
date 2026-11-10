@@ -1,11 +1,21 @@
 /** Tools a chief-of-staff chat keeps after its execution tools are removed. */
 import { z } from 'zod'
 import { tool, type Tool } from '../app/tools/tool.ts'
-import type { SubmittedTicket } from './submit.ts'
+
+/** What handing a task to the Engine produced: the ticket it created, or why nothing was created. */
+export interface DispatchedTask {
+  ticketId?: string
+  triggerId: string
+  /** `stored` means the Engine took the Trigger; `duplicate`/`filtered` mean no ticket exists for it. */
+  result: 'stored' | 'duplicate' | 'filtered'
+}
 
 export interface ChatRouterToolsHost {
-  /** Writes one task file into the local inbox; the inbox Source turns it into a Trigger and an isolated worker session. */
-  submit(title: string, request: string, context?: string): Promise<SubmittedTicket>
+  /**
+   * Hands one task to the Engine as an explicit Trigger and accepts it at once. It does not go through the Router
+   * Session, so dispatch keeps working when that Session is unavailable; the worker still gets its own Session.
+   */
+  submit(title: string, request: string, context?: string): Promise<DispatchedTask>
   /** Read-only view of the shared ticket store, for the chat that dispatched the work. */
   status(): Promise<unknown>
   /** Passes a person's answer back to the worker that asked. */
@@ -28,8 +38,13 @@ export function chatRouterTools(host: ChatRouterToolsHost): Tool[] {
         const results = []
         for (const task of tasks) {
           try {
-            const submitted = await host.submit(task.title, task.request, task.context)
-            results.push({ title: task.title, file: submitted.file, status: 'queued' })
+            const dispatched = await host.submit(task.title, task.request, task.context)
+            // Report what actually happened: a ticket id, or the reason nothing was created. Never call a stored
+            // Trigger "queued" — that reads as a live ticket when no ticket exists.
+            results.push(dispatched.ticketId
+              ? { title: task.title, ticket_id: dispatched.ticketId, status: 'created' }
+              : { title: task.title, status: dispatched.result, reason: dispatched.result === 'duplicate'
+                ? 'This exact task was already dispatched; look it up with chat_status.' : 'The Engine filtered this Trigger; no ticket was created.' })
           } catch (error) {
             results.push({ title: task.title, status: 'failed', error: error instanceof Error ? error.message : String(error) })
           }

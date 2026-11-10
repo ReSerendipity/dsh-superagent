@@ -1,5 +1,21 @@
 # DSH-Superagent Changelog
 
+## [0.2.1] — 2026-11-10
+
+### Fixed
+
+- **`chat_dispatch` 不再依赖 Router 会话**：原先写一个 inbox 文件，等 inbox Source 轮询、再由 Router 主 Session 用 `orchestrator_route` 决策；Router 会话一旦 `blocked`（模型不可达、被归档等），派发就静默失败，而主对话仍显示"已派出"。现在直接把任务作为 explicit Trigger 交给 Engine 并立即 accept（`engine.receive` + `engine.decide(kind: 'accept')`），worker 仍按 Trigger → Ticket → `worker-<ticket id>` 创建独立会话。
+- 返回值不再用误导性的 `queued`：成功时给出真实 `ticket_id`，失败时给出 `duplicate` / `filtered` 及原因，模型不会再编造"排队中"。
+
+### Changed
+
+- `src/chat-router/tools.ts` 的 `ChatRouterToolsHost.submit` 返回 `DispatchedTask`（`ticketId?` + `triggerId` + `result`）；`src/app/runtime.ts` 新增 `dispatchChatTask`，以 `source: inbox` / `actor: local` / `addressed: direct` 的 explicit Trigger 走既有准入（收件白名单含 `local`），不写文件、不等轮询。
+
+### Notes
+
+- 简报回投仍走 `done/*.reply.md` 轮询；直接建单不再产生 inbox 文件，所以本轮简报回投暂不生效，请用 `chat_status` 查看工单状态（阶段、标题）。后续版本改为事件驱动。
+- 已知限制不变：`chat_answer` 仍以 `engine.note` 简化；`worker.maxParallel` 未接执行器槽位；面板仍无任务列表/工作台视图。
+
 ## [0.2.0] — 2026-11-09
 
 ### Added
