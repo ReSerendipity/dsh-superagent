@@ -1,5 +1,17 @@
 # DSH-Superagent Changelog
 
+## [0.2.2] — 2026-11-10
+
+### Added
+
+- **总管派发的工单结束后自动回投主对话**：`Runtime` 在建单时记录 `ticketId → 发起派发的 chatSessionId`，在 `ticket.ended` 领域事件里通过 `sessions.prompt` 投递一条限长简报（`briefOf(report.summary, 400)`），内容是结束结果（completed / stopped / dropped …）+ worker 的报告摘要。主对话不再需要轮询，也不会出现"说好会回报却没回报"。
+- 简报只带报告摘要；完整执行过程仍在 `worker-<ticket id>` 会话里（DSH 左侧对应工作区可直接打开）。
+
+### Notes
+
+- 面板任务列表与「打开 worker 会话」按钮仍未做，下一步。
+- 本次未补 `tests/runtime.spec.ts` 的回投用例；现有 1282 个测试全绿。
+
 ## [0.2.1] — 2026-11-10
 
 ### Fixed
