@@ -56,7 +56,7 @@ import type { ResourceHost } from './resources.ts'
 import { mainTools, type MainToolsHost } from './tools/main.ts'
 import { executorTools, type ExecutorToolsHost } from './tools/executor.ts'
 import { CHAT_ROUTER_PROMPT, type ChatRouterHost } from '../chat-router/host.ts'
-import { chatRouterTools } from '../chat-router/tools.ts'
+import { chatRouterTools, type DispatchedTask } from '../chat-router/tools.ts'
 import { submitChatTicket } from '../chat-router/submit.ts'
 import { ChatReplyWatcher } from '../chat-router/channel.ts'
 import { inboxDir } from '../sources/inbox.ts'
@@ -189,7 +189,7 @@ export class Runtime extends Service implements SourceHost {
         settings: () => store.settings().chatRouter,
         prompt: () => CHAT_ROUTER_PROMPT,
         tools: agent => chatRouterTools({
-          submit: async (title, request, context) => submitChatTicket(chatInboxRoot(), title, request, agent.id, context),
+          submit: async (title, request, context) => this.dispatchChatTask(agent.id, title, request, context),
           status: async () => ({ tickets: store.tickets.list().slice(0, 20).map(ticketCard) }),
           answer: async (ticketId, text) => { this.engine.note(ticketId, text); return { noted: true } },
         }),
@@ -294,6 +294,32 @@ export class Runtime extends Service implements SourceHost {
     const { setup: { deployment }, sources } = this
     // The variables follow the ticket's own Source, so a ticket from the second repository carries that repository.
     return ticketEnvironment({ deployment: this.setup.deploymentFor(ticket.channels[0]?.source), sources, settings: this.store.settings(), ticket, ...trigger ? { trigger } : {} })
+  }
+  /**
+   * Hand a chief-of-staff task straight to the Engine: an explicit Trigger accepted at once. Dispatch therefore never
+   * depends on the Router Session (which may be unavailable) and the worker still gets its own Session.
+   */
+  private dispatchChatTask(sessionId: string, title: string, request: string, context?: string): DispatchedTask {
+    const at = new Date().toISOString()
+    const text = context?.trim()
+      ? `${request.trim()}\n\n## Context from the dispatching conversation\n${context.trim()}`
+      : request.trim()
+    const trigger: Trigger = {
+      id: key('chat-trigger', sessionId, title, text, at),
+      source: 'inbox',
+      threads: [{ source: 'inbox', id: key('chat-thread', sessionId) }],
+      actor: { source: 'inbox', id: 'local' },
+      human: true,
+      addressed: 'direct',
+      at,
+      text,
+      meta: { title, chatSession: sessionId, dispatchedBy: 'chat-router' },
+    }
+    const result = this.engine.receive(trigger)
+    if (result !== 'stored') return { triggerId: trigger.id, result }
+    const decision = this.engine.decide(trigger.id, { kind: 'accept', title, scope: title,
+      reason: 'Dispatched from a chief-of-staff chat' })
+    return { triggerId: trigger.id, ...(decision.ticketId ? { ticketId: decision.ticketId } : {}), result }
   }
   checkSetup(): void { this.setup.check() }
   receive(trigger: Trigger): ReceiveResult { return this.passes.receive(trigger) }
