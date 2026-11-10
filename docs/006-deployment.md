@@ -16,12 +16,12 @@ The bundle defines `dsh-superagent-worker` for Executors and `dsh-superagent-rou
 
 Opening a blank managed Session in the Web UI can select the profile's default preset. dsh-superagent restores its role-specific preset before the first turn.
 
-Both presets run with `danger-full-access` as the operator's OS user and read messages from subscribed Threads. Account wrappers remain an optional way to run the CLIs by hand; the host selects the GitHub agent account with `GH_CONFIG_DIR` on every platform. They do not isolate the process. A worker can execute programs by path and read the operator's home directory. For isolation, use a dedicated OS account containing only the agent's credentials.
+Both presets run with `danger-full-access` as the operator's OS user and read messages from subscribed Threads. The GitHub CLI wrapper remains an optional way to run `gh` by hand; the host selects the GitHub agent account with `GH_CONFIG_DIR` on every platform. They do not isolate the process. A worker can execute programs by path and read the operator's home directory. For isolation, use a dedicated OS account containing only the agent's credentials.
 
 ## Prerequisites
 
 - Node.js 22.19+ or 24+, pnpm, git 2.32+, Python 3.8+ and tmux
-- GitHub CLI (`gh`) 2.48 or later. Source CLI fields must point to `gh` or `lark-cli`; a wrapper is optional because dsh-superagent injects `GH_CONFIG_DIR`. The host relies on their subcommands and output formats.
+- GitHub CLI (`gh`) 2.48 or later. Source CLI fields must point to `gh` or `lark-cli`; a GitHub wrapper is optional because dsh-superagent injects `GH_CONFIG_DIR`. The host relies on their subcommands and output formats.
 - A repository on github.com; GitHub Enterprise Server is not supported. To create a checkout per Ticket, keep a local clone from which the prepare command can add worktrees. Install `git-lfs` if that repository uses Git LFS.
 - A model provider configured for DeepSeek Harness. dsh-superagent uses the profile's default model unless the Eval or Execution settings name another.
 - For Feishu: `lark-cli` (tested with 1.0.90) and a Feishu or Lark app with a bot
@@ -154,12 +154,22 @@ Setup must succeed before polling or work starts. Overview lists missing require
 
 1. **Sources.** Set the GitHub repository (`owner/name`) and agent CLI, for example `/home/me/.local/bin/gh-agent`. Requests normally arrive through the agent account's notifications. A new Issue or comment mentioning the account arrives on the next poll; adding a mention by editing an existing Issue body does not. Post a new comment instead. For Feishu, set the bot CLI, chats, each chat's receive-all or mentions-only mode, and whether to receive direct messages.
 2. **Policy.** The two example rules can be edited or removed. Under **On each Source**, add the GitHub accounts and Feishu users who may ask for work; until a list has someone, no request can become a Ticket. With Feishu, a chat can be chosen to sync the list from, at startup and on **Sync now**.
-3. **Execution.** The directory root and a prepare command. To give each Ticket a checkout of the repository:
+3. **Execution.** The directory root and a prepare command. **`executor.prepare` is platform-specific configuration**: it runs through `sh -c` on macOS/Linux and `cmd.exe /d /s /c` on Windows, so the same command is not portable between them. Use the template for the platform that runs dsh-superagent.
+
+   macOS / Linux (POSIX `sh` variables):
 
    ```sh
    git -C /home/me/src/widgets fetch --no-tags "https://github.com/$DSH_SUPERAGENT_GITHUB_REPOSITORY.git" "${DSH_SUPERAGENT_GITHUB_PR_HEAD:-HEAD}:refs/dsh-superagent/$DSH_SUPERAGENT_TICKET" &&
    git -C /home/me/src/widgets worktree add -b "agent/$DSH_SUPERAGENT_NAME" "$DSH_SUPERAGENT_DIR" "refs/dsh-superagent/$DSH_SUPERAGENT_TICKET"
    ```
+
+   Windows (`cmd.exe` `%…%` variables):
+
+   ```bat
+   git -C C:\src\widgets fetch --no-tags "https://github.com/%DSH_SUPERAGENT_GITHUB_REPOSITORY%.git" "HEAD:refs/dsh-superagent/%DSH_SUPERAGENT_TICKET%" && git -C C:\src\widgets worktree add -b "agent/%DSH_SUPERAGENT_NAME%" "%DSH_SUPERAGENT_DIR%" "refs/dsh-superagent/%DSH_SUPERAGENT_TICKET%"
+   ```
+
+   For a Ticket that started from a PR, substitute `%DSH_SUPERAGENT_GITHUB_PR_HEAD%` for `HEAD` when that variable is non-empty. The Windows template deliberately keeps the command on one line because `cmd.exe /d /s /c` receives one command string.
 
    List personal CLIs, such as one signed in to your own account, as blocked commands.
 4. **Prompts.** Set the team sections: the GitHub disclosure line, review bots, the commit author and the auto-merge condition.

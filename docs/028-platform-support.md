@@ -135,7 +135,7 @@ PATH 剥离与幂等性；`tests/environment.spec.ts` 覆盖 POSIX 垫片的执�
 | 变量语法 | 同上 | `%VAR%`、`&&` 等 cmd 语法 | `$VAR`、`&&` 等 POSIX 语法 |
 | 后果 | — | 同一份 `executor.prepare` 不能跨平台复用，需按平台配置 | 同左（与 Windows 相反） |
 
-这是配置层的已知分裂，修复属于后续阶段；P0 只确认 POSIX 分支仍走 `sh -c`，并有测试覆盖。
+这是配置层的既定差异，不做统一抽象（Q3）；`docs/006-deployment.md` 的 Execution 一节给出 macOS / Linux 与 Windows 两份模板，并显著标注「平台专属配置、同一份不保证跨平台复用」。
 
 ### 3.5 包装器调用
 
@@ -178,7 +178,7 @@ PATH 剥离与幂等性；`tests/environment.spec.ts` 覆盖 POSIX 垫片的执�
 | POSIX 垫片、git 配置、路径剥离、符号链接 | `tests/environment.spec.ts`、`tests/deployment.spec.ts` |
 | Windows 操作者视角的 17 条差异与 E2E 记录 | `WINDOWS-SETUP.md` §11 / §12 |
 | 上游基线与逐处改动、升级流程 | `WINDOWS-DELTA.md` |
-| Windows 本机测试基线 | `1282 passed / 49 skipped`（2026-11-10 全量实测，与 `AGENTS.md` §4 一致；6f429c3 起用例总数为 1331） |
+| Windows 本机测试基线 | `1284 passed / 49 skipped`（2026-11-10 P1 全量实测；较 `AGENTS.md` §4 的 `1282 / 49` 多 2 条 P1 防回归断言：setup 探针契约与 launcher mode/LF；总用例 1333） |
 | 首次三平台 CI（run 42833259273，2026-11-10） | <https://github.com/ReSerendipity/dsh-superagent/actions/runs/42833259273>：`windows-latest` 绿；`ubuntu-latest` / `macos-latest` 红。3 个 POSIX 侧失败：F1 `tests/deployment.spec.ts` 断言未包含当前 `machineOf` 契约的 `mode` / `configPath`（测试断言过期）；F2 `tests/sources.spec.ts` 飞书 health 被迟到的 `[event] ready` 覆盖（产品跨流竞态）；F3 `tests/config-watch.spec.ts` 在 macOS `fs.watch` 空文件名时放行邻居事件（产品缺陷）。修复后待重跑，未提前写成已通过 |
 | 第二次三平台 CI（run 42835530222，2026-11-10） | <https://github.com/ReSerendipity/dsh-superagent/actions/runs/42835530222>：`windows-latest` / `ubuntu-latest` 绿；`macos-latest` 仍 1 红（`tests/config-watch.spec.ts` 邻居误触发，`1 failed / 1325 passed / 5 skipped`）。F1 / F2 已在 Ubuntu 实测通过。F3 的首次修复只拦截了无文件名事件；`fired` 从 0 变 1，但无文件名分支本应因目标指纹未变而返回，反推出 macOS FSEvents 把邻居写入报成了匹配 `names` 的命名事件，`ebba31d` 的 `if (changed)` 分支因此绕过指纹比较。二次修复不再信任 `changed`，每个目录事件都核对被监听文件的 inode/mtime/ctime/size 指纹；邻居写入不改变指纹，原子保存仍改变 inode，待第三次 macOS CI 验证 |
 | POSIX CI 修复提交 | `ebba31d`（F1 `tests/deployment.spec.ts` 断言、F2 `src/sources/feishu-loops.ts` 跨流 health 竞态、F3 首次修复）；`ee39bd8`（F3 二次修复：`src/app/config-watch.ts` 不再信任 `fs.watch` 的 filename，统一核对被监听文件的指纹） |
