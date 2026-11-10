@@ -26,8 +26,8 @@ export const WORKER_COMMANDS: readonly string[] = ['gh', 'git', 'lark-cli']
 export const workerBin = (stateDir: string): string => join(stateDir, 'worker-bin')
 export const workerGitConfig = (stateDir: string): string => join(stateDir, 'worker-gitconfig')
 /**
- * The agent's own GitHub CLI configuration directory. Windows selects the agent account through GH_CONFIG_DIR because
- * Node refuses to spawn a `.cmd` wrapper (`spawn EINVAL`), so the upstream wrapper-script trick cannot be the CLI here.
+ * The agent's own GitHub CLI configuration directory. Every platform selects the agent account through
+ * `GH_CONFIG_DIR`; a wrapper script is optional and remains useful for running the CLI by hand.
  */
 export const agentGhConfig = (stateDir: string): string => join(stateDir, 'gh-config')
 const shellQuote = (value: string): string => `'${value.replaceAll("'", "'\\''")}'`
@@ -57,8 +57,8 @@ export const GIT_LOCATION: readonly string[] = ['GIT_DIR', 'GIT_WORK_TREE', 'GIT
 export function agentVariables(stateDir: string): Record<string, string | undefined> {
   return {
     GH_TOKEN: undefined, GITHUB_TOKEN: undefined,
-    // Select the agent account by configuration directory: a `.cmd` wrapper cannot be spawned by Node on Windows.
-    ...isWindows ? { GH_CONFIG_DIR: agentGhConfig(stateDir) } : {},
+    // Select the agent account by configuration directory on every platform; the gh CLI reads this variable everywhere.
+    GH_CONFIG_DIR: agentGhConfig(stateDir),
     // A worker's git finds the repository from its directory, never from the host's environment.
     ...Object.fromEntries(GIT_LOCATION.map(name => [name, undefined])),
     GIT_CONFIG_GLOBAL: workerGitConfig(stateDir), GIT_CONFIG_NOSYSTEM: '1',

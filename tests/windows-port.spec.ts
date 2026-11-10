@@ -9,6 +9,7 @@ import { join } from 'node:path'
 import type { SubprocessRuntime } from '@deepseek-ai/dsh-subprocess'
 import { expect, it } from 'vitest'
 import { agentGhConfig, agentVariables, runAsWorker, workerBin, workerGitConfig, writeEnvironment } from '../src/infra/environment.ts'
+import { workerProbe } from '../src/deployment.ts'
 
 // Every path is derived, so this contract test runs on any machine.
 const stateDir = join(tmpdir(), 'dsh-superagent-windows-port')
@@ -75,15 +76,50 @@ it('writes shims that strip their own directory from PATH', async () => {
   expect(blocked).toContain('is blocked in this installation')
   expect(blocked.trimEnd().endsWith(windows ? 'exit /b 1' : 'exit 1')).toBe(true)
 
-  // GH_CONFIG_DIR selects the agent account on Windows only; on POSIX the wrapper script names the configuration directory.
+  // GH_CONFIG_DIR selects the agent account on every platform; the wrapper script is optional, not the only route.
   console.log('GH_CONFIG_DIR override:', agentVariables(stateDir).GH_CONFIG_DIR)
-  expect(agentVariables(stateDir).GH_CONFIG_DIR).toBe(windows ? agentGhConfig(stateDir) : undefined)
+  expect(agentVariables(stateDir).GH_CONFIG_DIR).toBe(agentGhConfig(stateDir))
   await expect(readdir(agentGhConfig(stateDir))).resolves.toBeDefined()
   expect(await readFile(workerGitConfig(stateDir), 'utf8')).toContain('[credential "https://github.com"]')
 
   // Idempotency: setup re-runs this on every start, so an unrecognised marker would raise `foreignFile`.
   await writeEnvironment(deployment, ['python', 'gh', 'git', 'myblocked'])
   expect((await readdir(workerBin(stateDir))).sort()).toEqual(shims)
+})
+
+it('runs setup probes with the platform-specific environment and forwards Feishu notifier switches', async () => {
+  const calls: { argv: string[]; env?: Record<string, string> }[] = []
+  const subprocess = {
+    spawn(spec: { argv: string[]; env?: Record<string, string> }) {
+      calls.push({ argv: [...spec.argv], env: spec.env })
+      const reader = { readFrom: () => ({ text: '' }) }
+      return { done: Promise.resolve({ exitCode: 0 }), collected: { stdout: reader, stderr: reader } }
+    },
+  } as unknown as SubprocessRuntime
+  const state = join(tmpdir(), 'dsh-superagent-probe-test')
+  const probe = workerProbe(subprocess, state, state, new AbortController().signal)
+  await probe(['lark-cli', 'auth', 'status'], {
+    LARKSUITE_CLI_NO_UPDATE_NOTIFIER: '1', LARKSUITE_CLI_NO_SKILLS_NOTIFIER: '1',
+  })
+  expect(calls).toHaveLength(1)
+  const call = calls[0]!
+  if (windows) {
+    // Windows has no `env`; the shim-free PATH and both account/Source variables are an explicit environment layer.
+    expect(call.argv).toEqual(['lark-cli', 'auth', 'status'])
+    expect(call.env).toMatchObject({
+      GH_CONFIG_DIR: agentGhConfig(state),
+      LARKSUITE_CLI_NO_UPDATE_NOTIFIER: '1', LARKSUITE_CLI_NO_SKILLS_NOTIFIER: '1',
+    })
+    expect(Object.keys(call.env ?? {}).some(name => name.toUpperCase() === 'PATH')).toBe(true)
+  } else {
+    // POSIX keeps `env` as the transport; PATH, the agent account and the Source switches are argv prefixes.
+    expect(call.argv.slice(0, 2)).toEqual(['env', expect.stringMatching(/^PATH=/)])
+    expect(call.argv).toContain(`GH_CONFIG_DIR=${agentGhConfig(state)}`)
+    expect(call.argv).toContain('LARKSUITE_CLI_NO_UPDATE_NOTIFIER=1')
+    expect(call.argv).toContain('LARKSUITE_CLI_NO_SKILLS_NOTIFIER=1')
+    expect(call.argv.slice(-3)).toEqual(['lark-cli', 'auth', 'status'])
+    expect(call.env).toBeUndefined()
+  }
 })
 
 it.skipIf(!windows)('runs a batch wrapper CLI through cmd.exe and forwards its arguments intact', async () => {

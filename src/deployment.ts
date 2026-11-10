@@ -108,13 +108,13 @@ export function executable(name: string, path: string, exclude?: string): string
   throw new Error(`${name} is not an executable file${isAbsolute(name) ? '' : ' on PATH'}`)
 }
 
-export type Probe = (argv: string[]) => Promise<string>
+export type Probe = (argv: string[], env?: Record<string, string>) => Promise<string>
 /** Run startup checks through DSH's worker subprocess service with worker shims removed from PATH so a `gh` wrapper script reaches the real binary. */
 export function workerProbe(subprocess: SubprocessRuntime, stateDir: string, cwd: string, signal: AbortSignal): Probe {
   const path = withoutDirectory(process.env.PATH ?? '', workerBin(stateDir))
   const timeout = (): AbortSignal => AbortSignal.any([signal, AbortSignal.timeout(60_000)])
-  return argv => {
-    const command = probeEnv(path, agentGhConfig(stateDir), argv)
+  return (argv, extra) => {
+    const command = probeEnv(path, agentGhConfig(stateDir), argv, extra)
     return runAsWorker(subprocess, command.argv, cwd, timeout(), command.env)
   }
 }
@@ -151,6 +151,7 @@ export async function resolveDeployment(machine: Machine, github: unknown, probe
 
 const AuthStatus = z.object({ appId: z.string().regex(/^cli_[A-Za-z0-9]+$/), brand: z.enum(['feishu', 'lark']).default('feishu'), identities: z.object({ bot: z.object({ status: z.string() }) }) })
 const BotInfo = z.object({ bot: z.object({ open_id: z.string().regex(/^ou_[A-Za-z0-9]+$/), app_name: z.string().default('') }) })
+const FEISHU_PROBE_ENV: Record<string, string> = { LARKSUITE_CLI_NO_UPDATE_NOTIFIER: '1', LARKSUITE_CLI_NO_SKILLS_NOTIFIER: '1' }
 /**
  * Verify that the configured Feishu CLI is authenticated as a bot and restricted to strict mode `bot`.
  * Workers invoke this CLI as `lark-cli`, so a CLI that also permits a user identity would let workers act as that user.
@@ -161,7 +162,8 @@ export async function resolveFeishuBot(machine: Machine, feishu: unknown, probe:
   const fail = (error: unknown): never => { throw error instanceof SetupError ? error : new SetupError('feishuCliFailed', { output: reason(error) }) }
   let cli = ''
   try { cli = executable(name, path, workerBin(machine.stateDir)) } catch (error) { fail(error) }
-  const run = (...args: string[]): Promise<string> => probe(['env', 'LARKSUITE_CLI_NO_UPDATE_NOTIFIER=1', 'LARKSUITE_CLI_NO_SKILLS_NOTIFIER=1', cli, ...args]).catch(fail)
+  // The probe transport supplies PATH, GH_CONFIG_DIR and this Source's own notifier switches on both Windows and POSIX.
+  const run = (...args: string[]): Promise<string> => probe([cli, ...args], FEISHU_PROBE_ENV).catch(fail)
   const text = await run('auth', 'status')
   const status = parsed(AuthStatus, text.slice(text.indexOf('{')))
   if (!status) return fail(new SetupError('feishuNoApp'))

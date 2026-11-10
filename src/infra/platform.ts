@@ -33,12 +33,17 @@ export interface ProbeCommand {
 }
 
 /**
- * Builds a setup-probe invocation with a shim-free PATH and, on Windows, the agent's `GH_CONFIG_DIR`. POSIX has
- * `env`, so the PATH becomes an argv prefix; Windows has no `env` executable and needs an explicit environment object.
+ * Builds a setup-probe invocation with a shim-free PATH, the agent's `GH_CONFIG_DIR`, and any Source-specific
+ * variables. POSIX has `env`, so those become argv prefixes; Windows has no `env` executable and needs an explicit
+ * environment object. `GH_CONFIG_DIR` is supplied on both platforms so the probe reads the agent account, never the
+ * operator's own.
  */
-export const probeEnv = (path: string, ghConfig: string, argv: readonly string[]): ProbeCommand => {
-  if (!isWindows) return { argv: ['env', `PATH=${path}`, ...argv] }
+export const probeEnv = (path: string, ghConfig: string, argv: readonly string[], extra: Record<string, string> = {}): ProbeCommand => {
+  const variables = { GH_CONFIG_DIR: ghConfig, ...extra }
+  if (!isWindows) {
+    return { argv: ['env', `PATH=${path}`, ...Object.entries(variables).map(([name, value]) => `${name}=${value}`), ...argv] }
+  }
   // Windows variable names are case-insensitive, so override the spelling that already exists in the environment.
   const pathVariable = Object.keys(process.env).find(name => name.toUpperCase() === 'PATH') ?? 'PATH'
-  return { argv: [...argv], env: { [pathVariable]: path, GH_CONFIG_DIR: ghConfig } }
+  return { argv: [...argv], env: { [pathVariable]: path, ...variables } }
 }

@@ -120,12 +120,12 @@ PATH 剥离与幂等性；`tests/environment.spec.ts` 覆盖 POSIX 垫片的执�
 
 | 项 | 代码归属 | Windows | macOS / Linux |
 | --- | --- | --- | --- |
-| 选定智能体账号 | `agentVariables()`、`agentGhConfig()` | 注入 `GH_CONFIG_DIR=<stateDir>/gh-config` | 由智能体 CLI 包装器自行设置 `GH_CONFIG_DIR`（上游文档模型） |
-| 启动检查 / 探针 | `src/deployment.ts` `workerProbe()` | 显式环境层传 PATH + `GH_CONFIG_DIR` | `env PATH=… <cli>` 前缀 |
-| 当前状态 | — | 已实测（见 `WINDOWS-SETUP.md` §12.1） | POSIX 分支保持上游语义；双账号 Mode B 未在 POSIX 实测 |
+| 选定智能体账号 | `agentVariables()`、`agentGhConfig()` | 三平台统一注入 `GH_CONFIG_DIR=<stateDir>/gh-config` | 同左；包装器仍可选，用于手工运行 CLI |
+| 启动检查 / 探针 | `src/deployment.ts` `workerProbe()`、`src/infra/platform.ts` `probeEnv()` | 显式环境层传 PATH + `GH_CONFIG_DIR` + Source 变量 | `env PATH=… GH_CONFIG_DIR=…` 前缀 + Source 变量 |
+| 当前状态 | — | 已实测（见 `WINDOWS-SETUP.md` §12.1） | 统一注入已实现；双账号 Mode B 未在 POSIX 实测 |
 
-两种账号模型（`GH_CONFIG_DIR` 与包装器脚本）目前仍并存，统一属于后续阶段；本文档只登记差异，
-不把任一侧写成「三平台已经一致」。
+三平台统一注入 `GH_CONFIG_DIR`；包装器脚本仍可选，但不再是唯一途径。探针的 PATH 与 `GH_CONFIG_DIR` 由
+`src/infra/platform.ts` 的 `probeEnv()` 生成，Windows 用显式环境层，macOS / Linux 用 `env` 前缀。
 
 ### 3.4 准备命令
 
@@ -196,10 +196,7 @@ PATH 剥离与幂等性；`tests/environment.spec.ts` 覆盖 POSIX 垫片的执�
 ### 4.2 P1 之后的开放项
 
 - macOS 真机的安装、DSH 桌面端、Gatekeeper / Keychain 与端到端首单（Mode A / Mode B）；Linux 的安装说明与端到端首单。
-- `GH_CONFIG_DIR` 与包装器两种账号模型的统一。
-- `executor.prepare` 的跨平台配置策略。
 - `release:check` 的 POSIX 实现。
-- 飞书探针的 `env` 前缀问题。
 - `docs/WINDOWS-SETUP.md` / `WINDOWS-DELTA.md` 是否改名（决策待定）。
 
 ## 5. 维护约定
