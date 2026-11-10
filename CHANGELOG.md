@@ -1,5 +1,18 @@
 # DSH-Superagent Changelog
 
+## [0.2.5] — 2026-11-10
+
+### Added
+
+- **右侧栏「总管任务」标签**（`sidebar.right.pane.tab`）：像 dsh-pet 的对话面板那样，右侧栏多一个标签，列出总管派出的工单（标题 + 阶段），每条带「打开会话」直达 `worker-<ticket id>`，不必切到插件主面板。
+- 该 slot 由 DSH 0.2.0-rc.1 引入，本包 devDependencies 的类型集较旧，因此在 `src/client/index.tsx` 里做了 module augmentation；宿主没有该 slot 时注册无副作用。
+- 客户端复用 `caller`/`messages` 直接请求 `GET chatRouter/tasks`，右栏面板不依赖插件主面板的 React context。
+
+### Notes
+
+- 右栏标签在宿主声明该 slot 后才注册（generator 形式的 `slots.inject`），避免「打开标签却空白」。
+- 面板路由记忆仍生效：点侧边栏图标会回到上次停留的页。
+
 ## [0.2.4] — 2026-11-10
 
 ### Added
