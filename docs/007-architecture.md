@@ -371,6 +371,7 @@ Some generic modules still refer directly to GitHub or Feishu:
 | `src/executor/local-workspace.ts` | The built-in workspace of a `mode: local` Ticket with no `executor.prepare`: `usesLocalWorkspace` decides (local delivery and a blank command, so `github` is untouched), `localWorkspaceCommands` is the remote-free git sequence (init on `main`, the placeholder identity, an empty base commit, `agent/<name>`), and `initLocalWorkspace` runs it |
 | `src/infra/commands.ts` | `Commands`, the CLI transport: `run`; `api` and `pages`, limited to the configured repository and validated; `lark` as the bot; `git`. `CliError` carries the code a command's output reports, such as a GitHub HTTP status, and a command that prints nothing fails with how it ended, never with its arguments; `validItems` skips and counts the malformed items of a list |
 | `src/infra/environment.ts` | The agent's process environment: command shims, the git configuration and credential helper, `runAsWorker`, and the checks of the environment and of a Ticket's directory |
+| `src/infra/platform.ts` | The platform predicates in one place: `isWindows`, shim name/body/mode, the prepare command shell, the batch-wrapper check, the PATH delimiter, and the setup-probe environment transport |
 | `src/infra/paths.ts` | The package's root, where packaged files are |
 | `src/infra/text.ts` | Word counts and the chat message limit, `fill` and `sameName` |
 | `src/infra/health.ts` | The `HealthBoard`, every part's health entry, each claimed by its one writer |

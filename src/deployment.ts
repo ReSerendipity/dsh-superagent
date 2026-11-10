@@ -8,6 +8,7 @@ import s from '@deepseek-ai/schemastery'
 import { z } from 'zod'
 import type { SubprocessRuntime } from '@deepseek-ai/dsh-subprocess'
 import { agentGhConfig, runAsWorker, sameDirectory, withoutDirectory, workerBin } from './infra/environment.ts'
+import { probeEnv } from './infra/platform.ts'
 import { SetupError } from './setup.ts'
 
 const reason = (error: unknown): string => error instanceof Error ? error.message : String(error)
@@ -112,14 +113,10 @@ export type Probe = (argv: string[]) => Promise<string>
 export function workerProbe(subprocess: SubprocessRuntime, stateDir: string, cwd: string, signal: AbortSignal): Probe {
   const path = withoutDirectory(process.env.PATH ?? '', workerBin(stateDir))
   const timeout = (): AbortSignal => AbortSignal.any([signal, AbortSignal.timeout(60_000)])
-  if (process.platform !== 'win32') return argv => runAsWorker(subprocess, ['env', `PATH=${path}`, ...argv], cwd, timeout())
-  // Windows has no `env` executable; supply the shim-free PATH as an explicit environment layer, which DSH merges
-  // onto its sanitised ambient environment. Windows variable names are case-insensitive, so override the key that exists.
-  const pathVariable = Object.keys(process.env).find(name => name.toUpperCase() === 'PATH') ?? 'PATH'
-  // This probe runs before `applyEnvironment`, so the agent's configuration directory must be supplied here as well;
-  // otherwise the account check would read the operator's own `gh` login.
-  const environment = { [pathVariable]: path, GH_CONFIG_DIR: agentGhConfig(stateDir) }
-  return argv => runAsWorker(subprocess, argv, cwd, timeout(), environment)
+  return argv => {
+    const command = probeEnv(path, agentGhConfig(stateDir), argv)
+    return runAsWorker(subprocess, command.argv, cwd, timeout(), command.env)
+  }
 }
 
 const GithubUser = z.object({ login: z.string().regex(/^[A-Za-z0-9-]+$/), id: z.number().int().positive() })

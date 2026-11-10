@@ -5,11 +5,12 @@
  */
 import { lstat, mkdir, readdir, readFile, rename, unlink, writeFile } from 'node:fs/promises'
 import { realpathSync } from 'node:fs'
-import { delimiter, join, resolve } from 'node:path'
+import { join, resolve } from 'node:path'
 import type { SubprocessOutputReader, SubprocessRuntime } from '@deepseek-ai/dsh-subprocess'
 import type { Deployment } from '../deployment.ts'
 import { SetupError } from '../setup.ts'
 import { CliError } from './commands.ts'
+import { isBatchWrapper, isWindows, pathDelimiter, shimBody, shimMode, shimName } from './platform.ts'
 
 const MARKER = '# Written by dsh-superagent on every start; edits are lost.'
 /**
@@ -20,8 +21,6 @@ const MARKER = '# Written by dsh-superagent on every start; edits are lost.'
 const sshTransport = (): boolean => process.env.SUPERAGENT_GIT_SSH === '1'
 /** Markers of files written under the project's earlier names (`dsh-tag`, `dsh-go`, `dsh-freelancer`), which `dsh-superagent` owns and replaces too. */
 const LEGACY_MARKERS = ['dsh-tag', 'dsh-go', 'dsh-freelancer'].map(name => `# Written by ${name} on every start; edits are lost.`)
-/** Windows needs batch shims and drive-qualified paths; every other platform keeps the POSIX forms below. */
-const windows = process.platform === 'win32'
 /** Commands workers need, which `blockedCommands` cannot block: the shims and git. */
 export const WORKER_COMMANDS: readonly string[] = ['gh', 'git', 'lark-cli']
 export const workerBin = (stateDir: string): string => join(stateDir, 'worker-bin')
@@ -40,7 +39,7 @@ export function sameDirectory(a: string, b: string): boolean {
   return real(a) === real(b)
 }
 export function withoutDirectory(path: string, dir: string): string {
-  return path.split(delimiter).filter(entry => !sameDirectory(entry, dir)).join(delimiter)
+  return path.split(pathDelimiter()).filter(entry => !sameDirectory(entry, dir)).join(pathDelimiter())
 }
 
 /**
@@ -59,7 +58,7 @@ export function agentVariables(stateDir: string): Record<string, string | undefi
   return {
     GH_TOKEN: undefined, GITHUB_TOKEN: undefined,
     // Select the agent account by configuration directory: a `.cmd` wrapper cannot be spawned by Node on Windows.
-    ...windows ? { GH_CONFIG_DIR: agentGhConfig(stateDir) } : {},
+    ...isWindows ? { GH_CONFIG_DIR: agentGhConfig(stateDir) } : {},
     // A worker's git finds the repository from its directory, never from the host's environment.
     ...Object.fromEntries(GIT_LOCATION.map(name => [name, undefined])),
     GIT_CONFIG_GLOBAL: workerGitConfig(stateDir), GIT_CONFIG_NOSYSTEM: '1',
@@ -102,11 +101,10 @@ export async function writeEnvironment(deployment: Pick<Deployment, 'stateDir' |
   // Workers may be running concurrently: write each shim to a temp file and atomically rename it so no command ever resolves past the shim directory.
   const kept = new Set<string>()
   const shim = async (name: string, body: string): Promise<void> => {
-    const entry = windows ? `${name}.cmd` : name
+    const entry = shimName(name)
     const temporary = join(dir, `.${name}.${process.pid}.tmp`)
     // A batch file is reachable through PATHEXT; an extensionless `#!/bin/sh` file is invisible to a Windows PATH lookup.
-    const text = windows ? `@echo off\r\n@REM ${MARKER}\r\n${body}\r\n` : `#!/bin/sh\n${MARKER}\n${body}\n`
-    await writeFile(temporary, text, { mode: windows ? 0o644 : 0o755 })
+    await writeFile(temporary, shimBody(MARKER, body), { mode: shimMode() })
     await rename(temporary, join(dir, entry))
     kept.add(entry)
   }
@@ -127,10 +125,10 @@ export async function writeEnvironment(deployment: Pick<Deployment, 'stateDir' |
     'for %%P in ("!PATH:;=" "!") do if /I not "%%~P"=="!_SELF!" set "_NEW=!_NEW!;%%~P"',
     'endlocal & set "PATH=%_NEW:~1%"',
   ].join('\r\n')
-  const run = (program: string): string => windows
+  const run = (program: string): string => isWindows
     ? `${withoutShimsWindows}\r\n"${program}" %*\r\nexit /b %ERRORLEVEL%`
     : `${withoutShims}\nexec ${shellQuote(program)} "$@"`
-  const fail = (message: string): string => windows
+  const fail = (message: string): string => isWindows
     ? `>&2 echo ${message}\r\nexit /b 1`
     : `echo ${shellQuote(message)} >&2\nexit 1`
   if (github.cli) await shim('gh', run(github.cli))
@@ -161,7 +159,7 @@ export async function writeEnvironment(deployment: Pick<Deployment, 'stateDir' |
 
 /** Applies environment overrides and prepends worker shims to `process.env.PATH`, returning a restore callback. */
 export function applyEnvironment(variables: Record<string, string | undefined>, stateDir: string, path: string): () => void {
-  const values = { ...variables, PATH: [workerBin(stateDir), path].join(delimiter) }
+  const values = { ...variables, PATH: [workerBin(stateDir), path].join(pathDelimiter()) }
   const previous = Object.fromEntries(Object.keys(values).map(name => [name, process.env[name]]))
   const apply = (env: Record<string, string | undefined>): void => { for (const [name, value] of Object.entries(env)) { if (value === undefined) delete process.env[name]; else process.env[name] = value } }
   apply(values)
@@ -172,7 +170,7 @@ export function applyEnvironment(variables: Record<string, string | undefined>, 
 export async function runAsWorker(subprocess: SubprocessRuntime, argv: string[], cwd: string, signal: AbortSignal, env?: Record<string, string>): Promise<string> {
   // Node refuses to spawn `.cmd`/`.bat` directly (the CVE-2024-27980 hardening), so a batch wrapper CLI — the account model
   // docs/006-deployment.md describes — is handed to cmd.exe, which is also the only place its quoting rules apply.
-  const batch = process.platform === 'win32' && /\.(cmd|bat)$/i.test(argv[0] ?? '')
+  const batch = isBatchWrapper(argv[0] ?? '')
   // Hand the program and its arguments as SEPARATE argv entries: Node then quotes each one for cmd, whereas joining
   // them into one command line lets cmd re-parse the quotes and hand the program literal backslash-quotes.
   const spawnArgv = batch ? ['cmd.exe', '/d', '/c', argv[0]!, ...argv.slice(1)] : argv
