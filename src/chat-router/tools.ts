@@ -15,7 +15,7 @@ export interface ChatRouterToolsHost {
    * Hands one task to the Engine as an explicit Trigger and accepts it at once. It does not go through the Router
    * Session, so dispatch keeps working when that Session is unavailable; the worker still gets its own Session.
    */
-  submit(title: string, request: string, context?: string): Promise<DispatchedTask>
+  submit(title: string, request: string, context?: string, name?: string): Promise<DispatchedTask>
   /** Read-only view of the shared ticket store, for the chat that dispatched the work. */
   status(): Promise<unknown>
   /** Passes a person's answer back to the worker that asked. */
@@ -26,6 +26,9 @@ const TaskSchema = z.object({
   title: z.string().trim().min(1).max(200).describe('A short label of the original request; do not turn it into a plan.'),
   request: z.string().trim().min(1).max(20_000).describe('The request in the person\'s own words, verbatim. Never add implementation steps, acceptance criteria or checklists.'),
   context: z.string().trim().max(4000).optional().describe('Optional background the worker needs, copied from this conversation. It is the only context the worker receives.'),
+  // A ticket's execution needs a kebab-case worktree name; without one, ticket creation throws before any worker runs.
+  name: z.string().trim().max(32).regex(/^[a-z]+(?:-[a-z0-9]+){0,3}$/, 'Use 1–4 short English words in lowercase kebab-case, at most 32 characters').optional()
+    .describe('Short English kebab-case name for the ticket worktree, e.g. create-hello-file. Translate the title into 1–4 lowercase English words; omit it and one is generated.'),
 }).strict()
 
 export function chatRouterTools(host: ChatRouterToolsHost): Tool[] {
@@ -38,7 +41,7 @@ export function chatRouterTools(host: ChatRouterToolsHost): Tool[] {
         const results = []
         for (const task of tasks) {
           try {
-            const dispatched = await host.submit(task.title, task.request, task.context)
+            const dispatched = await host.submit(task.title, task.request, task.context, task.name)
             // Report what actually happened: a ticket id, or the reason nothing was created. Never call a stored
             // Trigger "queued" — that reads as a live ticket when no ticket exists.
             results.push(dispatched.ticketId
