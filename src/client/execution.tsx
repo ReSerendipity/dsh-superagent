@@ -3,13 +3,27 @@ import { useRef, useState } from 'react'
 import { TICKET_FILTERS, type TicketFilter } from '../app/api.ts'
 import { LIMITS } from '../limits.ts'
 import { usePoll, type SettingsView, type SourceView, type StateView } from './api.ts'
-import { DisclosureRow, Icon, InfoTip, Input, Pill } from './controls.tsx'
+import { Button, DisclosureRow, Icon, InfoTip, Input, Pill, Tag } from './controls.tsx'
 import { SaveBar } from './draft.tsx'
 import { usePanel } from './provider.tsx'
 import { TicketLine } from './rows.tsx'
 import { ConfigHistory, Field, Fields, ModelField, numberOf, useBlockDraft, useSettings } from './settings-kit.tsx'
 import { localized } from './text.ts'
 import { ConfirmButton, Hint, LabelValue, LoadMore, LoadState, Section, StatusHead } from './widgets.tsx'
+
+/** The tickets a chief-of-staff chat dispatched, each one click away from the worker Session that runs it. */
+function ChatRouterTasks() {
+  const { t, call, openSession } = usePanel()
+  const { data } = usePoll(() => call('GET chatRouter/tasks'), [])
+  if (!data?.items.length) return null
+  return <Section title={t('chatRouterTasks')} hint={t('chatRouterTasksHint')}>
+    <ul className="dt-list">{data.items.map(item => <li key={item.ticket_id} className="dt-row-meta">
+      <span className="dt-status-text">{item.title}</span>
+      <Tag tone="outline">{item.state}</Tag>
+      <Button variant="outline" onClick={() => { void openSession(item.worker_session) }}>{t('openWorkerSession')}</Button>
+    </li>)}</ul>
+  </Section>
+}
 
 export function ExecutionStatus({ filter: current, state, reload }: {
   filter: TicketFilter; state: StateView; reload: () => Promise<void>
@@ -26,6 +40,7 @@ export function ExecutionStatus({ filter: current, state, reload }: {
   const action = paused ? 'resumeProcessing' : 'pauseProcessing'
   return <>
     <StatusHead hint={t('executionStatusIntro')} settings="execution" />
+    <ChatRouterTasks />
     <div className="dt-row-meta dt-status-line">
       <span className="dt-status-text" data-state={status.tone}>{status.label}</span>
       {!state.setup.problem && <>
