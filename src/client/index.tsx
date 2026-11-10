@@ -11,10 +11,21 @@ import type { PluginConfigViewProps } from '@deepseek-ai/dsh-client-ui-plugin-ma
 import type { ISessions } from '@deepseek-ai/dsh-api-session-controller/client'
 import type { SessionId } from '@deepseek-ai/dsh-session/types'
 import { openKnownSession, SessionNavigationError } from '../navigation.ts'
+import { caller } from './api.ts'
 import { App } from './app.tsx'
+import { messages } from './provider.tsx'
+import { TasksPane } from './tasks-pane.tsx'
 import { PluginConfig, usePageForm } from './deployment.tsx'
 import { en, zh } from './locales.ts'
 import type { T } from './text.ts'
+
+// DSH 0.2.0-rc.1 added the right-pane tab slot; this bundle's devDependencies pin an older type set, so declare
+// the slot here. The host renders it when the slot exists, and the registration is inert otherwise.
+declare module '@deepseek-ai/dsh-client-ui-slots' {
+  interface SlotMap {
+    'sidebar.right.pane.tab': { kind: 'list'; scope: 'root'; owner: Record<never, never> }
+  }
+}
 
 type ClientContext = Context & { sessions: ISessions; layout: ILayout }
 const NS = 'dshSuperagent'
@@ -65,6 +76,18 @@ export function apply(ctx: ClientContext): void {
         {wide && <span>{t('chatRouterTasks')}</span>}
       </button>),
   ))
+  // A right-pane tab, like a companion plugin's chat pane: the tasks a chief-of-staff chat dispatched, listed
+  // beside the conversation instead of behind the panel icon.
+  const call = caller(() => messages(t))
+  const openSession = async (id: string): Promise<void> => {
+    try { await openKnownSession(ctx.sessions, id as SessionId, target => { ctx.uiWorkspace.openSession(target) }, new AbortController().signal) }
+    catch (error) { console.warn('dsh-superagent: cannot open Session', error) }
+  }
+  // The right pane may mount after this plugin: wait for the slot declaration before registering, or the tab opens blank.
+  ctx.slots.inject('sidebar.right.pane.tab', function* () {
+    yield ctx.slots.register({ name: 'sidebar.right.pane.tab', id: 'dsh-superagent-tasks', order: 100,
+      label: () => t('chatRouterTasks') }, () => <TasksPane t={t} call={call} openSession={openSession} />)
+  })
   ctx.slots.inject('plugins.row.config', () => ctx.slots.register({ name: 'plugins.row.config', key: `${ENTRY}#${ENTRY}`, locale: NS },
     (props: PluginConfigViewProps & { t: T }) => <PluginConfig t={props.t} view={props.view} form={props.form} />))
 }

@@ -427,6 +427,7 @@ Some generic modules still refer directly to GitHub or Feishu:
 | `src/chat-router/submit.ts` | A dispatched task as an inbox `.md` carrying the originating chat id |
 | `src/chat-router/channel.ts` | A bounded brief from an archived reply back to the chat that dispatched it |
 | `src/client/chat-router.tsx` | The panel settings group for the presets and dispatch switches |
+| `src/client/tasks-pane.tsx` | The right-pane tab listing the tickets a chief-of-staff chat dispatched, each opening its worker Session |
 
 ## Tests
 
