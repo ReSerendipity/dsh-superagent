@@ -2,6 +2,7 @@
 import { liveTicket, threadKey, ticketStage, type AcceptMode, type AdmissionCell, type MandateBasis, type Ticket,
   type TicketStage } from '../../core/index.ts'
 import { workerSessionId } from '../../executor/dsh.ts'
+import { ticketCard } from '../cards.ts'
 import type { Store } from '../store.ts'
 import { channelLink, decisionView, newestFirst, page, snapshot, threadSummary, ticketLine, type Snapshot,
   type ViewHost } from './records.ts'
@@ -41,6 +42,23 @@ export function ticketList(host: ViewHost, stage: 'open' | TicketStage['stage'],
   return { ...result, items: result.items.map(ticket => ticketRow(view, ticket)) }
 }
 export type TicketListView = ReturnType<typeof ticketList>
+/**
+ * The tickets a chief-of-staff chat dispatched, newest first, each with the chat that sent it and the worker Session
+ * that runs it: the panel's task list, so a person does not have to hunt through workspaces to follow the work.
+ */
+export function chatRouterTasks(host: ViewHost) {
+  const view = snapshot(host)
+  const { store } = view
+  const items = store.tickets.list()
+    .map(ticket => ({ ticket, trigger: store.triggers.get(ticket.origin.triggerId) }))
+    .filter(({ trigger }) => trigger?.meta.dispatchedBy === 'chat-router')
+    .slice(0, 20)
+    .map(({ ticket, trigger }) => ({ ...ticketCard(ticket),
+      chat_session: String(trigger?.meta.chatSession ?? ''),
+      worker_session: workerSessionId(ticket.id) }))
+  return { items }
+}
+export type ChatRouterTasksView = ReturnType<typeof chatRouterTasks>
 export function ticketRow(view: Snapshot, ticket: Ticket) {
   const line = ticketLine(view, ticket)
   const channel = ticket.channels[0]

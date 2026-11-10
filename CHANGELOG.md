@@ -1,5 +1,17 @@
 # DSH-Superagent Changelog
 
+## [0.2.3] — 2026-11-10
+
+### Added
+
+- **面板「总管任务」列表**：设置 → 执行页顶部新增区块，列出总管派出的工单（标题 + 阶段），每条带「打开会话」按钮，直接打开对应的 `worker-<ticket id>` 会话，不必再去 DSH 左侧工作区翻找。
+- 新增只读路由 `GET chatRouter/tasks`：按 `trigger.meta.dispatchedBy === 'chat-router'` 过滤工单，返回 `ticketCard` 字段外加 `chat_session`（发起派发的主对话）与 `worker_session`（执行会话）。
+
+### Notes
+
+- 列表最多 20 条，按工单存储顺序倒序。
+- 主对话内的任务卡仍是文字形式（`chat_dispatch` 返回的 `ticket_id`）；内嵌可视化卡片未做。
+
 ## [0.2.2] — 2026-11-10
 
 ### Added

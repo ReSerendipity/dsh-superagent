@@ -7,7 +7,7 @@ import type { OverviewView } from './views/overview.ts'
 import type { SettingsView } from './views/settings.ts'
 import type { SourceStatusView } from './views/sources.ts'
 import type { DecisionListView, SearchView, ThreadDetailView, ThreadListView } from './views/threads.ts'
-import type { TicketListView } from './views/tickets.ts'
+import type { ChatRouterTasksView, TicketListView } from './views/tickets.ts'
 
 export const TICKET_FILTERS = ['open', 'person', 'working', 'idle', 'ended'] as const
 export const THREAD_FILTERS = ['subscribed', 'evaluating', 'recent', 'all'] as const
@@ -31,6 +31,7 @@ export interface Api {
   'GET decisions': { query?: Paged & { kind?: string; window?: '24h' }; response: DecisionListView }
   'POST decisions/:id/dismiss': { response: { dismissed: true } }
   'GET tickets': { query?: Paged & { state?: TicketFilter }; response: TicketListView }
+  'GET chatRouter/tasks': { response: ChatRouterTasksView }
   'GET tickets/:id': { response: TicketPageView }
   'POST tickets': { body: { title: string; body?: string }; response: { file: string; inbox: string } }
   'POST tickets/:id/retry': { response: { retried: true } }
