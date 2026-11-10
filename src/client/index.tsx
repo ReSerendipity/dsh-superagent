@@ -27,7 +27,9 @@ declare module '@deepseek-ai/dsh-client-ui-slots' {
   }
 }
 
-type ClientContext = Context & { sessions: ISessions; layout: ILayout }
+// `layout` is read on demand: requiring it at activation blocked the whole entry on hosts where the layout
+// service is not ready yet, which made DSH fail to boot.
+type ClientContext = Context & { sessions: ISessions; layout?: ILayout }
 const NS = 'dshSuperagent'
 const PANEL_ID = 'dsh-superagent' as MainPanelId
 const ENTRY = 'dsh-superagent'
@@ -56,7 +58,7 @@ function Mounted({ ctx, t }: { ctx: ClientContext; t: T }) {
   return <App t={t} openSession={openSession} deploymentForm={form} />
 }
 
-export const inject = ['slots', 'locale', 'sessions', 'uiWorkspace', 'layout']
+export const inject = ['slots', 'locale', 'sessions', 'uiWorkspace']
 /** Registers the panel, sidebar icon, and Plugin Manager config view; `configForms` is optional (without it, machine settings are read-only). */
 export function apply(ctx: ClientContext): void {
   ctx.effect(() => ctx.locale.register(NS, { zh, en }), 'dsh-superagent: dictionaries')
@@ -69,7 +71,7 @@ export function apply(ctx: ClientContext): void {
   ctx.slots.inject('sidebar.footer.action', () => ctx.slots.register(
     { name: 'sidebar.footer.action', id: 'dsh-superagent:tasks', order: 10, label: () => t('chatRouterTasks'), locale: NS },
     ({ wide }: SidebarFooterActionOwnerProps) => (
-      <button type="button" title={t('chatRouterTasks')} onClick={() => { ctx.layout.selectPanel(PANEL_ID) }}
+      <button type="button" title={t('chatRouterTasks')} onClick={() => { ctx.layout?.selectPanel(PANEL_ID) }}
         style={{ display: 'flex', alignItems: 'center', gap: 6, width: '100%', justifyContent: wide ? 'flex-start' : 'center',
           padding: wide ? '6px 8px' : 6, background: 'none', border: 0, color: 'inherit', cursor: 'pointer', font: 'inherit' }}>
         <HammerIcon size={16} active={false} />

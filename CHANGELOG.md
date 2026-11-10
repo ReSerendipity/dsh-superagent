@@ -1,5 +1,16 @@
 # DSH-Superagent Changelog
 
+## [0.2.6] — 2026-11-10
+
+### Fixed
+
+- **0.2.5 会让 DSH 启动失败**：`web boot: 1 entry did not activate / @reserendipity/dsh-superagent: failed`。原因是客户端 `inject` 把 `layout` 当成了必需依赖，而宿主在插件激活时该服务尚未就绪，整个 entry 停在 pending，导致应用无法启动。现在 `layout` 改为按需读取（`ctx.layout?.selectPanel`），不再阻塞激活。
+- 受影响版本：仅 0.2.5。请升级到 0.2.6；0.2.5 已发布不可撤回。
+
+### Notes
+
+- 0.2.5 的右栏「总管任务」标签保持不变，只是不再硬依赖 `layout` 服务。
+
 ## [0.2.5] — 2026-11-10
 
 ### Added
