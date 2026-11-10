@@ -179,6 +179,7 @@ PATH 剥离与幂等性；`tests/environment.spec.ts` 覆盖 POSIX 垫片的执�
 | Windows 操作者视角的 17 条差异与 E2E 记录 | `WINDOWS-SETUP.md` §11 / §12 |
 | 上游基线与逐处改动、升级流程 | `WINDOWS-DELTA.md` |
 | Windows 本机测试基线 | `1282 passed / 49 skipped`（2026-11-10 全量实测；`AGENTS.md` §4 的 `1226 / 48` 是更早的基线，6f429c3 的用例总数更多） |
+| 首次三平台 CI（run 42833259273，2026-11-10） | <https://github.com/ReSerendipity/dsh-superagent/actions/runs/42833259273>：`windows-latest` 绿；`ubuntu-latest` / `macos-latest` 红。3 个 POSIX 侧失败：F1 `tests/deployment.spec.ts` 断言未包含当前 `machineOf` 契约的 `mode` / `configPath`（测试断言过期）；F2 `tests/sources.spec.ts` 飞书 health 被迟到的 `[event] ready` 覆盖（产品跨流竞态）；F3 `tests/config-watch.spec.ts` 在 macOS `fs.watch` 空文件名时放行邻居事件（产品缺陷）。修复后待重跑，未提前写成已通过 |
 
 ### 4.1 只能在 CI 验证的结论
 
@@ -186,10 +187,12 @@ PATH 剥离与幂等性；`tests/environment.spec.ts` 覆盖 POSIX 垫片的执�
 - 约 48 项既有 `skipIf(WINDOWS)` 用例在 POSIX 的首次真跑结果（另有 1 项新增的 POSIX 包装器对等用例）；本机只能跑 Windows 侧。
 - `timeout-minutes: 20` 是否足够，尤其 macOS runner。
 - `tests/portability.spec.ts` 在 CI 账号（`runner` / `runneradmin`）下不误报机器路径。
+- F1–F3 的修复结果：必须重跑 `ubuntu-latest` / `macos-latest` 才能确认；本机 Windows 侧这些用例大多跳过。
 - macOS 真机层（桌面端注入、Gatekeeper、Keychain、端到端首单）**不在 CI 能力范围内**，见 §2.1；CI 全绿不构成真机证据。
 
 ### 4.2 P0 之后的开放项
 
+- 重跑三平台 CI 验证 F1–F3 修复；在首次全绿前 Linux 仍为 Tier 3（全绿后升 Tier 2），macOS 保持 Tier 3。
 - macOS 真机的安装、DSH 桌面端、Gatekeeper / Keychain 与端到端首单（Mode A / Mode B）；Linux 的安装说明与端到端首单。
 - `GH_CONFIG_DIR` 与包装器两种账号模型的统一。
 - `executor.prepare` 的跨平台配置策略。
