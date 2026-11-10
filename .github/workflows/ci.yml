@@ -55,3 +55,21 @@ jobs:
           fi
           echo 'lib/ is what a git install serves'
       - run: pnpm vitest run
+
+  # The branch protection rule on main still requires the historical check context
+  # "Typecheck, build, tests". The matrix job above reports one check per platform, so this
+  # aggregate job restores that exact context. Do not rename or delete it: the required
+  # context would otherwise stay pending and block every PR.
+  required-check:
+    name: Typecheck, build, tests
+    needs: verify
+    if: always()
+    runs-on: ubuntu-latest
+    steps:
+      - name: Report the three-platform result
+        run: |
+          if [ "${{ needs.verify.result }}" != "success" ]; then
+            echo "One or more platform jobs failed: ${{ needs.verify.result }}"
+            exit 1
+          fi
+          echo "All platform jobs passed"
