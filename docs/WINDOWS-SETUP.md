@@ -1327,6 +1327,8 @@ title: 首单只读验证（勿改文件）
 
 ## 11. Windows 移植与上游的差异
 
+> 三平台对称的差异台账见 [`docs/028-platform-support.md`](028-platform-support.md)；本节保留 Windows 侧已验证的操作者视角记录。
+
 > 这是**操作者视角**的摘要。完整的逐处清单、冲突处理预案与升级判定标准以 [`docs/WINDOWS-DELTA.md`](WINDOWS-DELTA.md) 为准。表中与桌面外壳有关的行（如 `Superagent.exe`、快捷方式）是 2026-11-07 移除前的历史记录。
 > 仓库状态（可引用）：`origin` = `ReSerendipity/dsh-superagent`（本适配版唯一推送目标）、`upstream` = 官方原型仓库、`reference` = Check-mj 的 Windows 移植（起步来源，已不再是上游）；具体提交以 `git remote -v` 与 `git log -1` 为准，三处来源的分工见 `NOTICE`。`WINDOWS-DELTA.md` 的 §3.4 记录 E2E 才暴露的两处缺陷、§3.5 记录 batch 包装器参数传递；契约测试 `tests/windows-port.spec.ts` 2 条全绿（batch shim + PATH 剥离 + `.cmd` 包装器精确传参）。
 

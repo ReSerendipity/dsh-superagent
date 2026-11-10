@@ -1,7 +1,7 @@
-dsh-superagent — Windows adaptation
-====================================
+dsh-superagent — an independent cross-platform distribution
+============================================================
 
-This repository is an adaptation built on the official DeepSeek project:
+This repository is an independently maintained, cross-platform distribution built on the official DeepSeek project:
 
     dsh-superagent-prototype
     https://github.com/deepseek-ai/dsh-superagent-prototype

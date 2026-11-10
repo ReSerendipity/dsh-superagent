@@ -10,7 +10,7 @@
     "access": "public",
     "registry": "https://registry.npmjs.org/"
   },
-  "description": "（非官方产品）DSH-Superagent 是 DeepSeek Harness 的插件：把 GitHub 仓库（issue/PR/评论/CI）、本机收件目录或可选的飞书群聊事件，变成在上下文隔离的 DSH 会话里执行的工单，并把结果回贴原处；面板管触发、评估、执行与设置。可直接装进官方 DeepSeek Harness 应用（无需第二个程序），也支持完全不配 GitHub 的本地模式；作为官方 dsh-superagent-prototype 的 Windows 适配版（非官方产品），补齐了上游未实现的 Watchdog 控制回路与 Router 分片。上游：https://github.com/deepseek-ai/dsh-superagent-prototype（MIT，Copyright (c) 2026 DeepSeek Harness Team）；本构建：https://github.com/ReSerendipity/dsh-superagent",
+  "description": "（非官方产品）DSH-Superagent 是 DeepSeek Harness 的插件：把 GitHub 仓库（issue/PR/评论/CI）、本机收件目录或可选的飞书群聊事件，变成在上下文隔离的 DSH 会话里执行的工单，并把结果回贴原处；面板管触发、评估、执行与设置。可直接装进官方 DeepSeek Harness 应用（无需第二个程序），也支持完全不配 GitHub 的本地模式；作为官方 dsh-superagent-prototype 的跨平台发行版（非官方产品，由 Windows 适配版扩展为 Windows / macOS / Linux，适配进行中），补齐了上游未实现的 Watchdog 控制回路与 Router 分片。上游：https://github.com/deepseek-ai/dsh-superagent-prototype（MIT，Copyright (c) 2026 DeepSeek Harness Team）；本构建：https://github.com/ReSerendipity/dsh-superagent",
   "type": "module",
   "main": "lib/index.js",
   "types": "lib/index.d.ts",
@@ -146,7 +146,9 @@
     "deepseek-harness",
     "super-agent",
     "github",
-    "windows"
+    "windows",
+    "macos",
+    "linux"
   ],
   "contributors": [
     {
