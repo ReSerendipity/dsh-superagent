@@ -1,10 +1,41 @@
 // The declarative settings file is watched, so saving an edit applies it without a service restart.
+import type { FSWatcher } from 'node:fs'
 import { mkdtemp, rename, rm, writeFile } from 'node:fs/promises'
 import { tmpdir } from 'node:os'
 import { join } from 'node:path'
-import { expect, it } from 'vitest'
+import { expect, it, vi } from 'vitest'
 import { declarativeFileNames } from '../src/app/config-file.ts'
 import { watchDeclarative } from '../src/app/config-watch.ts'
+
+/**
+ * One save makes the directory watcher emit several events. Waiting for the operating system to deliver them makes
+ * the debounce assertion depend on the runner's write pacing rather than on the debounce contract: when two real
+ * writes land more than `debounceMs` apart, a trailing debounce correctly calls back twice. That is what
+ * ubuntu-latest reported as `expected 2 to be 1` while the very same commit passed on a rerun, so the burst case
+ * dispatches the events itself. Every other case below keeps using the real `fs.watch`.
+ */
+const injectedWatch = vi.hoisted(() => ({
+  active: false,
+  listeners: [] as Array<() => void>,
+}))
+
+vi.mock('node:fs', async importOriginal => {
+  const actual = await importOriginal<typeof import('node:fs')>()
+  const realWatch = actual.watch as (
+    directory: string,
+    options: { persistent: boolean },
+    listener: () => void,
+  ) => FSWatcher
+  return {
+    ...actual,
+    watch: ((directory: string, options: { persistent: boolean }, listener: () => void) => {
+      if (!injectedWatch.active) return realWatch(directory, options, listener)
+      injectedWatch.listeners.push(listener)
+      // The watcher only calls close() and on('error'); the events are dispatched by the test.
+      return { close: () => undefined, on: () => undefined } as unknown as FSWatcher
+    }) as unknown as typeof actual.watch,
+  }
+})
 
 /** Resolve once `until()` is true, or fail the test after `ms`. Watching is asynchronous, so polling beats sleeping. */
 const until = async (until: () => boolean, ms = 2000): Promise<void> => {
@@ -60,14 +91,32 @@ it('collapses a burst of events from one save into a single callback', async () 
   const file = join(dir, 'superagent.settings.json')
   await writeFile(file, '{}', 'utf8')
   let fired = 0
+  // Four events of one burst, dispatched as soon as each write landed, plus a fake clock for the quiet period: the
+  // callback count is then decided by the debounce logic alone, not by how a loaded runner schedules I/O and timers.
+  injectedWatch.active = true
+  vi.useFakeTimers()
   const watcher = watchDeclarative(file, () => { fired++ }, { debounceMs: 60 })
   try {
-    for (let i = 0; i < 4; i++) await writeFile(file, '{"executor":{"maxWorkers":' + i + '}}', 'utf8')
-    await until(() => fired >= 1)
-    await settle(150)
+    const emit = (): void => { for (const listener of injectedWatch.listeners) listener() }
+    expect(injectedWatch.listeners).toHaveLength(1)
+    for (let i = 0; i < 4; i++) {
+      await writeFile(file, '{"executor":{"maxWorkers":' + i + '}}', 'utf8')
+      emit()
+    }
+    // The burst is still unsettled one tick before the debounce window closes...
+    await vi.advanceTimersByTimeAsync(59)
+    expect(fired).toBe(0)
+    await vi.advanceTimersByTimeAsync(1)
+    expect(fired).toBe(1)
+    // ...and a later directory event that leaves the watched files unchanged must not queue a second callback.
+    emit()
+    await vi.advanceTimersByTimeAsync(600)
     expect(fired).toBe(1)
   } finally {
     watcher.close()
+    vi.useRealTimers()
+    injectedWatch.active = false
+    injectedWatch.listeners.length = 0
     await rm(dir, { recursive: true, force: true })
   }
 })
