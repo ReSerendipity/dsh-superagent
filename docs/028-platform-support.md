@@ -195,6 +195,7 @@ PATH 剥离与幂等性；`tests/environment.spec.ts` 覆盖 POSIX 垫片的执�
 
 ### 4.2 P1 之后的开放项
 
+- **P1-5 服务启动器的真机验证**：契约层已在 CI 覆盖（`tests/service-script.spec.ts` 的 POSIX 分支，真 `fcntl.flock` / 真 `SIGINT`，但用假 `ps` / 假 `tmux`）；真实 `tmux` 交互、BSD/GNU `ps` 解析与真实 `dsh` 进程仍需在真机执行一次，清单见 `docs/029-manual-verification.md`（编号文档只允许链接到更早的编号，故此处不设链接）。开发机无 WSL 发行版，且 `ubuntu-24.04` 官方镜像不含 tmux——为一条低频路径给每次 CI 加 `apt-get install tmux` 不划算，故不做 CI 自动化。
 - macOS 真机的安装、DSH 桌面端、Gatekeeper / Keychain 与端到端首单（Mode A / Mode B）；Linux 的安装说明与端到端首单。
 - `release:check` 的 POSIX 实现。
 - `docs/WINDOWS-SETUP.md` / `WINDOWS-DELTA.md` 是否改名（决策待定）。
