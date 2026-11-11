@@ -19,11 +19,19 @@ const BINARY = /\.(png|ico|jpg|jpeg|webp|zip|zst|zstd|exe|dll|pak|dat|bin|pdf)$/
 const USER = userInfo().username
 const HOME = homedir()
 const escape = (value: string): string => value.replace(/[.*+?^${}()|[\]\\]/g, '\\$&')
+// GitHub's hosted runners use a generic service account (`runner` on Linux/macOS, `runneradmin` on Windows).
+// Those names are ordinary words in prose ("a Linux runner needs more time") and identify no person, so the
+// user-name rule is skipped for them; the home, Windows-user and checkout path rules still run on CI.
+const SERVICE_ACCOUNTS = new Set(['runner', 'runneradmin', 'vsts', 'build', 'builder', 'administrator'])
+const developerUser = SERVICE_ACCOUNTS.has(USER.toLowerCase()) ? undefined : USER
+const userRule: { name: string; pattern: RegExp }[] = developerUser === undefined ? [] : [
+  { name: 'developer user name', pattern: new RegExp(`(?:^|[^A-Za-z0-9_])${escape(developerUser)}(?:$|[^A-Za-z0-9_])`, 'i') },
+]
 
 /** Absolute paths and names that only exist on the machine this checkout runs on. */
 export const FORBIDDEN: { name: string; pattern: RegExp }[] = [
   { name: 'developer home directory', pattern: new RegExp(escape(HOME), 'i') },
-  { name: 'developer user name', pattern: new RegExp(`(?:^|[^A-Za-z0-9_])${escape(USER)}(?:$|[^A-Za-z0-9_])`, 'i') },
+  ...userRule,
   { name: 'windows user path', pattern: new RegExp(`C:[\\\\/]{1,2}Users[\\\\/]{1,2}${escape(USER)}\\b`, 'i') },
   { name: 'repository checkout path', pattern: new RegExp(escape(ROOT), 'i') },
 ]

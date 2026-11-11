@@ -1,6 +1,6 @@
-# WINDOWS-DELTA — 本项目相对上游的改动清单与升级流程
+# WINDOWS-DELTA — 平台差异台账与上游升级流程
 
-本文件是本适配版的**唯一权威差量清单**。上游（`deepseek-ai/dsh-superagent-prototype`）每次更新后，按本文件核对即可。
+本文件是**平台差异台账与上游升级清单**：平台层改动按代码归属登记，Windows / macOS / Linux 共用同一份记录。上游（`deepseek-ai/dsh-superagent-prototype`）每次更新后，按本文件核对即可。
 
 设计目标：**上游更新能被低成本吸收，本项目的工作永不丢失。**
 
@@ -11,8 +11,8 @@
 ```
 upstream   https://github.com/deepseek-ai/dsh-superagent-prototype.git   （只读，官方原型，差量核对的基准）
 reference  https://github.com/Check-mj/dsh-superagent-windows.git         （只读，Windows 层的起步来源，不再是上游）
-origin     https://github.com/ReSerendipity/dsh-superagent                （本适配版唯一推送目标）
-main       本项目的分支 = 官方 main + Check-mj 的 Windows 移植 + 本适配版的后续改动
+origin     https://github.com/ReSerendipity/dsh-superagent                （本仓唯一推送目标）
+main       本项目的分支 = 官方 main + 平台层改动 + 本仓的后续改动（三平台共用）
 tag        upstream-base   记录取基线时的官方提交（8c32a9d），一条命令即可看官方新动向
 ```
 
@@ -26,7 +26,7 @@ tag        upstream-base   记录取基线时的官方提交（8c32a9d），一�
 
 | 层 | 位置 | 与上游冲突概率 | 说明 |
 |---|---|---|---|
-| **L1 平台补丁** | `src/deployment.ts`、`src/infra/environment.ts` | 中（仅这几处） | `process.platform === 'win32'` 门控，Linux 分支保持逐字节等价 |
+| **L1 平台补丁** | `src/deployment.ts`、`src/infra/environment.ts` | 中（仅这几处） | 按平台门控；POSIX 分支保持上游逐字节语义，Windows 分支叠加平台机制 |
 | **L2 新增文件** | `scripts/dsh-superagent.cmd`、`scripts/dsh-service-hook.mjs` | 无 | 纯新增，上游不会有同名文件 |
 | **L3 应用壳（已移除）** | `windows-app/`（Electron；2026-11-07 删除） | **零** | 当年完全不 import 上游源码，只通过 CLI 与 HTTP API 交互 |
 | **L4 契约测试 + 文档** | `tests/windows-port.spec.ts`、`WINDOWS-SETUP.md`、本文件 | 低 | 测试锁定本项目依赖的行为，文档记录口径 |

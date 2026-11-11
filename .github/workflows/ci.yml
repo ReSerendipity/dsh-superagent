@@ -1,5 +1,7 @@
 # 远端载体（治理标准 §20.1）：typecheck、构建一致性检查与全量测试必须在推送 / PR 上跑，
-# 不依赖维护者本机；公开仓的分钟数走免费额度，故周检在转公开后再加 schedule。
+# 不依赖维护者本机。本仓是独立维护的跨平台发行版，Windows / macOS / Linux 都是目标平台，
+# 因此同一套检查在三个 runner 上都执行；Windows 仍是回归基线，不是唯一平台。
+# 公开仓的分钟数走免费额度，故周检在转公开后再加 schedule。
 name: CI
 
 on:
@@ -17,11 +19,14 @@ concurrency:
 
 jobs:
   verify:
-    name: Typecheck, build, tests
-    # The product targets Windows: `tests/windows-port.spec.ts` asserts `.cmd` wrappers and the
-    # named-pipe probes, so a Linux runner would fail on tests that are correct for the shipped
-    # platform. Run the suite where the plugin actually runs.
-    runs-on: windows-latest
+    name: Typecheck, build, tests (${{ matrix.os }})
+    # Windows, macOS and Linux are all target platforms, so run the same suite on each. `fail-fast: false`
+    # keeps every platform's result visible instead of cancelling the rest after the first failure.
+    strategy:
+      fail-fast: false
+      matrix:
+        os: [ubuntu-latest, macos-latest, windows-latest]
+    runs-on: ${{ matrix.os }}
     timeout-minutes: 20
     steps:
       - uses: actions/checkout@v7
@@ -36,16 +41,35 @@ jobs:
       - run: pnpm typecheck
       - run: pnpm build
       # A git install serves `lib/` as committed, so a green test run alone does not prove that
-      # lib matches src. Fail when the fresh build changed the tracked build output.
+      # lib matches src. Fail when the fresh build changed the tracked build output. `shell: bash`
+      # runs Git Bash on Windows, so one POSIX script covers all three runners.
       - name: Committed lib matches a fresh build
-        shell: pwsh
+        shell: bash
         run: |
-          $dirty = git status --porcelain -- lib
-          if ($dirty) {
-            Write-Host 'lib/ is stale - rebuild and commit it.'
+          dirty=$(git status --porcelain -- lib)
+          if [ -n "$dirty" ]; then
+            echo 'lib/ is stale - rebuild and commit it.'
             git diff --stat -- lib
-            Write-Host $dirty
+            echo "$dirty"
             exit 1
-          }
-          Write-Host 'lib/ is what a git install serves'
+          fi
+          echo 'lib/ is what a git install serves'
       - run: pnpm vitest run
+
+  # The branch protection rule on main still requires the historical check context
+  # "Typecheck, build, tests". The matrix job above reports one check per platform, so this
+  # aggregate job restores that exact context. Do not rename or delete it: the required
+  # context would otherwise stay pending and block every PR.
+  required-check:
+    name: Typecheck, build, tests
+    needs: verify
+    if: always()
+    runs-on: ubuntu-latest
+    steps:
+      - name: Report the three-platform result
+        run: |
+          if [ "${{ needs.verify.result }}" != "success" ]; then
+            echo "One or more platform jobs failed: ${{ needs.verify.result }}"
+            exit 1
+          fi
+          echo "All platform jobs passed"

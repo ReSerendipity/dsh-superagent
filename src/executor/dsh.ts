@@ -9,6 +9,7 @@ import type { AssessmentOutcome, Assignment, EngineForExecutor, Execution, Execu
   from '../core/index.ts'
 import type { Machine } from '../deployment.ts'
 import { runAsWorker, verifyDirectory } from '../infra/environment.ts'
+import { commandShell } from '../infra/platform.ts'
 import type { Settings } from '../policy.ts'
 import type { Store } from '../app/store.ts'
 import { Later, type Effects } from '../app/effects.ts'
@@ -256,7 +257,7 @@ export class DshExecutor implements Executor {
     const signal = AbortSignal.any([this.host.lifetime, AbortSignal.timeout(PREPARE_TIMEOUT_MS)])
     // A Windows deployment has no `sh`: the prepare command is a batch/command string, so run it through cmd.exe.
     // Running it through a POSIX shell there also eats the backslashes of every Windows path in it.
-    const shell = process.platform === 'win32' ? ['cmd.exe', '/d', '/s', '/c'] : ['sh', '-c']
+    const shell = commandShell()
     if (command) await runAsWorker(this.host.context.subprocess, [...shell, command], dirname(directory), signal, env)
       .catch(async (error: unknown) => {
         // Remove an empty directory left by a failed prepare command so a later retry does not treat it as already prepared.

@@ -88,6 +88,15 @@ it('has a changelog with the published version', () => {
   expect(changelog).toContain('DSH-Superagent')
 })
 
+it('keeps the POSIX launcher executable and the LF normalization of tracked text', () => {
+  // The launcher is invoked directly on macOS/Linux; a mode change or a CRLF checkout would break it without any
+  // test importing the script. Check the index, not the working tree, so a Windows checkout is judged the same way.
+  const staged = execFileSync('git', ['-C', ROOT, 'ls-files', '-s', 'scripts/dsh-superagent'], { encoding: 'utf8' }).trim()
+  expect(staged).toMatch(/^100755 [0-9a-f]+ 0\tscripts\/dsh-superagent$/)
+  const attributes = read('.gitattributes').split(/\r?\n/)
+  expect(attributes).toContain('* text=auto eol=lf')
+})
+
 it('never trades in a credential', () => {
   const files = trackedTextFiles()
   // An empty enumeration is not a pass: the scan has to see the repository.

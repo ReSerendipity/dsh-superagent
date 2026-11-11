@@ -2,7 +2,7 @@
 import { describe, expect, it, vi, type Mock } from 'vitest'
 import { existsSync, mkdirSync, mkdtempSync, readFileSync, readdirSync, statSync, writeFileSync } from 'node:fs'
 import { tmpdir } from 'node:os'
-import { join } from 'node:path'
+import { join, resolve } from 'node:path'
 import { Engine, key, threadKey, type OutboundMessage, type Trigger } from '../src/core/index.ts'
 import { inboxDir, inboxKind, inboxTrigger, pollInbox, sendInbox } from '../src/sources/inbox.ts'
 import { SourceRegistry } from '../src/sources/registry.ts'
@@ -178,8 +178,10 @@ describe('the inbox kind', () => {
     expect(inboxKind.policy!.rows!({})[0]!.id).toBe('inbox')
   })
   it('accepts an absolute inbox directory and defaults to one under the state directory', () => {
-    expect(inboxDir({ stateDir: 'C:/state' }, { ...CONFIG, inboxDir: 'D:/tasks' })).toBe('D:\\tasks')
-    expect(inboxDir({ stateDir: 'C:/state' }, CONFIG)).toBe('C:\\state\\inbox')
+    // A configured directory is resolved; the default is joined onto the state directory. Both hold on every
+    // platform: `resolve('D:/tasks')` is `D:\tasks` on Windows and stays `D:/tasks` on POSIX (relative to cwd).
+    expect(inboxDir({ stateDir: 'C:/state' }, { ...CONFIG, inboxDir: 'D:/tasks' })).toBe(resolve('D:/tasks'))
+    expect(inboxDir({ stateDir: 'C:/state' }, CONFIG)).toBe(join('C:/state', 'inbox'))
   })
   it('claims its health entry on registration', () => {
     const h = host()

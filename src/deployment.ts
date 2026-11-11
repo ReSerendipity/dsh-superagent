@@ -8,6 +8,7 @@ import s from '@deepseek-ai/schemastery'
 import { z } from 'zod'
 import type { SubprocessRuntime } from '@deepseek-ai/dsh-subprocess'
 import { agentGhConfig, runAsWorker, sameDirectory, withoutDirectory, workerBin } from './infra/environment.ts'
+import { probeEnv } from './infra/platform.ts'
 import { SetupError } from './setup.ts'
 
 const reason = (error: unknown): string => error instanceof Error ? error.message : String(error)
@@ -107,19 +108,15 @@ export function executable(name: string, path: string, exclude?: string): string
   throw new Error(`${name} is not an executable file${isAbsolute(name) ? '' : ' on PATH'}`)
 }
 
-export type Probe = (argv: string[]) => Promise<string>
+export type Probe = (argv: string[], env?: Record<string, string>) => Promise<string>
 /** Run startup checks through DSH's worker subprocess service with worker shims removed from PATH so a `gh` wrapper script reaches the real binary. */
 export function workerProbe(subprocess: SubprocessRuntime, stateDir: string, cwd: string, signal: AbortSignal): Probe {
   const path = withoutDirectory(process.env.PATH ?? '', workerBin(stateDir))
   const timeout = (): AbortSignal => AbortSignal.any([signal, AbortSignal.timeout(60_000)])
-  if (process.platform !== 'win32') return argv => runAsWorker(subprocess, ['env', `PATH=${path}`, ...argv], cwd, timeout())
-  // Windows has no `env` executable; supply the shim-free PATH as an explicit environment layer, which DSH merges
-  // onto its sanitised ambient environment. Windows variable names are case-insensitive, so override the key that exists.
-  const pathVariable = Object.keys(process.env).find(name => name.toUpperCase() === 'PATH') ?? 'PATH'
-  // This probe runs before `applyEnvironment`, so the agent's configuration directory must be supplied here as well;
-  // otherwise the account check would read the operator's own `gh` login.
-  const environment = { [pathVariable]: path, GH_CONFIG_DIR: agentGhConfig(stateDir) }
-  return argv => runAsWorker(subprocess, argv, cwd, timeout(), environment)
+  return (argv, extra) => {
+    const command = probeEnv(path, agentGhConfig(stateDir), argv, extra)
+    return runAsWorker(subprocess, command.argv, cwd, timeout(), command.env)
+  }
 }
 
 const GithubUser = z.object({ login: z.string().regex(/^[A-Za-z0-9-]+$/), id: z.number().int().positive() })
@@ -154,6 +151,7 @@ export async function resolveDeployment(machine: Machine, github: unknown, probe
 
 const AuthStatus = z.object({ appId: z.string().regex(/^cli_[A-Za-z0-9]+$/), brand: z.enum(['feishu', 'lark']).default('feishu'), identities: z.object({ bot: z.object({ status: z.string() }) }) })
 const BotInfo = z.object({ bot: z.object({ open_id: z.string().regex(/^ou_[A-Za-z0-9]+$/), app_name: z.string().default('') }) })
+const FEISHU_PROBE_ENV: Record<string, string> = { LARKSUITE_CLI_NO_UPDATE_NOTIFIER: '1', LARKSUITE_CLI_NO_SKILLS_NOTIFIER: '1' }
 /**
  * Verify that the configured Feishu CLI is authenticated as a bot and restricted to strict mode `bot`.
  * Workers invoke this CLI as `lark-cli`, so a CLI that also permits a user identity would let workers act as that user.
@@ -164,7 +162,8 @@ export async function resolveFeishuBot(machine: Machine, feishu: unknown, probe:
   const fail = (error: unknown): never => { throw error instanceof SetupError ? error : new SetupError('feishuCliFailed', { output: reason(error) }) }
   let cli = ''
   try { cli = executable(name, path, workerBin(machine.stateDir)) } catch (error) { fail(error) }
-  const run = (...args: string[]): Promise<string> => probe(['env', 'LARKSUITE_CLI_NO_UPDATE_NOTIFIER=1', 'LARKSUITE_CLI_NO_SKILLS_NOTIFIER=1', cli, ...args]).catch(fail)
+  // The probe transport supplies PATH, GH_CONFIG_DIR and this Source's own notifier switches on both Windows and POSIX.
+  const run = (...args: string[]): Promise<string> => probe([cli, ...args], FEISHU_PROBE_ENV).catch(fail)
   const text = await run('auth', 'status')
   const status = parsed(AuthStatus, text.slice(text.indexOf('{')))
   if (!status) return fail(new SetupError('feishuNoApp'))
