@@ -61,5 +61,24 @@ describe.skipIf(!WINDOWS)('the Windows launcher branch', () => {
 
   // Not tested here: `start` really does spawn the profile's service. Its marker-clearing behaviour is
   // deliberately left to the end-to-end run, so this suite stays free of side effects.
+})
 
+describe('the PowerShell scripts that run unattended', () => {
+  it('parse as scripts at all, which the rest of the suite never checks', () => {
+    // These run at logon or on a schedule where nobody watches; a syntax error surfaces only as silence.
+    const scripts = ['dsh-superagent-guard.ps1', 'dsh-superagent-watchdog.ps1', 'release-check.ps1']
+    for (const name of scripts) {
+      const path = join(ROOT, 'scripts', name)
+      const probe = spawnSync('powershell', ['-NoProfile', '-Command',
+        `$null = [scriptblock]::Create((Get-Content -Raw '${path.replaceAll("'", "''")}')); if ($?) { 'ok' } else { exit 1 }`], { encoding: 'utf8' })
+      expect(probe.stdout.trim(), name).toBe('ok')
+    }
+  })
+  it('records the service pid with a birth stamp, so a reused pid is not mistaken for the service', () => {
+    // The writer and the reader must agree on the JSON shape; a bare pid stays readable as the legacy format.
+    const manager = readFileSync(SCRIPT, 'utf8')
+    expect(manager).toContain("json.dumps({'pid': child.pid, 'born': process_born(child.pid)})")
+    expect(manager).toContain('same_process(pid, born)')
+    expect(manager).toContain('def process_born(pid)')
+  })
 })

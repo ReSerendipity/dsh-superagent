@@ -104,7 +104,10 @@ switch ($code) {
         }
     }
     { $_ -eq 2 -or $_ -eq 3 } {
-        $sig = ($json -replace '\d{4}-\d\d-\d\dT[\d:.]+Z', 'T' -replace '\s+', ' ' -replace '\\\\', '\')
+        # The signature must survive a service restart: timestamps collapse, doubled backslashes (JSON escaping
+        # of Windows paths) collapse to one, and the volatile pids/cwd fields are dropped before hashing.
+        $sig = (($json | ConvertFrom-Json | Select-Object * -ExcludeProperty pids, cwd) | ConvertTo-Json -Compress -Depth 10)
+        $sig = ($sig -replace '\d{4}-\d\d-\d\dT[\d:.]+Z', 'T' -replace '\s+', ' ' -replace '\\\\', '\')
         $hash = [BitConverter]::ToString((New-Object Security.Cryptography.SHA256Managed).ComputeHash(
             [Text.Encoding]::UTF8.GetBytes($sig))).Replace('-', '').Substring(0, 16).ToLower()
         $kind = if ($code -eq 2) { 'part-error' } else { 'setup-pending' }

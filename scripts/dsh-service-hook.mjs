@@ -16,7 +16,12 @@ if (path) {
   const server = net.createServer(socket => {
     let request = ''
     socket.setEncoding('utf8')
-    socket.on('data', chunk => { request += chunk })
+    // The only request this channel serves is "stop": cap the buffer so a local process cannot grow it
+    // without bound, and drop anything longer before it is ever parsed.
+    socket.on('data', chunk => {
+      request += chunk
+      if (request.length > 64) { say('oversized control request; dropping'); socket.destroy() }
+    })
     socket.on('error', () => { /* a client that hangs up early asks for nothing */ })
     socket.on('end', () => {
       if (request.trim() !== 'stop') return

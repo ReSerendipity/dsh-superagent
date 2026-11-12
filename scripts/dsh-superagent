@@ -89,7 +89,9 @@ def serves(args, profile):
             matched = True
         elif not word.startswith('-'):
             words.append(word)
-    return matched and 'plugin' not in words
+    # The service's argv carries no positional subcommand (`node lib/bin.js --profile p --no-open`), so any
+    # positional - `dsh --profile p doctor`, `plugin ...` - is someone else's dsh invocation, not this service.
+    return matched and not words
 
 
 def ps(*options, check=False):
@@ -146,6 +148,42 @@ def process_alive(pid):
         kernel32.CloseHandle(handle)
 
 
+def process_born(pid):
+    """Return the process's creation time as a 100-ns FILETIME integer, or None when it cannot be read.
+
+    Windows reuses pids aggressively: a recorded pid whose process died and whose number another process
+    took would otherwise read as a healthy service. The birth stamp makes the check identity-based, the
+    way the POSIX branch's `serves()` argument check is.
+    """
+    from ctypes import wintypes
+
+    class FILETIME(ctypes.Structure):
+        _fields_ = [('low', wintypes.DWORD), ('high', wintypes.DWORD)]
+
+    kernel32 = ctypes.windll.kernel32
+    kernel32.OpenProcess.argtypes = [wintypes.DWORD, wintypes.BOOL, wintypes.DWORD]
+    kernel32.OpenProcess.restype = wintypes.HANDLE
+    kernel32.GetProcessTimes.argtypes = [wintypes.HANDLE, ctypes.POINTER(FILETIME), ctypes.POINTER(FILETIME),
+                                         ctypes.POINTER(FILETIME), ctypes.POINTER(FILETIME)]
+    kernel32.GetProcessTimes.restype = wintypes.BOOL
+    kernel32.CloseHandle.argtypes = [wintypes.HANDLE]
+    kernel32.CloseHandle.restype = wintypes.BOOL
+    handle = kernel32.OpenProcess(PROCESS_QUERY_LIMITED_INFORMATION, False, pid)
+    if not handle:
+        return None
+    try:
+        creation, exited, kernel, user = FILETIME(), FILETIME(), FILETIME(), FILETIME()
+        if not kernel32.GetProcessTimes(handle, ctypes.byref(creation), ctypes.byref(exited), ctypes.byref(kernel), ctypes.byref(user)):
+            return None
+        return (creation.high << 32) | creation.low
+    finally:
+        kernel32.CloseHandle(handle)
+
+
+def same_process(pid, born):
+    """Return whether `pid` runs and, when a birth stamp is recorded, is still that very process."""
+    return process_alive(pid) and (born is None or process_born(pid) == born)
+
 def dsh_command(profile):
     """Return the argv that boots `profile`: `node <dsh lib/bin.js> --profile <profile> --no-open`.
 
@@ -180,12 +218,24 @@ def control_pipe(profile):
 
 
 def windows_processes(profile):
-    """Return the recorded service pid while it is alive; every instance this script starts is recorded there."""
+    """Return the recorded service pid while it is alive and still the process that was recorded.
+
+    `service.pid` carries a birth stamp (a bare pid is the historical format and keeps working); a pid the
+    system gave to another process in the meantime reads as no service at all.
+    """
     try:
-        pid = int((control(profile) / 'service.pid').read_text())
-    except (OSError, ValueError):
+        text = (control(profile) / 'service.pid').read_text().strip()
+    except OSError:
         return []
-    return [pid] if process_alive(pid) else []
+    try:
+        record = json.loads(text)
+        pid, born = int(record['pid']), record.get('born')
+    except (ValueError, KeyError, TypeError):
+        try:
+            pid, born = int(text), None
+        except ValueError:
+            return []
+    return [pid] if same_process(pid, born) else []
 
 
 def request_stop(profile):
@@ -239,11 +289,11 @@ def windows_start(args):
             child = subprocess.Popen(command, cwd=str(ROOT), stdin=subprocess.DEVNULL, stdout=output,
                                      stderr=subprocess.STDOUT, creationflags=CREATE_NO_WINDOW, close_fds=True,
                                      env={**os.environ, 'DSH_SUPERAGENT_CONTROL_PIPE': control_pipe(args.profile)})
-        (control(args.profile) / 'service.pid').write_text(f'{child.pid}\n')
+        (control(args.profile) / 'service.pid').write_text(json.dumps({'pid': child.pid, 'born': process_born(child.pid)}) + '\n')
         prune_logs(args.profile)
         print('Log: ' + str(log), flush=True)
     else:
-        (control(args.profile) / 'service.pid').write_text(f'{pids[0]}\n')
+        (control(args.profile) / 'service.pid').write_text(json.dumps({'pid': pids[0], 'born': process_born(pids[0])}) + '\n')
         print(f'dsh-superagent already running (PID {pids[0]}); no duplicate started.', flush=True)
     (control(args.profile) / 'manually-stopped').unlink(missing_ok=True)
     return wait_for_health(args)
