@@ -500,3 +500,14 @@ it('gives a worker the other messages of the request its ticket was accepted fro
   expect(page).toMatchObject({ batch: [{ trigger_id: other, read: `trigger/${other}` }] })
   expect(await h.runTool(`worker-${ticket.id}`, 'orchestrator_read', { resource: `trigger/${other}` })).toMatchObject({ trigger_id: other })
 })
+
+it('briefs the dispatching chat of an ended task even when a restart lost the in-memory mapping', async () => {
+  const { ticket } = await h.acceptedTicket({ ...feishu('9', '@bot dispatch this'), meta: { chatSession: 'chat-x', dispatchedBy: 'chat-router' } })
+  // A restart between dispatch and end empties the map; the persisted Trigger meta names the chat again.
+  const internals = h.runtime as unknown as { chatTickets: Map<string, string>;
+    reportToChat(ticketId: string, outcome: string, ticket: typeof ticket | undefined, sessions: typeof h.runtime.sessions): void }
+  internals.chatTickets.clear()
+  const prompt = vi.spyOn(h.runtime.sessions, 'prompt').mockResolvedValue(undefined)
+  internals.reportToChat(ticket.id, 'completed', h.runtime.store.tickets.get(ticket.id), h.runtime.sessions)
+  expect(prompt).toHaveBeenCalledWith('chat-x', `chat-brief:${ticket.id}`, expect.stringContaining(`Task ${ticket.id}`), 'queue')
+})

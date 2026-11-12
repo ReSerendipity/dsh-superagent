@@ -343,7 +343,10 @@ export class Runtime extends Service implements SourceHost {
    * transcript stays in its Session; the chat gets the outcome and the report summary, so it never has to poll.
    */
   private reportToChat(ticketId: string, outcome: string, ticket: Ticket | undefined, sessions: Sessions): void {
-    const chatSession = this.chatTickets.get(ticketId)
+    // The in-memory map covers the common case; a restart between dispatch and end falls back to the persisted
+    // Trigger, whose meta carries the dispatching chat's session id.
+    const chatSession = (this.chatTickets.get(ticketId)
+      ?? (ticket !== undefined ? this.store.triggers.get(ticket.origin.triggerId)?.meta.chatSession : undefined)) as string | undefined
     if (!chatSession) return
     this.chatTickets.delete(ticketId)
     const summary = ticket?.assignments.at(-1)?.report?.summary?.trim()
