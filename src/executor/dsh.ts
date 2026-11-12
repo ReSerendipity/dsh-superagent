@@ -274,7 +274,6 @@ export class DshExecutor implements Executor {
         })
     }
     await mkdir(directory, { recursive: true })
-    await verifyDirectory(directory, this.host.context.subprocess, this.host.lifetime)
   }
   /** Enqueues a `launch` effect for an accepted or resumed assignment; launches start in queue order as worker slots free up. */
   start(ticket: Ticket, assignment: Assignment): void {
@@ -447,11 +446,17 @@ export class DshExecutor implements Executor {
     const source = sourceTrigger(this.host, ticket)
     const workspace = ticket.execution?.directory ?? ''
     if (!current()) return
-    // Prepare the workspace directory once; an existing directory counts as already prepared, including worktrees created before `prepare` commands existed.
-    if (!await stat(workspace).then(() => true, () => false)) {
+    // Prepare the workspace directory once; an existing directory counts as already prepared, including worktrees
+    // created before `prepare` commands existed. A file occupying the path is not a prepared directory.
+    const info = await stat(workspace).catch(() => undefined)
+    if (info && !info.isDirectory()) throw new Error(`The workspace of ticket ${ticket.id} is a file, not a directory: ${workspace}`)
+    if (!info) {
       await this.prepareDirectory(ticket)
       if (!current()) return
     }
+    // The repository git config is verified on every launch, not only when the directory is first created: a
+    // retry or a crash recovery reuses the directory, and its config can change between Assignments.
+    await verifyDirectory(workspace, this.host.context.subprocess, this.host.lifetime)
     if (!current()) return
     const sessionId = workerSessionId(ticket.id)
     const agent = await this.host.sessions.ensure(sessionId, workspace, ticket.title, 'worker')

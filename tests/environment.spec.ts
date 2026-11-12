@@ -166,6 +166,24 @@ describe.skipIf(WINDOWS)('ticket directory check', () => {
   })
 })
 
+describe('the repository config a ticket directory may set', () => {
+  // Real git on every platform: the check runs `git config` through the subprocess runtime, never a shell shim,
+  // so these tests do not belong behind skipIf(WINDOWS).
+  const signal = new AbortController().signal
+  const git = (...args: string[]) => exec('git', args, { cwd: dir, env: gitEnv({ GIT_CONFIG_GLOBAL: join(dir, 'global'), GIT_CONFIG_NOSYSTEM: '1' }) })
+  const check = (directory: string) => verifyDirectory(join(dir, directory), subprocess(join(dir, 'global')), signal)
+  beforeEach(() => { writeFileSync(join(dir, 'global'), '') })
+  it('rejects a repo-local sslVerify and an insteadOf rewrite, and accepts a repository without them', async () => {
+    await git('init', '-q', 'repo2')
+    await expect(check('repo2')).resolves.toBeUndefined()
+    await git('-C', 'repo2', 'config', 'http.https://github.com/.sslVerify', 'false')
+    await expect(check('repo2')).rejects.toThrow(/sslVerify/i)
+    await git('-C', 'repo2', 'config', '--unset', 'http.https://github.com/.sslVerify')
+    await git('-C', 'repo2', 'config', 'url.ssh://git@evil.example/.insteadOf', 'git@github.com:')
+    await expect(check('repo2')).rejects.toThrow(/insteadOf/i)
+  })
+})
+
 describe.skipIf(WINDOWS)('the repository the host\'s environment names', () => {
   it('is left alone by the tests\' git and named in no worker\'s environment, as when they run inside `git rebase --exec`', async () => {
     // A scratch repository stands for the one under test, which `git rebase --exec` names in GIT_DIR and GIT_WORK_TREE.
