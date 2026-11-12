@@ -1,6 +1,6 @@
 # 架构 — DSH-Superagent
 
-> 治理定位：`delivery=tool`、`lifecycle=active`、`visibility=private`、`distribution=none`（`ReSerendipity/.github` 的 `governance/desired-state.json`）。
+> 治理定位：`delivery=tool`、`lifecycle=active`、`visibility=public`、`distribution=["npm"]`（`ReSerendipity/.github` 的 `governance/desired-state.json`，2026-11-12 复核；GitHub 实测 `visibility: public`）。
 > 本文只描述本仓内部结构；治理规范正文只在 `.github/governance`，不在此复述。
 
 ## 1. 定位
