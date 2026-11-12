@@ -72,19 +72,24 @@ it('lists in prompts the built-in parts whose text changed since the team overro
   expect(defaults.parts).toEqual(Object.fromEntries(Object.entries(builtInParts()).map(([key, part]) => [key, part.text])))
 })
 
-it('saves with the prompt save tool an override without its base, refuses a part no version has, and drops a removed one read back', async () => {
+it('refuses a prompt override from the tool - the main Session reads external content - and saves one from the panel', async () => {
   const save = (overrides: Record<string, unknown>) => h.runTool(h.runtime.masterId, 'orchestrator_prompts_save',
     { config: { ...defaultPrompts(), overrides }, baseRevision: h.runtime.prompts.current().revision })
   await expect(save({ constructor: { text: 'x' } })).rejects.toThrow(new UserError('unknownPromptPart', { part: 'constructor' }))
-  await save({ 'runtime/dispatch': { text: '## dispatch\nOurs.' } })
+  await expect(save({ 'runtime/dispatch': { text: '## dispatch\nOurs.' } })).rejects.toThrow('only be changed in the management panel')
+  expect(h.runtime.prompts.current().config.overrides).toBeUndefined()
+  // The panel (and a team section edit through the tool) keep working: overrides save panel-side, then a tool
+  // save of the configuration as read changes nothing override-wise and still applies.
   const dispatch = { text: '## dispatch\nOurs.', base: builtInBase(builtInParts()['runtime/dispatch'].text) }
+  const { revision } = h.runtime.prompts.current()
+  h.runtime.prompts.save({ ...defaultPrompts(), overrides: { 'runtime/dispatch': dispatch } }, revision, 'panel')
   expect(h.runtime.prompts.current().config.overrides).toEqual({ 'runtime/dispatch': dispatch })
   // The saved version overrides a part this version no longer has: saving back the configuration as read drops it.
-  const { revision } = h.runtime.prompts.current(), read = { ...defaultPrompts(), overrides: { 'runtime/dispatch': dispatch,
+  const { revision: next } = h.runtime.prompts.current(), read = { ...defaultPrompts(), overrides: { 'runtime/dispatch': dispatch,
     'runtime/retired': { text: 'Old.', base: 'b' } } }
-  h.runtime.store.set(KV.prompts.version(revision + 1), { revision: revision + 1, previousRevision: revision, savedAt: '', source: 'panel', config: read })
-  h.runtime.store.set(KV.prompts.revision, revision + 1)
-  await h.runTool(h.runtime.masterId, 'orchestrator_prompts_save', { config: read, baseRevision: revision + 1 })
+  h.runtime.store.set(KV.prompts.version(next + 1), { revision: next + 1, previousRevision: next, savedAt: '', source: 'panel', config: read })
+  h.runtime.store.set(KV.prompts.revision, next + 1)
+  h.runtime.prompts.save(read, next + 1, 'panel')
   expect(h.runtime.prompts.current().config.overrides).toEqual({ 'runtime/dispatch': dispatch })
   // The tool describes the overrides once, in its schema.
   const tool = h.tools.get(h.runtime.masterId)!.get('orchestrator_prompts_save') as unknown as { description: string }
