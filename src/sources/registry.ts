@@ -139,7 +139,7 @@ export class SourceRegistry implements SourceScope {
     const kind = this.kinds.get(this.kindId(settings, trigger.source))
     const context = kind?.threadContext
     if (!kind || !context) return undefined
-    const { config } = this.resolve(kind, settings.sources[trigger.source], trigger.source)
+    const { config } = this.resolve(kind, this.entryFor(kind, settings, trigger.source), trigger.source)
     return {
       messageId: context.messageId(trigger),
       read: (commands, part, cursor) => context.read(commands, trigger, part, cursor, config),
@@ -152,12 +152,27 @@ export class SourceRegistry implements SourceScope {
   }
   scope(input: { source: string; meta: Record<string, unknown> }, settings = this.settings()): ScopeResult {
     const kind = this.kinds.get(this.kindId(settings, input.source))
-    const stored = settings.sources[input.source]
+    const stored = this.entryFor(kind, settings, input.source)
     // Without its kind plugin the stored scope cannot be evaluated, so a configured Source whose plugin is missing listens to nothing.
     if (!kind) return stored ? { listened: false, reason: 'source_not_installed' } : { listened: true, observed: false }
     const instance = this.resolve(kind, stored, input.source)
     if (!instance.enabled) return { listened: false, reason: 'source_disabled' }
     return kind.scope ? kind.scope({ meta: input.meta }, instance.config) : { listened: true, observed: false }
+  }
+  /**
+   * The stored entry a Trigger of this kind reads its scope and context from: the entry named after the kind, or -
+   * while one instance per kind is the supported shape (docs/010) - the kind's only other stored instance, whose id
+   * may name a repository. Without this, a single instance stored under a custom id would be gated by schema
+   * defaults instead of its own configuration.
+   */
+  private entryFor(kind: SourceKind | undefined, settings: Settings, kindOrInstance: string): { enabled: boolean; config: Record<string, unknown> } | undefined {
+    if (!kind) return settings.sources[kindOrInstance]
+    return settings.sources[kindOrInstance] ?? settings.sources[kind.kind] ?? this.onlyInstance(kind, settings)
+  }
+  /** The kind's single enabled instance stored under a custom id, when there is exactly one (docs/010 keeps multi-instance refused). */
+  private onlyInstance(kind: SourceKind, settings: Settings): { enabled: boolean; config: Record<string, unknown> } | undefined {
+    const others = Object.entries(settings.sources).filter(([id, stored]) => id !== kind.kind && sourceKindOf(id, stored) === kind.kind && stored.enabled !== false)
+    return others.length === 1 ? others[0]![1] : undefined
   }
   /** Falls back to schema defaults and disables the instance when stored configuration fails validation. */
   private resolve(kind: SourceKind, stored: { enabled: boolean; config: Record<string, unknown> } | undefined, instanceId: string): SourceInstance {

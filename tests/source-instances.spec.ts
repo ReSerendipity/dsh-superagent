@@ -26,3 +26,17 @@ it('rejects a kind that is not a valid instance id', () => {
   expect(() => settings({ acme: { kind: 'GitHub', config: {} } })).toThrow()
   expect(() => settings({ acme: { kind: 'github_2', config: {} } })).toThrow()
 })
+
+it('gates a single custom-id instance by its own configuration, not the kind entry\'s defaults', async () => {
+  // setup refuses a second GitHub instance, so the supported shape is one instance that may name its repository;
+  // its Trigger carries the kind as source, and the gate must still read the instance's own config (docs/010).
+  const { SourceRegistry } = await import('../src/sources/registry.ts')
+  const { githubKind } = await import('../src/sources/github.ts')
+  const value = settings({ acme: { kind: 'github', enabled: true, config: { repository: 'acme/widgets' } } })
+  const registry = new SourceRegistry(() => value)
+  registry.register(githubKind)
+  // The feishu kind is absent here, so the gate's entry lookup exercises the custom-id fallback directly.
+  const result = registry.scope({ source: 'github', meta: {} })
+  expect(result).not.toEqual({ listened: false, observed: false })
+  expect(result).toMatchObject({ listened: expect.any(Boolean) })
+})

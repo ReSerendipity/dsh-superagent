@@ -691,6 +691,15 @@ declare class SourceRegistry implements SourceScope {
       };
     };
   }): ScopeResult;
+  /**
+   * The stored entry a Trigger of this kind reads its scope and context from: the entry named after the kind, or -
+   * while one instance per kind is the supported shape (docs/010) - the kind's only other stored instance, whose id
+   * may name a repository. Without this, a single instance stored under a custom id would be gated by schema
+   * defaults instead of its own configuration.
+   */
+  private entryFor;
+  /** The kind's single enabled instance stored under a custom id, when there is exactly one (docs/010 keeps multi-instance refused). */
+  private onlyInstance;
   /** Falls back to schema defaults and disables the instance when stored configuration fails validation. */
   private resolve;
 }
