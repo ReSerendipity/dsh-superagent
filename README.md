@@ -62,8 +62,8 @@ tarball、本地目录、独立 profile 与常驻服务见 [WINDOWS-SETUP.md](do
 
 ![插件管理器「已安装插件」：DSH-Superagent 开关为启用](https://gcore.jsdelivr.net/gh/ReSerendipity/dsh-superagent@main/docs/assets/readme-plugin-installed-20261108.png)
 
-> **图**：插件管理器「已安装插件」列表中 DSH-Superagent 的开关为启用状态，模式 `mode: local`。
-> **Figure**: in the plugin manager's installed-plugins list the DSH-Superagent switch is enabled; mode `mode: local`.
+> **图**：插件管理器「已安装插件」列表中 DSH-Superagent 的开关为启用状态。
+> **Figure**: in the plugin manager's installed-plugins list the DSH-Superagent switch is enabled.
 
 ## 它是什么
 
@@ -73,8 +73,8 @@ tarball、本地目录、独立 profile 与常驻服务见 [WINDOWS-SETUP.md](do
 
 ![执行页「进行中」：2 张执行中、2 张排队](https://gcore.jsdelivr.net/gh/ReSerendipity/dsh-superagent@main/docs/assets/readme-tickets-20261108.png)
 
-> **图**：执行页「进行中」显示 2 张执行中、2 张排队，执行器运行中（2/2），模式 `mode: local`。
-> **Figure**: the Execution tab shows two tickets executing and two queued with the executor running (2/2); mode `mode: local`.
+> **图**：执行页「进行中」显示 2 张执行中、2 张排队，执行器运行中（2/2）。
+> **Figure**: the Execution tab shows two tickets executing and two queued with the executor running (2/2).
 
 ## 它能做什么
 
@@ -89,8 +89,8 @@ tarball、本地目录、独立 profile 与常驻服务见 [WINDOWS-SETUP.md](do
 
 ![概览页：运行判读「正常」，过去 24 小时到达 6 / 接单 6，执行器 2/2](https://gcore.jsdelivr.net/gh/ReSerendipity/dsh-superagent@main/docs/assets/readme-overview-20261108.png)
 
-> **图**：概览页的运行判读为「正常（对应 CLI 退出码 0）」，过去 24 小时到达 6、已评估 6、接单或续做 6，待处理工单 0，执行器 2/2、排队 2；模式 `mode: local`。
-> **Figure**: the Overview tab reports a normal run (CLI exit code 0): 6 delivered, 6 evaluated and 6 accepted or continued in the last 24 hours, 0 pending tickets, executors 2/2 with 2 queued; mode `mode: local`.
+> **图**：概览页的运行判读为「正常（对应 CLI 退出码 0）」，过去 24 小时到达 6、已评估 6、接单或续做 6，待处理工单 0，执行器 2/2、排队 2。
+> **Figure**: the Overview tab reports a normal run (CLI exit code 0): 6 delivered, 6 evaluated and 6 accepted or continued in the last 24 hours, 0 pending tickets, executors 2/2 with 2 queued.
 
 ## 第一次使用
 
@@ -108,20 +108,20 @@ tarball、本地目录、独立 profile 与常驻服务见 [WINDOWS-SETUP.md](do
 
 ![设置 → 执行：Watchdog 间隔 30 分钟、停滞判定 45 分钟、Router 分片 2](https://gcore.jsdelivr.net/gh/ReSerendipity/dsh-superagent@main/docs/assets/readme-watchdog-20261108.png)
 
-> **图**：设置 → 执行中执行器模型为 DSH 默认（`modelscope / Qwen/Qwen3.8-Flash-Next`），并行工单数 2、Watchdog 间隔 30 分钟、停滞判定 45 分钟、Router 分片数 2，以上设置已保存并生效；模式 `mode: local`。
-> **Figure**: under Settings → Execution the executor model is the DSH default (`modelscope / Qwen/Qwen3.8-Flash-Next`), with two parallel tickets, a 30-minute Watchdog interval, a 45-minute stall threshold and two Router shards saved and in effect; mode `mode: local`.
+> **图**：设置 → 执行中执行器模型为 DSH 默认（`modelscope / Qwen/Qwen3.8-Flash-Next`），并行工单数 2、Watchdog 间隔 30 分钟、停滞判定 45 分钟、Router 分片数 2，以上设置已保存并生效。
+> **Figure**: under Settings → Execution the executor model is the DSH default (`modelscope / Qwen/Qwen3.8-Flash-Next`), with two parallel tickets, a 30-minute Watchdog interval, a 45-minute stall threshold and two Router shards saved and in effect.
 
 ### 一条工单的样子
 
 ![工单详情：已完成，授权详情、订阅的线程，执行环境与标识为收起状态](https://gcore.jsdelivr.net/gh/ReSerendipity/dsh-superagent@main/docs/assets/readme-ticket-detail-20261108-r1.png)
 
-> **图**：一条已完成工单的详情——授权详情（触发原文、决定「接单」、范围、点名方式、策略版本（当时））、订阅的线程；执行环境、渠道与标识三栏保持收起，画面里不出现本机路径；模式 `mode: local`。
-> **Figure**: the detail of one completed ticket — mandate details (original trigger, decision "accept", scope, addressing, policy version (at the time)) and its subscribed thread; the execution environment, channel and identifier rows stay collapsed, so no machine path appears; mode `mode: local`.
+> **图**：一条已完成工单的详情——授权详情（触发原文、决定「接单」、范围、点名方式、策略版本（当时））、订阅的线程；执行环境、渠道与标识三栏保持收起，画面里不出现本机路径。
+> **Figure**: the detail of one completed ticket — mandate details (original trigger, decision "accept", scope, addressing, policy version (at the time)) and its subscribed thread; the execution environment, channel and identifier rows stay collapsed, so no machine path appears.
 
 ![执行器会话最终回报：分支 agent/glossary-notes-b36e816a648e、该轮执行的提交](https://gcore.jsdelivr.net/gh/ReSerendipity/dsh-superagent@main/docs/assets/readme-ticket-run-20261108.png)
 
-> **图**：一条工单的执行器会话已完成（用时 1 分 46 秒）并回报：新增 `docs/notes/glossary.md`、分支 `agent/glossary-notes-b36e816a648e`、该轮执行的提交（提交信息带 Signed-off-by）、工作树干净，本地交付未推送、未开 PR；模式 `mode: local`。
-> **Figure**: the executor session of one ticket completed (1 min 46 s) and reported back — it added `docs/notes/glossary.md`, committed on branch `agent/glossary-notes-b36e816a648e` with a Signed-off-by trailer, left a clean worktree, and delivered locally without pushing or opening a PR; mode `mode: local`.
+> **图**：一条工单的执行器会话已完成（用时 1 分 46 秒）并回报：新增 `docs/notes/glossary.md`、分支 `agent/glossary-notes-b36e816a648e`、该轮执行的提交（提交信息带 Signed-off-by）、工作树干净，本地交付未推送、未开 PR。
+> **Figure**: the executor session of one ticket completed (1 min 46 s) and reported back — it added `docs/notes/glossary.md`, committed on branch `agent/glossary-notes-b36e816a648e` with a Signed-off-by trailer, left a clean worktree, and delivered locally without pushing or opening a PR.
 
 ## 多实例
 
