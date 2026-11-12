@@ -1,10 +1,10 @@
 /** The inbox Source on a real Engine and Store: file translation, poll rounds with archiving, replies, scope and policy. */
 import { describe, expect, it, vi, type Mock } from 'vitest'
-import { existsSync, mkdirSync, mkdtempSync, readFileSync, readdirSync, statSync, writeFileSync } from 'node:fs'
+import { existsSync, mkdirSync, mkdtempSync, readFileSync, readdirSync, statSync, utimesSync, writeFileSync } from 'node:fs'
 import { tmpdir } from 'node:os'
 import { join, resolve } from 'node:path'
 import { Engine, key, threadKey, type OutboundMessage, type Trigger } from '../src/core/index.ts'
-import { inboxDir, inboxKind, inboxTrigger, pollInbox, sendInbox } from '../src/sources/inbox.ts'
+import { INBOX_STABILITY_MS, inboxDir, inboxKind, inboxTrigger, pollInbox, sendInbox } from '../src/sources/inbox.ts'
 import { SourceRegistry } from '../src/sources/registry.ts'
 import { Store } from '../src/app/store.ts'
 import { Commands } from '../src/infra/commands.ts'
@@ -37,12 +37,14 @@ function host(overrides: Partial<SourceContextDeps> = {}) {
     ready: Promise.resolve(), configured: () => true, receive, ...overrides }
   return { ...parts, ...sourceContextOf(parts, inboxKind), dir, store, engine, board, health: board.all, receive: parts.receive }
 }
-/** Drop one task file into the inbox. */
-function drop(dir: string, name: string, text: string): string {
+/** Drop one task file into the inbox. The mtime is backdated past the stability grace, as a drop that finished writing has. */
+function drop(dir: string, name: string, text: string, ageMs = 10_000): string {
   const root = inboxDir({ stateDir: dir }, CONFIG)
   if (!existsSync(root)) mkdirSync(root, { recursive: true })
   const path = join(root, name)
   writeFileSync(path, text)
+  const settled = new Date(Date.now() - ageMs)
+  utimesSync(path, settled, settled)
   return path
 }
 
@@ -108,6 +110,20 @@ describe('pollInbox', () => {
     expect(await pollInbox(h, CONFIG, new AbortController().signal)).toEqual({ read: 1, moved: 0, failed: 1 })
     // The file stays in the inbox, so the next round retries it.
     expect(existsSync(join(h.dir, 'inbox', 'task.md'))).toBe(true)
+    h.store.close()
+  })
+  it('waits out a file that is still being written, then takes it in whole on a later round', async () => {
+    const h = host()
+    // A fresh mtime stands for a writer that has not closed the file yet (cloud-sync drop, slow copy).
+    drop(h.dir, 'task.md', 'fix the typo', 0)
+    expect(Date.now() - statSync(join(h.dir, 'inbox', 'task.md')).mtimeMs).toBeLessThan(INBOX_STABILITY_MS)
+    expect(await pollInbox(h, CONFIG, new AbortController().signal)).toEqual({ read: 0, moved: 0, failed: 0 })
+    expect(h.receive as Mock).not.toHaveBeenCalled()
+    expect(existsSync(join(h.dir, 'inbox', 'task.md'))).toBe(true)
+    // The writer finishes (the mtime settles past the grace), and the next round reads the whole file once.
+    drop(h.dir, 'task.md', 'fix the typo in README')
+    expect(await pollInbox(h, CONFIG, new AbortController().signal)).toEqual({ read: 1, moved: 1, failed: 0 })
+    expect(await (h.receive as Mock).mock.results[0]!.value).toBe('stored')
     h.store.close()
   })
 })

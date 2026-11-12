@@ -19,6 +19,12 @@ import type { DeliveredMessage, SourceKind } from './kind.ts'
 const SOURCE = 'inbox'
 const ARCHIVE = 'done'
 const MAX_TEXT_CHARS = 200_000
+/**
+ * A pending file younger than this may still be being written (a cloud-sync drop, a slow copy): taking it in would
+ * ingest a truncated request and, once the writer closes, re-offer the whole file as a second request. The poll skips
+ * such a file this round and reads it whole on the next one, so the grace costs one polling interval at most.
+ */
+export const INBOX_STABILITY_MS = 2_000
 
 const InboxConfigSchema = z.object({
   /** Absolute inbox directory; empty means `<stateDir>/inbox`. The `done/` subdirectory holds archived tasks and replies. */
@@ -137,7 +143,7 @@ export const inboxKind: SourceKind<InboxConfig> = {
   },
 }
 
-/** Read pending files in the inbox, take in each, and archive it under done/. Advance nothing else: the move is the cursor. */
+/** Read pending files in the inbox once they have settled, take in each, and archive it under done/. The move is the cursor. */
 export async function pollInbox(ctx: SourceContext, config: InboxConfig, signal: AbortSignal): Promise<{ read: number; moved: number; failed: number }> {
   const root = inboxDir(ctx.deployment, config)
   if (!existsSync(root)) mkdirSync(root, { recursive: true })
@@ -151,6 +157,8 @@ export async function pollInbox(ctx: SourceContext, config: InboxConfig, signal:
     try {
       const path = join(root, name)
       const st = statSync(path)
+      // A freshly dropped file waits for the next round instead of being taken in mid-write.
+      if (Date.now() - st.mtimeMs < INBOX_STABILITY_MS) continue
       file = { path, relPath: name, content: readFileSync(path, 'utf8'), mtimeMs: st.mtimeMs }
     } catch { failed++; continue }
     read++

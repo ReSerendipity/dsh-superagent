@@ -3,6 +3,12 @@ import { U as Trigger, l as OutboundMessage } from "./intake-OhnAYFN6.js";
 import { n as SourceKind, r as SourceContext, t as DeliveredMessage } from "./kind-B-WulCxy.js";
 import { Context } from "@deepseek-ai/cordis";
 //#region src/sources/inbox.d.ts
+/**
+ * A pending file younger than this may still be being written (a cloud-sync drop, a slow copy): taking it in would
+ * ingest a truncated request and, once the writer closes, re-offer the whole file as a second request. The poll skips
+ * such a file this round and reads it whole on the next one, so the grace costs one polling interval at most.
+ */
+declare const INBOX_STABILITY_MS = 2000;
 declare const InboxConfigSchema: ZodObject<{
   inboxDir: ZodDefault<ZodString>;
   actor: ZodDefault<ZodString>;
@@ -30,7 +36,7 @@ declare function inboxTrigger(file: InboxFile, config: InboxConfig, root: string
  */
 declare function sendInbox(_host: Pick<SourceContext, 'commands'>, message: OutboundMessage, delivered?: readonly DeliveredMessage[]): Promise<'sent' | 'gone'>;
 declare const inboxKind: SourceKind<InboxConfig>;
-/** Read pending files in the inbox, take in each, and archive it under done/. Advance nothing else: the move is the cursor. */
+/** Read pending files in the inbox once they have settled, take in each, and archive it under done/. The move is the cursor. */
 declare function pollInbox(ctx: SourceContext, config: InboxConfig, signal: AbortSignal): Promise<{
   read: number;
   moved: number;
@@ -40,4 +46,4 @@ declare const name = "dsh-superagent-inbox";
 declare const inject: string[];
 declare function apply(ctx: Context): void;
 //#endregion
-export { InboxConfig, InboxFile, apply, inboxDir, inboxKind, inboxTrigger, inject, name, pollInbox, sendInbox };
+export { INBOX_STABILITY_MS, InboxConfig, InboxFile, apply, inboxDir, inboxKind, inboxTrigger, inject, name, pollInbox, sendInbox };
