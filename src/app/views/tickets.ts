@@ -73,9 +73,13 @@ export function ticketRow(view: Snapshot, ticket: Ticket) {
 }
 /** Executor slot utilization: `running` worker Sessions in an active turn (which occupy slots and are interrupted by a restart), and tickets `queued` for a slot. */
 export interface ExecutorLoad { running: number; queued: number }
+/** The one definition of "queued": an open ticket waiting for an executor slot, not one waiting for a person. */
+export const queuedForSlot = (ticket: Ticket): boolean => {
+  const stage = ticketStage(ticket)
+  return stage.stage === 'working' && stage.action === 'queued'
+}
 export function executorLoad(store: Store, running: number): ExecutorLoad {
-  const queued = (ticket: Ticket) => { const stage = ticketStage(ticket); return stage.stage === 'working' && stage.action === 'queued' }
-  return { running, queued: store.tickets.open().filter(queued).length }
+  return { running, queued: store.tickets.open().filter(queuedForSlot).length }
 }
 export function ticketDetail(host: ViewHost, id: string) {
   const { store } = host

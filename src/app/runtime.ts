@@ -27,7 +27,7 @@ import { MasterAssessor } from './assessment.ts'
 import { KV } from '../kv.ts'
 import { Store } from './store.ts'
 import { evalsHealth } from './views/overview.ts'
-import { executorLoad } from './views/tickets.ts'
+import { executorLoad, queuedForSlot } from './views/tickets.ts'
 import { INSTANCE_STATUS_INTERVAL_MS, INSTANCE_STATUS_SCHEMA, touchInstanceStatus, writeInstanceStatus, type InstanceStatus } from './instance-status.ts'
 import { acquireStateLock } from './state-lock.ts'
 import { dataHomeProblem } from './instance-roots.ts'
@@ -513,7 +513,9 @@ export class Runtime extends Service implements SourceHost {
     return {
       tickets,
       running: tickets.reduce((sum, ticket) => sum + ticket.states.filter(state => state === 'running').length, 0),
-      queued: this.store.tickets.open().length,
+      // The digest's queued is the executorLoad definition - waiting for a slot, not merely open - so a ticket
+      // waiting for a person does not read as queue pressure the Watchdog model would intervene on.
+      queued: open.filter(queuedForSlot).length,
       maxWorkers: this.store.settings().executor.maxWorkers,
       problems: watchdogProblems(this.board.all),
       apiBase: `http://127.0.0.1:${process.env.DSH_SUPERAGENT_WATCHDOG_API_PORT ?? 3082}/orchestrator/api`,
