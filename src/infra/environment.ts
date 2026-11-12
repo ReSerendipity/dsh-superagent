@@ -32,6 +32,9 @@ export const workerGitConfig = (stateDir: string): string => join(stateDir, 'wor
 export const agentGhConfig = (stateDir: string): string => join(stateDir, 'gh-config')
 const shellQuote = (value: string): string => `'${value.replaceAll("'", "'\\''")}'`
 const gitQuote = (value: string): string => `"${value.replace(/[\\"]/g, char => `\\${char}`)}"`
+/** Quotes a literal for a batch `echo` line, which cmd re-parses; the message must not depend on a schema's charset. */
+const batchQuote = (message: string): string => message.replaceAll('^', '^^').replaceAll('%', '%%')
+  .replaceAll('&', '^&').replaceAll('|', '^|').replaceAll('<', '^<').replaceAll('>', '^>')
 export const credentialHelper = (cli: string): string => `!${shellQuote(cli)} auth git-credential`
 
 export function sameDirectory(a: string, b: string): boolean {
@@ -96,16 +99,25 @@ export async function writeEnvironment(deployment: Pick<Deployment, 'stateDir' |
   const dir = workerBin(stateDir)
   await mkdir(dir, { recursive: true })
   await mkdir(agentGhConfig(stateDir), { recursive: true })
-  const before = await readdir(dir)
-  for (const name of before) { const file = join(dir, name); if (!await written(file)) throw new SetupError('foreignFile', { file }) }
+  const before: string[] = []
+  for (const name of await readdir(dir)) {
+    // A temp file a crashed write of ours left behind carries our own naming scheme: remove it instead of
+    // failing setup on a file only dsh-superagent could have written.
+    if (/^\..+\.\d+\.tmp$/.test(name)) { await unlink(join(dir, name)).catch(() => {}); continue }
+    before.push(name)
+    const file = join(dir, name)
+    if (!await written(file)) throw new SetupError('foreignFile', { file })
+  }
   // Workers may be running concurrently: write each shim to a temp file and atomically rename it so no command ever resolves past the shim directory.
   const kept = new Set<string>()
   const shim = async (name: string, body: string): Promise<void> => {
     const entry = shimName(name)
     const temporary = join(dir, `.${name}.${process.pid}.tmp`)
-    // A batch file is reachable through PATHEXT; an extensionless `#!/bin/sh` file is invisible to a Windows PATH lookup.
-    await writeFile(temporary, shimBody(MARKER, body), { mode: shimMode() })
-    await rename(temporary, join(dir, entry))
+    try {
+      // A batch file is reachable through PATHEXT; an extensionless `#!/bin/sh` file is invisible to a Windows PATH lookup.
+      await writeFile(temporary, shimBody(MARKER, body), { mode: shimMode() })
+      await rename(temporary, join(dir, entry))
+    } catch (error) { await unlink(temporary).catch(() => {}); throw error }
     kept.add(entry)
   }
   const withoutShims = [
@@ -129,7 +141,7 @@ export async function writeEnvironment(deployment: Pick<Deployment, 'stateDir' |
     ? `${withoutShimsWindows}\r\n"${program}" %*\r\nexit /b %ERRORLEVEL%`
     : `${withoutShims}\nexec ${shellQuote(program)} "$@"`
   const fail = (message: string): string => isWindows
-    ? `>&2 echo ${message}\r\nexit /b 1`
+    ? `>&2 echo ${batchQuote(message)}\r\nexit /b 1`
     : `echo ${shellQuote(message)} >&2\nexit 1`
   if (github.cli) await shim('gh', run(github.cli))
   await shim('lark-cli', feishu ? run(feishu.cli) : fail('lark-cli is unavailable: this installation has no Feishu bot.'))

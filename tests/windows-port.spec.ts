@@ -87,6 +87,15 @@ it('writes shims that strip their own directory from PATH', async () => {
   // Idempotency: setup re-runs this on every start, so an unrecognised marker would raise `foreignFile`.
   await writeEnvironment(deployment, ['python', 'gh', 'git', 'myblocked'])
   expect((await readdir(workerBin(stateDir))).sort()).toEqual(shims)
+
+  // A temp file a crashed write of ours left behind is cleaned up, not mistaken for a foreign takeover.
+  await writeFile(join(workerBin(stateDir), '.gh.99999.tmp'), 'truncated')
+  await writeEnvironment(deployment, ['python', 'gh', 'git', 'myblocked'])
+  expect((await readdir(workerBin(stateDir))).sort()).toEqual(shims)
+
+  // The blocked-command message is cmd-escaped, so it does not depend on the schema's charset.
+  await writeEnvironment({ ...deployment, github: { ...deployment.github, login: 'a&b<1>' } }, ['mycmd'])
+  expect(await readFile(shim('mycmd'), 'utf8')).toContain('a^&b^<1^> is blocked')
 })
 
 it('runs setup probes with the platform-specific environment and forwards Feishu notifier switches', async () => {
