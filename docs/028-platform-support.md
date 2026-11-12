@@ -160,7 +160,7 @@ PATH 剥离与幂等性；`tests/environment.spec.ts` 覆盖 POSIX 垫片的执�
 | 项 | 代码归属 | Windows | macOS / Linux | 状态 |
 | --- | --- | --- | --- | --- |
 | 本地发布门禁 | `package.json` `release:check` → `scripts/release-check.mjs` | Node 可执行 | Node 可执行（同一脚本） | 已跨平台；`release-check.ps1` 仅作历史参考 |
-| 飞书探针 | `src/deployment.ts` `resolveFeishuBot()` | `probe()` 不再外包 `env`，当前实现仍拼了 `env` 前缀，启用飞书 Source 时有已知风险 | `env` 前缀有效 | 已知问题，后续阶段修复 |
+| 飞书探针 | `src/deployment.ts` `resolveFeishuBot()` | `workerProbe()` 直接执行 argv，不再寻找 `env.exe`；Source 专属开关经 `platform.probeEnv()` 进入环境对象 | 同样经 `probeEnv()` 注入 POSIX `env` 前缀 | `09190e8` 已修复，三平台 CI 契约测试覆盖 |
 | 桌面 Electron 外壳 | `windows-app/`（2026-11-07 移除） | 历史记录，不再是现行部件 | 同左 | 仅 provenance，不构成平台差异 |
 | 网络传输 | `SUPERAGENT_GIT_SSH`、代理环境变量 | 与平台无关 | 与平台无关 | 文档见 `WINDOWS-DELTA.md` §8 |
 
