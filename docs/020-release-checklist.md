@@ -2,15 +2,16 @@
 
 ## 一条命令先跑一遍
 
-```powershell
+```sh
 pnpm release:check
-# 或：powershell -NoProfile -ExecutionPolicy Bypass -File scripts\release-check.ps1
+# 或：node scripts/release-check.mjs
 ```
 
 自动检查：工作区干净且已推送、归属标注齐全（README/NOTICE/LICENSE/locale/package）、CHANGELOG 有该版本、
 `typecheck`/`build`/全部测试、Release 资产与一行安装器的校验值一致。输出逐项 PASS/FAIL，任一失败退出码非 0。
 
-`-SkipTests` 只跑结构检查（几十秒）；`-SkipOnline` 跳过 GitHub 部分（离线用）。
+`--skip-tests` 只跑结构检查（几十秒）；`--skip-online` 跳过 GitHub 部分（离线用）。任一跳过都会把结论标成
+`NOT VERIFIED`（exit 2），不会打印 READY TO PUBLISH。旧写法 `-SkipTests` / `-SkipOnline` 仍被接受。
 
 
 > 发布前逐项打勾；任一项不过就不发。每项都写明"用什么命令/看什么"。
@@ -103,7 +104,7 @@ gh api --method POST -H "Content-Type: text/plain" --input <sha> "<upload_url>?n
 
 # 5. 再跑一次彩排，确认资产 digest 与本地 tarball 一致
 pnpm release:check            # 全跑，只有全跑才可能打印 READY TO PUBLISH
-#    只验在线资产时可用 pnpm release:check -SkipTests，结论会标 NOT VERIFIED（exit 2）
+#    只验在线资产时可用 pnpm release:check --skip-tests，结论会标 NOT VERIFIED（exit 2）
 
 # 6. 人工确认（彩排覆盖不到的部分）
 #    启动应用：setup 正常、面板「介绍」可打开、tarball 能在干净 profile 装好

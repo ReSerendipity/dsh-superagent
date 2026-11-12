@@ -31,7 +31,7 @@ src/infra ──→ src/core ←──┐          上游（不依赖任何本�
 | 运维 skill | `skills/` | 给智能体读的 SKILL.md | 是 |
 | 构建产物 | `lib/` | tsdown 输出；**故意入库**，让 git 安装无需构建 | 是（例外，见 §5） |
 | 历史外壳（已移除） | `windows-app/` | 便携 Electron 外壳，2026-11-07 从仓库删除；历史见 git 与 `CHANGELOG` | 否（已不存在） |
-| 命令行工具 | `scripts/` | Python 服务管理器、`.cmd` 垫片、guard/watchdog PowerShell、发布闸门 `release-check.ps1`、`pack-plugin.mjs`、`a9-check.js` | 是 |
+| 命令行工具 | `scripts/` | Python 服务管理器、`.cmd` 垫片、guard/watchdog PowerShell、跨平台发布闸门 `release-check.mjs`（`release-check.ps1` 仅作历史参考）、`pack-plugin.mjs`、`a9-check.js` | 是 |
 
 一处**已知的反向边**：`src/infra/` 有文件导入 `src/sources/host.ts`，所以 infra 不是严格最底层。改 `sources/host.ts` 的接口时必须同时核对 `infra/`。
 

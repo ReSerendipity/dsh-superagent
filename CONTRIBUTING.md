@@ -10,7 +10,7 @@
    pnpm install
    pnpm typecheck
    pnpm vitest run        # 全量基线；tests/service-script*.spec.ts 偶发并发抖动时单独重跑该文件复核
-   pnpm release:check -SkipOnline   # 离线跑结构、构建一致性与测试；在线检查被跳过时结论是 NOT VERIFIED（exit 2），不是 READY
+   pnpm release:check --skip-online   # 离线跑结构、构建一致性与测试；在线检查被跳过时结论是 NOT VERIFIED（exit 2），不是 READY
    ```
 
 4. `lib/` 是入库的构建产物且必须与新鲜构建一致：改了 `src/` 之后先 `pnpm build` 再提交。
