@@ -2131,4 +2131,4 @@ interface ZodReadonly<T extends SomeType = $ZodType> extends _ZodType<$ZodReadon
 }
 declare const ZodReadonly: $constructor<ZodReadonly>;
 //#endregion
-export { $strip as S, output as _, ZodLiteral as a, $loose as b, ZodObject as c, ZodRecord as d, ZodString as f, ZodUnknown as g, ZodURL as h, ZodEnum as i, ZodOptional as l, ZodType as m, ZodBoolean as n, ZodNullable as o, ZodTransform as p, ZodDefault as r, ZodNumber as s, ZodArray as t, ZodPipe as u, $ZodTypeInternals as v, $strict as x, $catchall as y };
+export { $strip as C, $strict as S, ZodUnknown as _, ZodEnum as a, $catchall as b, ZodNumber as c, ZodPipe as d, ZodRecord as f, ZodURL as g, ZodType as h, ZodDefault as i, ZodObject as l, ZodTransform as m, ZodBoolean as n, ZodLiteral as o, ZodString as p, ZodCatch as r, ZodNullable as s, ZodArray as t, ZodOptional as u, output as v, $loose as x, $ZodTypeInternals as y };

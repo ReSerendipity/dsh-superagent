@@ -1,4 +1,4 @@
-import { S as $strip, _ as output, b as $loose, c as ZodObject, d as ZodRecord, f as ZodString, g as ZodUnknown, i as ZodEnum, l as ZodOptional, m as ZodType, n as ZodBoolean, o as ZodNullable, p as ZodTransform, r as ZodDefault, s as ZodNumber, t as ZodArray, u as ZodPipe, v as $ZodTypeInternals, x as $strict, y as $catchall } from "./schemas-lx-F2nnt.js";
+import { C as $strip, S as $strict, _ as ZodUnknown, a as ZodEnum, b as $catchall, c as ZodNumber, d as ZodPipe, f as ZodRecord, h as ZodType, i as ZodDefault, l as ZodObject, m as ZodTransform, n as ZodBoolean, p as ZodString, r as ZodCatch, s as ZodNullable, t as ZodArray, u as ZodOptional, v as output, x as $loose, y as $ZodTypeInternals } from "./schemas-C2t1ehgZ.js";
 import { F as Thread, I as ThreadFact, R as ThreadRef, S as ChannelRef, U as Trigger, h as SourceScope, l as OutboundMessage, lt as Deployment, m as ScopeResult, t as ReceiveResult, v as AdmissionCell, z as Ticket } from "./intake-OhnAYFN6.js";
 import { Context } from "@deepseek-ai/cordis";
 import { DatabaseSync } from "node:sqlite";
@@ -93,6 +93,10 @@ declare const SettingsSchema: ZodObject<{
         name: ZodOptional<ZodString>;
       }, $strict>>>;
       admission: ZodDefault<ZodRecord<ZodString, ZodType<AdmissionRow, unknown, $ZodTypeInternals<AdmissionRow, unknown>>>>;
+      bots: ZodOptional<ZodCatch<ZodArray<ZodObject<{
+        id: ZodString;
+        name: ZodOptional<ZodString>;
+      }, $strict>>>>;
     }, $catchall<ZodUnknown>>>>;
   }, $strict>>;
   eval: ZodDefault<ZodObject<{
@@ -206,6 +210,10 @@ declare class SourceRegistry implements SourceScope {
           name?: string | undefined;
         }[];
         admission: Record<string, AdmissionRow>;
+        bots?: {
+          id: string;
+          name?: string | undefined;
+        }[] | undefined;
       }>;
     };
     eval: {
@@ -273,6 +281,10 @@ declare class SourceRegistry implements SourceScope {
           name?: string | undefined;
         }[];
         admission: Record<string, AdmissionRow>;
+        bots?: {
+          id: string;
+          name?: string | undefined;
+        }[] | undefined;
       }>;
     };
     eval: {
@@ -352,6 +364,10 @@ declare class SourceRegistry implements SourceScope {
           name?: string | undefined;
         }[];
         admission: Record<string, AdmissionRow>;
+        bots?: {
+          id: string;
+          name?: string | undefined;
+        }[] | undefined;
       }>;
     };
     eval: {
@@ -426,6 +442,10 @@ declare class SourceRegistry implements SourceScope {
           name?: string | undefined;
         }[];
         admission: Record<string, AdmissionRow>;
+        bots?: {
+          id: string;
+          name?: string | undefined;
+        }[] | undefined;
       }>;
     };
     eval: {
@@ -496,6 +516,10 @@ declare class SourceRegistry implements SourceScope {
           name?: string | undefined;
         }[];
         admission: Record<string, AdmissionRow>;
+        bots?: {
+          id: string;
+          name?: string | undefined;
+        }[] | undefined;
       }>;
     };
     eval: {
@@ -579,6 +603,10 @@ declare class SourceRegistry implements SourceScope {
           name?: string | undefined;
         }[];
         admission: Record<string, AdmissionRow>;
+        bots?: {
+          id: string;
+          name?: string | undefined;
+        }[] | undefined;
       }>;
     };
     eval: {
@@ -647,6 +675,10 @@ declare class SourceRegistry implements SourceScope {
           name?: string | undefined;
         }[];
         admission: Record<string, AdmissionRow>;
+        bots?: {
+          id: string;
+          name?: string | undefined;
+        }[] | undefined;
       }>;
     };
     eval: {

@@ -1,7 +1,9 @@
 import { mkdtempSync, mkdirSync, readFileSync, writeFileSync } from 'node:fs'
 import { tmpdir } from 'node:os'
-import { join } from 'node:path'
+import { dirname, join } from 'node:path'
 import { describe, expect, it } from 'vitest'
+import { fileURLToPath } from 'node:url'
+import { CHAT_ROUTER_PROMPT } from '../src/chat-router/host.ts'
 import { CHAT_TOOLS, ChatRouterSettingsSchema, DEFAULT_CHAT_ROUTER_SETTINGS, allowedChatTools, briefOf } from '../src/chat-router/config.ts'
 import { chatThreadKey, isChatRouterSession } from '../src/chat-router/match.ts'
 import { chatSessionFrom, submitChatTicket } from '../src/chat-router/submit.ts'
@@ -162,4 +164,11 @@ describe('submission collisions', () => {
     expect(readFileSync(join(root, first.file), 'utf8')).toContain('v1')
     expect(readFileSync(join(root, second.file), 'utf8')).toContain('v2')
   })
+})
+
+it('keeps the shipped chat-router.md identical to the prompt the runtime actually uses', () => {
+  // The runtime runs the inline copy; the .md is what a reader or team override flow sees, and the two
+  // copies are hand-maintained, so drift is caught here instead of in production wording.
+  const shipped = readFileSync(join(dirname(fileURLToPath(import.meta.url)), '..', 'prompts', 'chat-router.md'), 'utf8').trim()
+  expect(CHAT_ROUTER_PROMPT.trim()).toBe(shipped)
 })
