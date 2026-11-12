@@ -8,13 +8,13 @@ import s from '@deepseek-ai/schemastery'
 import { z } from 'zod'
 import type { SubprocessRuntime } from '@deepseek-ai/dsh-subprocess'
 import { agentGhConfig, runAsWorker, sameDirectory, withoutDirectory, workerBin } from './infra/environment.ts'
-import { probeEnv } from './infra/platform.ts'
+import { ABSOLUTE_PATH, probeEnv } from './infra/platform.ts'
 import { SetupError } from './setup.ts'
 
 const reason = (error: unknown): string => error instanceof Error ? error.message : String(error)
-// Windows absolute paths are drive-qualified (`C:/...` or `C:\...`), so the POSIX `^/` rule alone would reject every valid
-// state directory on that platform.
-const absolute = (description: string) => s.string().pattern(/^(?:[A-Za-z]:[\\/]|\/)/).description(`${description} Absolute path.`)
+// Absolute paths are drive-qualified on Windows (`C:/...` or `C:\...`), so the POSIX `^/` rule alone would reject every
+// valid state directory on that platform; the pattern is shared with the runtime settings schemas via infra/platform.
+const absolute = (description: string) => s.string().pattern(ABSOLUTE_PATH).description(`${description} Absolute path.`)
 /** Plugin configuration of the dsh-superagent entry. Volatile fields apply without a restart because dsh-superagent reads them on each use; changing `stateDir` remounts the plugin. */
 export const Config = s.object({
   // Optional since 0.1.5: an unconfigured install derives one state directory per profile (defaultStateDir below), so a fresh

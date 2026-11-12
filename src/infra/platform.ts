@@ -7,6 +7,9 @@ import { delimiter } from 'node:path'
 
 export const isWindows: boolean = process.platform === 'win32'
 
+/** Absolute paths are drive-qualified on Windows (`C:/...`, `C:\...`) and slash-rooted elsewhere; both schema layers share it. */
+export const ABSOLUTE_PATH = /^(?:[A-Za-z]:[\\/]|\/)/
+
 /** The separator between PATH entries (`;` on Windows, `:` elsewhere). */
 export const pathDelimiter = (): string => delimiter
 
