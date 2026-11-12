@@ -143,6 +143,9 @@ class Reader {
       }
       const entry = this.splitEntry(line)
       if (entry.key === '<<') throw new YamlError(line.number, line.indent + 1, 'merge keys are not supported')
+      if (entry.key === '__proto__' || entry.key === 'constructor') {
+        throw new YamlError(line.number, line.indent + 1, `"${entry.key}" is not a configuration key`)
+      }
       if (Object.prototype.hasOwnProperty.call(result, entry.key)) {
         throw new YamlError(line.number, line.indent + 1, 'duplicate key "' + entry.key + '"')
       }

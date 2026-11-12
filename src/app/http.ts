@@ -11,7 +11,8 @@ import { PromptConflict, SKILL_NAME, SKILL_PREFIX, TEAM_SECTIONS, builtInBase, b
 import { PROMPT_PRESETS } from './prompt-presets.ts'
 import { policyVersion } from '../policy.ts'
 import { inboxDir } from '../sources/inbox.ts'
-import { mkdirSync, writeFileSync } from 'node:fs'
+import { existsSync, mkdirSync, writeFileSync } from 'node:fs'
+import { randomUUID } from 'node:crypto'
 import { join } from 'node:path'
 import { SettingsConflict, type Settings } from './settings.ts'
 import { DeclarativeConflict, DeclarativeWriteError } from './config-write.ts'
@@ -216,7 +217,9 @@ function routes(runtime: HttpHost): Routes {
       const now = new Date()
       const stamp = now.toISOString().replace(/[:.]/g, '-')
       const slug = request.title.toLowerCase().replace(/[^a-z0-9一-鿿]+/g, '-').replace(/^-+|-+$/g, '').slice(0, 40) || 'ticket'
-      const file = `${slug}-${stamp}.md`
+      let file = `${slug}-${stamp}.md`
+      // Two panels dispatches of one title in the same millisecond would overwrite the first request file.
+      if (existsSync(join(root, file))) file = `${slug}-${stamp}-${randomUUID().slice(0, 8)}.md`
       writeFileSync(join(root, file), `<!-- created from the panel at ${now.toISOString()} -->
 # ${request.title}
 

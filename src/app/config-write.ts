@@ -5,7 +5,7 @@
  * refuses to write when the file changed outside the service, and replaces the file atomically.
  */
 import { randomUUID } from 'node:crypto'
-import { readFileSync, renameSync, statSync, unlinkSync, writeFileSync } from 'node:fs'
+import { closeSync, fsyncSync, openSync, readFileSync, renameSync, statSync, unlinkSync, writeFileSync } from 'node:fs'
 import { declarativeFormat, resolveDeclarativePath } from './config-file.ts'
 import { parseYaml } from './config-yaml.ts'
 import { SettingsSchema } from '../policy.ts'
@@ -86,7 +86,10 @@ export function patchJson(text: string, changes: Change[]): string {
   for (const { path, value } of changes) {
     let node = declared
     for (const key of path.slice(0, -1)) {
-      if (!isPlainObject(node[key])) node[key] = {}
+      // hasOwn, not a truthiness probe: a path segment named `__proto__` would otherwise walk onto
+      // Object.prototype and write the change onto every object. Today's change paths come from a zod
+      // re-parse that drops such keys, so this keeps the guard from depending on that behavior.
+      if (!Object.hasOwn(node, key) || !isPlainObject(node[key])) node[key] = {}
       node = node[key] as Record<string, unknown>
     }
     node[path[path.length - 1]!] = value
@@ -374,7 +377,14 @@ export class DeclarativeWriteBack {
     const changes = declarativeChanges(before, after, base)
     if (!changes.length) { this.seen = current; return }
     const text = current?.text ?? ''
-    const next = declarativeFormat(path) === 'yaml' ? patchYaml(text, changes) : patchJson(text, changes)
+    let next: string
+    try {
+      next = declarativeFormat(path) === 'yaml' ? patchYaml(text, changes) : patchJson(text, changes)
+    } catch (error) {
+      // A document the loader tolerated on startup (warn + ignore) can still fail to patch; say the file is
+      // the problem instead of letting a raw parser error reach the panel as an unclassified 500.
+      throw new DeclarativeWriteError(`The declarative settings file could not be written (${path}): it does not patch cleanly (${describe(error)}); nothing was written`)
+    }
     this.validate(path, next, changes)
     this.replace(path, next)
     this.seen = fileState(path)
@@ -398,11 +408,14 @@ export class DeclarativeWriteBack {
       }
     }
   }
-  /** tmp + rename, so a reader never sees a half-written file. */
+  /** tmp + fsync + rename, so a reader never sees a half-written file and a crash does not leave an empty one. */
   private replace(path: string, text: string): void {
     const tmp = `${path}.${process.pid}.${randomUUID()}.tmp`
     try {
       writeFileSync(tmp, text, 'utf8')
+      // The data reaches the disk before the rename, so a crash cannot leave the old name pointing at an empty file.
+      const handle = openSync(tmp, 'r+')
+      try { fsyncSync(handle) } finally { closeSync(handle) }
       renameSync(tmp, path)
     } catch (error) {
       try { unlinkSync(tmp) } catch { /* The write failed before the temporary file existed, or it was already gone. */ }
