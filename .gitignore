@@ -11,7 +11,11 @@ results.json
 dist/
 
 # Governance (ReSerendipity/.github §7.1 / §13.1): local-only container and agent context.
-/local/
+/local/*
+!/local/agents/
+/local/agents/*
+!/local/agents/GOTCHAS.md
+!/local/agents/REVISION_LOG.md
 AGENTS.md
 
 # Python bytecode from the CLI service launcher (artifacts, not sources; §9).
