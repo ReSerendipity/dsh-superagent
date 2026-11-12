@@ -444,8 +444,12 @@ export class Runtime extends Service implements SourceHost {
   private async ensureRouterSession(id: string): Promise<void> {
     if (id === this.masterId || this.routerSessions.has(id)) return
     const index = this.routerIdsValue.indexOf(id)
-    await this.sessions.ensure(id, this.machine.stateDir, `dsh-superagent orchestrator shard ${index}`, 'orchestrator')
+    // Reserve before the await: two assessments hashing to one uncreated shard would otherwise each call
+    // sessions.ensure for it, and the loser fails its candidate card on a session-already-exists error.
     this.routerSessions.add(id)
+    try {
+      await this.sessions.ensure(id, this.machine.stateDir, `dsh-superagent orchestrator shard ${index}`, 'orchestrator')
+    } catch (error) { this.routerSessions.delete(id); throw error }
     this.reportRouterHealth()
   }
   /** The Router Session that owns a Thread: the master while sharding is off, else the shard the Thread hashes to. */
