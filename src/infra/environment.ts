@@ -5,7 +5,7 @@
  */
 import { lstat, mkdir, readdir, readFile, rename, unlink, writeFile } from 'node:fs/promises'
 import { realpathSync } from 'node:fs'
-import { join, resolve } from 'node:path'
+import { basename, join, resolve } from 'node:path'
 import type { SubprocessOutputReader, SubprocessRuntime } from '@deepseek-ai/dsh-subprocess'
 import type { Deployment } from '../deployment.ts'
 import { SetupError } from '../setup.ts'
@@ -190,7 +190,8 @@ export async function runAsWorker(subprocess: SubprocessRuntime, argv: string[],
   const read = (reader: SubprocessOutputReader | undefined): string => reader?.readFrom(0).text ?? ''
   if (exitCode === 0) return read(handle.collected.stdout)
   const ended = exitCode === null ? 'was stopped before it finished' : `exited with ${exitCode}`
-  throw new CliError(read(handle.collected.stderr).trim() || `${argv.join(' ')} ${ended}`, undefined, exitCode ?? undefined)
+  // Only the program and the ending: argv may carry message text or a URL with credentials, which `commandError` never echoes.
+  throw new CliError(read(handle.collected.stderr).trim() || `${basename(argv[0] ?? 'command')} ${ended}`, undefined, exitCode ?? undefined)
 }
 
 /** Verifies that worker git invocations resolve the deployment's GitHub credential helper. */

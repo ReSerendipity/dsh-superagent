@@ -44,7 +44,9 @@ const fromPerson = (input?: TicketInput): boolean => input?.kind === 'trigger' ?
  */
 class PrepareFailed extends Error {}
 const PASSING = new RegExp(['ECONNRESET', 'ECONNREFUSED', 'ETIMEDOUT', 'EAI_AGAIN', 'ENOTFOUND', 'EPIPE', 'UND_ERR', 'socket hang up', 'fetch failed',
-  'network error', 'overloaded', 'rate limit', '\\b(?:408|429|50[0-4])\\b'].join('|'), 'i')
+  'network error', 'overloaded', 'rate limit'].join('|'), 'i')
+/** A bare status code only counts as transient when the text names it as an HTTP status, not as any number in the message. */
+const STATUS = /(?:\b(?:HTTP|status)\s*|\bcode\s*)(?:=|:)?\s*(408|429|5\d\d)\b/i
 /**
  * True when an error represents a transient network or model-provider failure: an HTTP 408, 429, or 5xx status, or a
  * connection that was refused, reset, timed out, or could not resolve its host.
@@ -53,7 +55,7 @@ export function transient(error: unknown): boolean {
   const status = (error as { status?: unknown } | undefined)?.status
   if (typeof status === 'number') return status === 408 || status === 429 || status >= 500
   const text = error instanceof Error ? `${error.name} ${error.message} ${String((error as { code?: unknown }).code ?? '')}` : String(error)
-  return PASSING.test(text)
+  return PASSING.test(text) || STATUS.test(text)
 }
 /** Appends a stable 12-character ticket ID suffix to a validated English worktree name. */
 const ticketWorktreeName = (name: string, id: string): string => `${WorktreeNameSchema.parse(name)}-${id.slice(0, 12)}`

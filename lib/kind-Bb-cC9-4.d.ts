@@ -703,6 +703,7 @@ declare const SETUP_PROBLEMS: {
   readonly multipleSourcesUnsupported: readonly ["deployment", "This process serves one context boundary, but these GitHub Sources were configured: {sources}. Run one instance per repository (or per team sharing memory and credentials) instead of adding repositories here; see docs/011."];
   readonly multiAccountUnsupported: readonly ["deployment", "These GitHub Sources use different agent accounts: {accounts}. One process serves several repositories only when they share one account, until per-instance accounts land (docs/010-multi-source.md)."];
   readonly environmentFailed: readonly ["deployment", "Preparing the agent environment failed."];
+  readonly gitUnavailable: readonly ["deployment", "git is unavailable; the local mode needs git 2.28 or later to commit tickets."];
   readonly repositoryUnset: readonly ["github", "The GitHub Source names no repository."];
   readonly agentCliUnset: readonly ["github", "The agent GitHub CLI is not set."];
   readonly agentCliMissing: readonly ["github", "The agent GitHub CLI was not found."];

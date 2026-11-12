@@ -100,6 +100,18 @@ export function acquireStateLock(
     if ((error as { code?: unknown }).code !== 'ELOCKED' || !deadHolder(stateDir)) throw error
     rmSync(`${stateDir}.lock`, { recursive: true, force: true })
     removeOwner(stateDir)
-    return own(acquire())
+    try {
+      return own(acquire())
+    } catch (reclaim) {
+      // Another process reclaimed at the same moment and won the re-acquire: fail with the original
+      // ELOCKED rather than a confusing second-failure, after one more dead-holder check in case it,
+      // too, died between the two acquisitions.
+      if ((reclaim as { code?: unknown }).code === 'ELOCKED' && deadHolder(stateDir)) {
+        rmSync(`${stateDir}.lock`, { recursive: true, force: true })
+        removeOwner(stateDir)
+        return own(acquire())
+      }
+      throw error
+    }
   }
 }

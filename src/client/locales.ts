@@ -864,6 +864,7 @@ const TEXT = {
   'routerShardsHint': ['1 表示单个 Router。分片按 Thread 哈希固定分配；**修改后需重启生效**。', '1 keeps a single Router. Shards pin Threads by hash; a change takes effect after a restart.'],
   'setup.multiAccountUnsupported': ['这些 GitHub 来源使用了不同的智能体账号：{accounts}。在支持逐实例账号之前，一个进程只能服务共用同一账号的多个仓库。', 'These GitHub Sources use different agent accounts: {accounts}. Until per-instance accounts land, one process serves several repositories only when they share one account.'],
   'setup.environmentFailed': ['准备智能体的运行环境失败。', SETUP_PROBLEMS.environmentFailed[1]],
+  'setup.gitUnavailable': ['git 不可用；本地模式需要 git 2.28 或更新版本来提交工单。', SETUP_PROBLEMS.gitUnavailable[1]],
   'setup.agentCliUnset': ['没有设置智能体的 GitHub CLI。', SETUP_PROBLEMS.agentCliUnset[1]],
   'setup.agentCliMissing': ['找不到智能体的 GitHub CLI。', SETUP_PROBLEMS.agentCliMissing[1]],
   'setup.agentCliSignedOut': ['智能体的 GitHub CLI 读不到它的账号。', SETUP_PROBLEMS.agentCliSignedOut[1]],
