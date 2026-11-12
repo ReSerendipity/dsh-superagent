@@ -29,6 +29,14 @@ export const commandShell = (): readonly string[] => isWindows ? ['cmd.exe', '/d
 /** True when `program` is a batch wrapper that Node must hand to cmd.exe instead of spawning directly. */
 export const isBatchWrapper = (program: string): boolean => isWindows && /\.(cmd|bat)$/i.test(program)
 
+/**
+ * The argv a runtime CLI is spawned with. A batch wrapper goes to `cmd.exe /d /c` with the program and its
+ * arguments kept as separate entries - Node then quotes each one for cmd - exactly how `runAsWorker` spawns
+ * one, so the polling, replying and git commands a validated wrapper serves behave like its setup probe.
+ */
+export const runtimeArgv = (program: string, args: readonly string[]): readonly string[] =>
+  isBatchWrapper(program) ? ['cmd.exe', '/d', '/c', program, ...args] : [program, ...args]
+
 /** One setup-probe invocation: the argv to spawn and, on Windows, the explicit environment layer. */
 export interface ProbeCommand {
   argv: string[]

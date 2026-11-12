@@ -10,7 +10,7 @@ import type { SubprocessOutputReader, SubprocessRuntime } from '@deepseek-ai/dsh
 import type { Deployment } from '../deployment.ts'
 import { SetupError } from '../setup.ts'
 import { CliError } from './commands.ts'
-import { isBatchWrapper, isWindows, pathDelimiter, shimBody, shimMode, shimName } from './platform.ts'
+import { isWindows, pathDelimiter, runtimeArgv, shimBody, shimMode, shimName } from './platform.ts'
 
 const MARKER = '# Written by dsh-superagent on every start; edits are lost.'
 /**
@@ -168,12 +168,11 @@ export function applyEnvironment(variables: Record<string, string | undefined>, 
 
 /** Spawns a command through the DSH subprocess runtime, which strips credential-shaped environment variables. */
 export async function runAsWorker(subprocess: SubprocessRuntime, argv: string[], cwd: string, signal: AbortSignal, env?: Record<string, string>): Promise<string> {
-  // Node refuses to spawn `.cmd`/`.bat` directly (the CVE-2024-27980 hardening), so a batch wrapper CLI — the account model
-  // docs/006-deployment.md describes — is handed to cmd.exe, which is also the only place its quoting rules apply.
-  const batch = isBatchWrapper(argv[0] ?? '')
-  // Hand the program and its arguments as SEPARATE argv entries: Node then quotes each one for cmd, whereas joining
-  // them into one command line lets cmd re-parse the quotes and hand the program literal backslash-quotes.
-  const spawnArgv = batch ? ['cmd.exe', '/d', '/c', argv[0]!, ...argv.slice(1)] : argv
+  // `runtimeArgv` hands a batch wrapper CLI to cmd.exe (Node refuses to spawn `.cmd`/`.bat` directly - the
+  // CVE-2024-27980 hardening) with the program and its arguments as SEPARATE argv entries: Node then quotes
+  // each one for cmd, whereas joining them into one command line lets cmd re-parse the quotes and hand the
+  // program literal backslash-quotes. The setup probe and every runtime command share this shape.
+  const spawnArgv = runtimeArgv(argv[0] ?? '', argv.slice(1))
   const handle = subprocess.spawn({ argv: spawnArgv, cwd, graceMs: 2000, signal, ...env ? { env } : {}, stdio: { stdin: 'ignore', stdout: { maxBytes: 1 << 20 }, stderr: { maxBytes: 1 << 16 } } })
   const { exitCode } = await handle.done
   const read = (reader: SubprocessOutputReader | undefined): string => reader?.readFrom(0).text ?? ''

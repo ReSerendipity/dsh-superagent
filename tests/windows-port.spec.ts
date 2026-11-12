@@ -9,6 +9,8 @@ import { join } from 'node:path'
 import type { SubprocessRuntime } from '@deepseek-ai/dsh-subprocess'
 import { expect, it } from 'vitest'
 import { agentGhConfig, agentVariables, runAsWorker, workerBin, workerGitConfig, writeEnvironment } from '../src/infra/environment.ts'
+import { Commands } from '../src/infra/commands.ts'
+import { runtimeArgv } from '../src/infra/platform.ts'
 import { workerProbe } from '../src/deployment.ts'
 
 // Every path is derived, so this contract test runs on any machine.
@@ -143,6 +145,29 @@ it.skipIf(!windows)('runs a batch wrapper CLI through cmd.exe and forwards its a
   const failing = join(dir, 'failing.cmd')
   await writeFile(failing, '@echo off\r\n1>&2 echo boom\r\nexit /b 3\r\n')
   await expect(runAsWorker(runtime(), [failing], dir, new AbortController().signal)).rejects.toThrow('boom')
+})
+
+it('routes every runtime CLI through one argv shape: batch wrappers to cmd.exe, everything else directly', () => {
+  // `runtimeArgv` is the single decision the setup probe, the pollers' Commands and the Feishu consumer share.
+  expect(runtimeArgv('gh', ['api', 'x'])).toEqual(['gh', 'api', 'x'])
+  if (windows) expect(runtimeArgv('C:/tools/gh-agent.cmd', ['api'])).toEqual(['cmd.exe', '/d', '/c', 'C:/tools/gh-agent.cmd', 'api'])
+  else expect(runtimeArgv('C:/tools/gh-agent.cmd', ['api'])).toEqual(['C:/tools/gh-agent.cmd', 'api'])
+})
+
+it.skipIf(!windows)('serves a batch wrapper to Commands.run the same way the setup probe did', async () => {
+  const dir = join(tmpdir(), 'dsh-superagent-wrapper-commands')
+  await rm(dir, { recursive: true, force: true })
+  await mkdir(dir, { recursive: true })
+  const wrapper = join(dir, 'gh-agent.cmd')
+  await writeFile(wrapper, '@echo off\r\necho [%1][%2]\r\nexit /b 0\r\n')
+  const failing = join(dir, 'failing.cmd')
+  await writeFile(failing, '@echo off\r\n1>&2 echo boom\r\nexit /b 3\r\n')
+  // Before this fix, execFile on a .cmd threw spawn EINVAL while the probe (runAsWorker) had passed it.
+  const commands = new Commands(() => ({ ...deployment, github: { ...deployment.github, cli: wrapper } }) as never, {}, new AbortController().signal)
+  expect((await commands.run(wrapper, ['api', 'repos/acme/widgets'])).trim()).toBe('[api][repos/acme/widgets]')
+  await expect(commands.run(failing, [])).rejects.toThrow('boom')
+  const missing = join(dir, 'missing.cmd')
+  await expect(commands.run(missing, [])).rejects.toThrow(/missing\.cmd|not recognized|cannot find/i)
 })
 
 // The POSIX twin of the batch-wrapper case: `runAsWorker` spawns the CLI itself, so no shell re-parses the arguments.
