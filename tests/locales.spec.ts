@@ -5,11 +5,19 @@ import { reasonLabel, type T } from '../src/client/text.ts'
 import { REASONS, USER_ERRORS } from '../src/core/index.ts'
 
 const placeholders = (text: string) => [...text.matchAll(/\{(\w+)\}/g)].map(match => match[1]).sort()
+/** What the host's interpolator leaves behind for a template, with every placeholder resolved. */
+const render = (text: string) => text.replace(/\{(\w+)\}/g, '<$1>')
 
 it('names the same placeholders in both languages', () => {
   const keys = Object.keys(zh) as DshSuperagentKey[]
   expect(keys.filter(key => placeholders(zh[key]).join() !== placeholders(en[key]).join())).toEqual([])
   expect(keys.filter(key => !zh[key] || !en[key])).toEqual([])
+})
+
+it('renders both languages without stray braces the interpolator would leave on screen', () => {
+  // The host interpolates single-brace names; a doubled `{{name}}` keeps its outer braces in the rendered text.
+  const keys = Object.keys(zh) as DshSuperagentKey[]
+  expect(keys.filter(key => /[{}]/.test(render(zh[key])) || /[{}]/.test(render(en[key])))).toEqual([])
 })
 
 it('words a reason by its code with its values, each of a batch, and words a person or an assessor wrote as written', () => {
