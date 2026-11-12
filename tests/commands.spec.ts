@@ -112,7 +112,7 @@ describe('Channels', () => {
     const gh = vi.spyOn(value, 'gh')
       .mockRejectedValueOnce(commandError({ stderr: 'gh: Not Found (HTTP 404)', code: 1 })).mockResolvedValueOnce({})
     expect(await send(value, { ...reply, channel: githubChannel(8, `https://github.com/${REPOSITORY}/pull/8#discussion_r7`) })).toBe('sent')
-    expect((pages.mock.calls[0] as unknown[])[1]).toBe('issues/8/comments')
+    expect((pages.mock.calls[0] as unknown[])[1]).toBe('issues/8/comments?per_page=100')
     const post = ['api', `repos/${REPOSITORY}/issues/8/comments`, '--method', 'POST', '-f', expect.stringContaining('Done')]
     expect(gh.mock.calls[1]![0]).toEqual(post)
   })

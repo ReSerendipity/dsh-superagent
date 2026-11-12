@@ -34,11 +34,11 @@ export async function sendGithub(host: Pick<SourceContext, 'commands'>, message:
         .catch((error: unknown) => { if (missing(error)) return undefined; throw error })
       rootId = source ? source.in_reply_to_id ?? source.id : undefined
     }
-    const path = rootId === undefined ? `issues/${number}/comments?per_page=100` : `pulls/${number}/comments?per_page=100`
+    const path = rootId === undefined ? `issues/${number}/comments` : `pulls/${number}/comments`
     const marker = `<!-- dsh-superagent:${message.id} -->`
     const mine = (comment: z.infer<typeof CommentSchema>) => sameName(comment.user?.login ?? '', github.login)
       && (rootId === undefined || comment.in_reply_to_id === rootId) && (comment.body ?? '').includes(marker)
-    if ((await commands.pages(CommentSchema, path)).some(mine)) return 'sent'
+    if ((await commands.pages(CommentSchema, `${path}?per_page=100`)).some(mine)) return 'sent'
     const target = rootId === undefined ? path : `${path}/${rootId}/replies`
     await commands.api(z.unknown(), target, '--method', 'POST', '-f', `body=${message.text}\n\n${marker}`)
     return 'sent'

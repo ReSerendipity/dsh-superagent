@@ -28,8 +28,9 @@ describe('sendGithub', () => {
     const commands = fake()
     expect(await sendGithub({ commands } as never, message('m1'))).toBe('sent')
     expect(vi.mocked(commands.pages)).toHaveBeenCalledTimes(1)
+    expect(vi.mocked(commands.pages).mock.calls[0]![1]).toBe('issues/12/comments?per_page=100')
     const call = vi.mocked(commands.api).mock.calls[0]!
-    expect(call[1]).toBe('issues/12/comments?per_page=100')
+    expect(call[1]).toBe('issues/12/comments')
     expect(String(call.at(-1))).toContain('<!-- dsh-superagent:m1 -->')
   })
   it('reads a deleted target as gone instead of retrying', async () => {

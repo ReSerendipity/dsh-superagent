@@ -80,14 +80,14 @@ function changedBlocks(from: SettingsValue, to: SettingsValue): SettingsSave[] {
   return blocks
 }
 
+/** How long a shutdown waits for effect handlers before continuing without them. */
+const DRAIN_STOP_MS = 30_000
+
 /**
  * Composition root of dsh-superagent that connects `Store`, `Setup`, `Engine`, `SourceRegistry`, `Effects`, `Outbox`, `Passes`, `Sessions`, `Settings`, `Prompts`, `DshExecutor`, and `MasterAssessor`.
  * Exposes the `SourceHost` service on the Cordis context for source plugins and coordinates startup, setup checks, HTTP route registration, and graceful shutdown.
  * Locks the state directory before opening SQLite so concurrent processes cannot corrupt or double-migrate state.
  */
-/** How long a shutdown waits for effect handlers before continuing without them. */
-const DRAIN_STOP_MS = 30_000
-
 export class Runtime extends Service implements SourceHost {
   readonly store: Store
   readonly setup: Setup

@@ -201,11 +201,6 @@ export class Prompts {
   }
   save(value: unknown, baseRevision: number, source: SettingsOrigin): PromptVersion {
     const config = this.validate(value)
-    // An override replaces built-in discipline text wholesale, so a tool call - the main Session reads
-    // external content - must not rewrite its own instructions; team sections and skills stay editable.
-    if (source === 'tool' && JSON.stringify(config.overrides ?? {}) !== JSON.stringify(this.current().config.overrides ?? {})) {
-      throw new Error('Built-in prompt overrides can only be changed in the management panel, not by a tool call')
-    }
     return this.store.atomic(() => {
       const previous = this.current()
       if (previous.revision !== baseRevision) throw new PromptConflict(`Prompt version changed to ${previous.revision}; compare the latest version before saving`)

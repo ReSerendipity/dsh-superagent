@@ -21,7 +21,7 @@ export interface MainToolsHost {
   readonly context: Context
   readonly engine: Pick<EngineForMainSession, 'decide' | 'attach' | 'reply' | 'requestStatus' | 'note'> & EngineForPeople
   readonly store: Pick<Store, 'tickets' | 'triggers' | 'threads' | 'atomic' | 'replyStatus' | 'settings'>
-  readonly prompts: Pick<Prompts, 'preview' | 'save'>
+  readonly prompts: Pick<Prompts, 'preview' | 'save' | 'validate' | 'current'>
   readonly sessions: Pick<Sessions, 'status' | 'notify' | 'delivery' | 'modelRetry'>
   readonly settings: Pick<Settings, 'view' | 'block' | 'save' | 'pause' | 'sync'>
   readonly assessor: Pick<MasterAssessor, 'context' | 'read' | 'decide'>
@@ -293,6 +293,13 @@ export function mainTools(host: MainToolsHost, agent: Agent): Tool[] {
           }) }
         }
         if (args.baseRevision === undefined) throw new Error('Saving needs baseRevision, the revision the configuration edits')
+        // An override replaces built-in discipline text wholesale, so a tool call - the main Session reads
+        // external content - must not rewrite its own instructions; team sections and skills stay editable.
+        // validate() first, so an unknown part still refuses with its own error.
+        const overrides = host.prompts.validate(args.config).overrides ?? {}
+        if (JSON.stringify(overrides) !== JSON.stringify(host.prompts.current().config.overrides ?? {})) {
+          throw new Error('Built-in prompt overrides can only be changed in the management panel, not by a tool call')
+        }
         const { context_delivery: _delivery, ...saved } = await savePrompts(host, args.config, args.baseRevision, 'tool')
         return saved
       },

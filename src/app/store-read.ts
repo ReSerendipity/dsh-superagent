@@ -1,6 +1,6 @@
 /** Read-only Store queries for views, tools, and Source polling. */
 import type { DatabaseSync, SQLInputValue } from 'node:sqlite'
-import type { Decision, Thread, Trigger } from '../core/index.ts'
+import type { Decision, Thread, Ticket, Trigger } from '../core/index.ts'
 import type { Dropped, Receipt, TimelinePlace } from './store.ts'
 
 export function storeReads(db: DatabaseSync) {
@@ -73,6 +73,20 @@ export function storeReads(db: DatabaseSync) {
   droppedReplies: (limit = 20): Dropped[] =>
     values('SELECT value FROM outbox WHERE dropped IS NOT NULL ORDER BY dropped DESC LIMIT ?', limit),
   droppedSince: (since: string): number => Number(db.prepare('SELECT COUNT(*) AS n FROM outbox WHERE dropped >= ?').get(since)?.n ?? 0),
+  /** Threads newest-activity first, paged in SQL: `since` bounds the day-of-recent view, `all` omits it. */
+  threadsPaged: (options: { since?: string; offset: number; limit: number }): { items: Thread[]; more: boolean } => {
+    const recent = "COALESCE(json_extract(value, '$.lastAt'), json_extract(value, '$.createdAt'))"
+    const where = options.since ? `WHERE ${recent} >= ?` : ''
+    const rows = db.prepare(`SELECT value FROM thread ${where} ORDER BY ${recent} DESC LIMIT ? OFFSET ?`)
+      .all(...(options.since ? [options.since] : []), options.limit + 1, options.offset)
+    return { items: rows.slice(0, options.limit).map(row => JSON.parse(String(row.value)) as Thread), more: rows.length > options.limit }
+  },
+  /** Tickets whose title matches a search term, newest first; the thread-reach match stays in the view layer. */
+  ticketsByTitle: (query: string, limit = 10): Ticket[] => {
+    const pattern = `%${query.replace(/[\\%_]/g, match => `\\${match}`)}%`
+    return db.prepare("SELECT value FROM ticket WHERE json_extract(value, '$.title') LIKE ? ESCAPE '\\' ORDER BY rowid DESC LIMIT ?")
+      .all(pattern, limit).map(row => JSON.parse(String(row.value)) as Ticket)
+  },
   subscribedThreads: (source?: string): Thread[] => source
     ? values('SELECT value FROM thread WHERE subscribed = ? ORDER BY rowid', source)
     // Force the partial index so SQLite does not scan the entire table in rowid order.
