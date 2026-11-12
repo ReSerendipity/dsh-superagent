@@ -1,0 +1,29 @@
+#!/bin/sh
+# 本地 pre-push：保护 main 的两种不可逆动作（删除、非快进）。
+# 服务器侧 ruleset 对私有仓不可用（Free 计划，ADR-0004），本钩子是替代控制。
+# 逃生阀：SKIP_GOVERNANCE_HOOKS=1 git push ...
+set -eu
+
+if [ "${SKIP_GOVERNANCE_HOOKS:-0}" = "1" ]; then
+  echo "pre-push: SKIP_GOVERNANCE_HOOKS=1，跳过治理检查" >&2
+  exit 0
+fi
+
+ZERO=0000000000000000000000000000000000000000
+while read -r local_ref local_sha remote_ref remote_sha; do
+  [ -n "${remote_ref:-}" ] || continue
+  [ "$remote_ref" = "refs/heads/main" ] || continue
+
+  if [ "$local_sha" = "$ZERO" ]; then
+    echo "pre-push: 禁止删除 main（remote=$remote_ref）" >&2
+    exit 1
+  fi
+
+  if [ "$remote_sha" != "$ZERO" ] && ! git merge-base --is-ancestor "$remote_sha" "$local_sha"; then
+    echo "pre-push: 禁止非快进推送 main（remote $remote_sha 不是本地 $local_sha 的祖先）" >&2
+    echo "pre-push: 先 git pull --rebase 合并远端，或确需改写时显式 SKIP_GOVERNANCE_HOOKS=1" >&2
+    exit 1
+  fi
+done
+
+exit 0
