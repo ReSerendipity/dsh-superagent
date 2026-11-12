@@ -84,7 +84,8 @@ export function issueTrigger(issue: Opened, agent: string): Trigger {
   return { id: key('github-issue', String(issue.number)), source: SOURCE,
     threads: [{ source: SOURCE, id: String(issue.number) }], ...author(issue.user, agent), at: issue.created_at,
     text: `${issue.title}\n\n${body}`,
-    ...(mentions(body, agent) ? { addressed: 'mention' as const } : {}),
+    // A mention in the title addresses the agent exactly as one in the body does; GitHub's own semantics agree.
+    ...(mentions(`${issue.title}\n${body}`, agent) ? { addressed: 'mention' as const } : {}),
     channel: githubChannel(issue.number, issue.html_url), url: issue.html_url, meta: { number: issue.number, isPr: false, kind: 'issue' } }
 }
 /**

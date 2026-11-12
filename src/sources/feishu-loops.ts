@@ -18,6 +18,8 @@ import type { FeishuConfig } from './feishu.ts'
 
 export const runFeishu = (ctx: SourceContext, signal: AbortSignal): Promise<unknown> =>
   Promise.allSettled([watch, backfillLoop, chatNamesLoop].map(loop => loop(ctx, signal)))
+/** How many seen message ids a thread's checkpoint keeps; an aged-out id only costs a duplicate trigger, which the Engine drops. */
+const SEEN_WINDOW = 500
 const enabled = (ctx: SourceContext): FeishuConfig | undefined => ctx.config<FeishuConfig>(SOURCE)
 const bot = (ctx: SourceContext): FeishuBot => {
   const resolved = ctx.deployment.feishu
@@ -266,7 +268,10 @@ async function pollThread(ctx: SourceContext, thread: Thread, signal?: AbortSign
       await receive(ctx, trigger)
     }
     result.messages.forEach(message => known.add(message.message_id))
-    ctx.state.set(checkpoint, [...known])
+    // Bound the stored window: an id that ages out can only cost a re-offered trigger, which the Engine
+    // deduplicates by id, while an unbounded set grows with every message the thread ever had.
+    const ids = [...known]
+    ctx.state.set(checkpoint, ids.length > SEEN_WINDOW ? ids.slice(-SEEN_WINDOW) : ids)
     if (initialized && encounteredKnown) break
     resource = result.next_resource
   }

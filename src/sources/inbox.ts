@@ -40,7 +40,7 @@ export type InboxConfig = z.infer<typeof InboxConfigSchema>
 export function inboxDir(deployment: { stateDir: string }, config: InboxConfig): string {
   return config.inboxDir ? resolve(config.inboxDir) : join(deployment.stateDir, 'inbox')
 }
-const fileUrl = (path: string): string => `file:///${path.replaceAll('\\', '/')}`
+const fileUrl = (path: string): string => `file:///${path.replaceAll('\\', '/').split('/').map(encodeURIComponent).join('/')}`
 
 /** One pending task file as the poll sees it. */
 export interface InboxFile { path: string; relPath: string; content: string; mtimeMs: number }
@@ -144,13 +144,13 @@ export const inboxKind: SourceKind<InboxConfig> = {
 }
 
 /** Read pending files in the inbox once they have settled, take in each, and archive it under done/. The move is the cursor. */
-export async function pollInbox(ctx: SourceContext, config: InboxConfig, signal: AbortSignal): Promise<{ read: number; moved: number; failed: number }> {
+export async function pollInbox(ctx: SourceContext, config: InboxConfig, signal: AbortSignal): Promise<{ read: number; moved: number; failed: number; lastError?: string }> {
   const root = inboxDir(ctx.deployment, config)
   if (!existsSync(root)) mkdirSync(root, { recursive: true })
   const names = readdirSync(root, { withFileTypes: true }).filter(entry => entry.isFile() && entry.name.toLowerCase().endsWith('.md'))
     .map(entry => entry.name).sort()
   const archive = join(root, ARCHIVE)
-  let read = 0, moved = 0, failed = 0
+  let read = 0, moved = 0, failed = 0, lastError: string | undefined
   for (const name of names) {
     if (signal.aborted) throw new Error('The inbox Source stopped during the read')
     let file: InboxFile
@@ -160,7 +160,7 @@ export async function pollInbox(ctx: SourceContext, config: InboxConfig, signal:
       // A freshly dropped file waits for the next round instead of being taken in mid-write.
       if (Date.now() - st.mtimeMs < INBOX_STABILITY_MS) continue
       file = { path, relPath: name, content: readFileSync(path, 'utf8'), mtimeMs: st.mtimeMs }
-    } catch { failed++; continue }
+    } catch (error) { failed++; lastError = String(error); continue }
     read++
     try {
       const trigger = inboxTrigger(file, config, root)
@@ -173,9 +173,9 @@ export async function pollInbox(ctx: SourceContext, config: InboxConfig, signal:
       if (existsSync(target)) target = join(archive, `${basename(name, extname(name))}-${Date.now()}${extname(name)}`)
       renameSync(file.path, target)
       moved++
-    } catch { failed++ }
+    } catch (error) { failed++; lastError = error instanceof Error ? error.message : String(error) }
   }
-  return { read, moved, failed }
+  return failed > 0 ? { read, moved, failed, lastError } : { read, moved, failed }
 }
 
 async function watch(ctx: SourceContext, signal: AbortSignal): Promise<void> {
@@ -189,9 +189,9 @@ async function watch(ctx: SourceContext, signal: AbortSignal): Promise<void> {
     else {
       const at = new Date().toISOString()
       try {
-        const { read, moved, failed } = await pollInbox(ctx, config, signal)
+        const { read, moved, failed, lastError } = await pollInbox(ctx, config, signal)
         failures = 0
-        ctx.report(SOURCE, { state: 'ready', detail: `${read} files, ${moved} archived, ${failed} failed`, at })
+        ctx.report(SOURCE, { state: 'ready', detail: `${read} files, ${moved} archived, ${failed} failed${lastError ? `; last error: ${lastError.slice(0, 300)}` : ''}`, at })
       } catch (error) {
         failures += 1
         // One filesystem failure is retried on the next round; three in a row need a person.

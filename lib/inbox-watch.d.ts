@@ -41,6 +41,7 @@ declare function pollInbox(ctx: SourceContext, config: InboxConfig, signal: Abor
   read: number;
   moved: number;
   failed: number;
+  lastError?: string;
 }>;
 declare const name = "dsh-superagent-inbox";
 declare const inject: string[];

@@ -69,6 +69,10 @@ export class SourceRegistry implements SourceScope {
       .filter(([id, stored]) => id !== sourceKindOf(id, stored) && this.kinds.has(sourceKindOf(id, stored)))
       .sort(([a], [b]) => a.localeCompare(b))
       .map(([id, stored]) => ({ ...this.resolve(this.kinds.get(sourceKindOf(id, stored))!, stored, id), installed: true }))
+    // Instances removed by a settings save release their health entries, which would otherwise hold a stale
+    // kind's names and misreport if a later instance reused the id.
+    const live = new Set([...primary, ...extra].map(item => item.id))
+    for (const [id, entries] of this.instanceEntries) if (!live.has(id)) { for (const entry of entries.values()) entry.release(); this.instanceEntries.delete(id) }
     // Stored instances whose kind is not installed stay last, with their configuration kept as stored.
     const orphaned = Object.entries(settings.sources)
       .filter(([id, stored]) => !this.kinds.has(sourceKindOf(id, stored)))

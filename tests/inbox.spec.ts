@@ -107,7 +107,7 @@ describe('pollInbox', () => {
   it('reports a file that cannot be read as failed instead of losing the round', async () => {
     const h = host({ receive: vi.fn(async () => { throw new Error('engine down') }) })
     drop(h.dir, 'task.md', 'x')
-    expect(await pollInbox(h, CONFIG, new AbortController().signal)).toEqual({ read: 1, moved: 0, failed: 1 })
+    expect(await pollInbox(h, CONFIG, new AbortController().signal)).toEqual({ read: 1, moved: 0, failed: 1, lastError: 'engine down' })
     // The file stays in the inbox, so the next round retries it.
     expect(existsSync(join(h.dir, 'inbox', 'task.md'))).toBe(true)
     h.store.close()
