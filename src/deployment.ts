@@ -8,7 +8,7 @@ import s from '@deepseek-ai/schemastery'
 import { z } from 'zod'
 import type { SubprocessRuntime } from '@deepseek-ai/dsh-subprocess'
 import { agentGhConfig, runAsWorker, sameDirectory, withoutDirectory, workerBin } from './infra/environment.ts'
-import { ABSOLUTE_PATH, probeEnv } from './infra/platform.ts'
+import { ABSOLUTE_PATH, isWindows, probeEnv } from './infra/platform.ts'
 import { SetupError } from './setup.ts'
 
 const reason = (error: unknown): string => error instanceof Error ? error.message : String(error)
@@ -99,8 +99,15 @@ export interface FeishuBot { cli: string; appId: string; brand: 'feishu' | 'lark
 
 /** Resolve a command name or absolute path to an executable file, ignoring the worker shim directory. */
 export function executable(name: string, path: string, exclude?: string): string {
-  if (name.includes('/') && !isAbsolute(name)) throw new Error(`${name} must be a command name or an absolute path`)
-  const candidates = isAbsolute(name) ? [name] : path.split(delimiter).filter(dir => isAbsolute(dir) && !(exclude && sameDirectory(dir, exclude))).map(dir => join(dir, name))
+  if ((name.includes('/') || name.includes('\\')) && !isAbsolute(name)) throw new Error(`${name} must be a command name or an absolute path`)
+  // A bare command name resolves through PATHEXT on Windows (`gh` finds `gh.exe`/`gh.cmd`, as CreateProcess
+  // would); an absolute path or an already extended name is used as given. Elsewhere the name is the file,
+  // and an extensionless file that only PATH ordering would surface cannot be executed on Windows anyway.
+  const bare = isWindows && !isAbsolute(name) && !/\.\w+$/.test(name)
+  const extensions = bare ? (process.env.PATHEXT ?? '.COM;.EXE;.BAT;.CMD').split(';').filter(Boolean).map(extension => extension.toLowerCase()) : []
+  const names = extensions.length > 0 ? extensions.map(extension => `${name}${extension}`) : [name]
+  const candidates = isAbsolute(name) ? names
+    : names.flatMap(candidate => path.split(delimiter).filter(dir => isAbsolute(dir) && !(exclude && sameDirectory(dir, exclude))).map(dir => join(dir, candidate)))
   for (const candidate of candidates) {
     try { if (statSync(candidate).isFile()) { accessSync(candidate, constants.X_OK); return candidate } }
     catch { /* Not an executable file here; try the next PATH directory. */ }
