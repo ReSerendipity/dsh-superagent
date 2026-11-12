@@ -1,5 +1,5 @@
 /** Turns a chat dispatch call into an ordinary inbox .md file, so it travels the exact same path as a dropped ticket. */
-import { mkdirSync, writeFileSync } from 'node:fs'
+import { existsSync, mkdirSync, writeFileSync } from 'node:fs'
 import { join } from 'node:path'
 
 const MARKER = /^<!--\s*chat-session:\s*([^\s>]+)\s*-->$/m
@@ -16,7 +16,9 @@ export function submitChatTicket(root: string, title: string, request: string, s
   const now = new Date()
   const stamp = now.toISOString().replace(/[:.]/g, '-')
   const slug = title.toLowerCase().replace(/[^a-z0-9一-鿿]+/g, '-').replace(/^-+|-+$/g, '').slice(0, 40) || 'ticket'
-  const file = `chat-${slug}-${stamp}.md`
+  let file = `chat-${slug}-${stamp}.md`
+  // Two dispatches of one title within the same millisecond would overwrite each other; a suffix keeps both.
+  if (existsSync(join(root, file))) file = `chat-${slug}-${stamp}-${Math.random().toString(36).slice(2, 8)}.md`
   const lines = [
     `<!-- created by chat-router at ${now.toISOString()} -->`,
     `<!-- chat-session: ${sessionId} -->`,

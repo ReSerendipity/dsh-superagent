@@ -264,8 +264,10 @@ export class Runtime extends Service implements SourceHost {
       this.statusTimer = setInterval(() => { this.publishStatus('running') }, INSTANCE_STATUS_INTERVAL_MS)
       this.statusTimer.unref?.()
       // Mode A reply files are the bridge back to the main chat that dispatched a task: only a bounded brief is sent.
+      // `queue`, not `steer`: a chat that dispatched and then finished its turn is idle, and steer only reaches a
+      // running turn - the brief was silently dropped for exactly the normal "dispatch, wait, hear back" sequence.
       const briefs = new ChatReplyWatcher(chatInboxRoot, async (sessionId, text) => {
-        try { await sessions.prompt(sessionId, `chat-brief:${key(text)}`, text, 'steer') }
+        try { await sessions.prompt(sessionId, `chat-brief:${key(text)}`, text, 'queue') }
         catch { /* The main chat may have been closed; the reply itself stays archived under done/. */ }
       })
       const briefTimer = setInterval(() => {
