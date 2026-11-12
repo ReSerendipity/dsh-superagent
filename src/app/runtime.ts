@@ -43,6 +43,7 @@ import { HealthBoard } from '../infra/health.ts'
 import { Outbox } from './outbox.ts'
 import { Passes } from './passes.ts'
 import { Setup } from './setup.ts'
+import { until } from '../executor/background.ts'
 import { feishuSettings } from '../sources/feishu.ts'
 import { health, type Health, type SourceContext, type SourceHost } from '../sources/host.ts'
 import { Sessions } from './sessions.ts'
@@ -84,6 +85,9 @@ function changedBlocks(from: SettingsValue, to: SettingsValue): SettingsSave[] {
  * Exposes the `SourceHost` service on the Cordis context for source plugins and coordinates startup, setup checks, HTTP route registration, and graceful shutdown.
  * Locks the state directory before opening SQLite so concurrent processes cannot corrupt or double-migrate state.
  */
+/** How long a shutdown waits for effect handlers before continuing without them. */
+const DRAIN_STOP_MS = 30_000
+
 export class Runtime extends Service implements SourceHost {
   readonly store: Store
   readonly setup: Setup
@@ -583,10 +587,16 @@ export class Runtime extends Service implements SourceHost {
     this.closingFlag = true; const passes = this.passes.stop(); this.stopped.abort()
     try {
       this.assessor.stop()
-      const ids = [this.masterId, ...this.store.tickets.list().map(ticket => workerSessionId(ticket.id))]
+      // The workers' turns stop with the tickets'; the Router shards and the Watchdog Session end their turns too,
+      // so a fiber restart does not leave an old shard finishing a turn beside the new instance.
+      const ids = [...new Set([...this.routerIdsValue, ...(this.watchdogId ? [this.watchdogId] : []),
+        ...this.store.tickets.list().map(ticket => workerSessionId(ticket.id))])]
       const agents = ids.map(id => this.ctx.agents.get(id as SessionId)).filter((agent): agent is Agent => agent !== undefined)
       for (const agent of agents) agent.cancel({ kind: 'user' }, { keepInbox: true })
-      await Promise.allSettled([passes, this.effects.drain(), ...agents.map(agent => agent.whenIdle())])
+      // A handler that ignores the abort signal must not hold the state directory lock hostage: give the drain a
+      // deadline, then keep shutting down and say what was left behind.
+      const drained = await until(Promise.allSettled([passes, this.effects.drain(), ...agents.map(agent => agent.whenIdle())]), undefined, DRAIN_STOP_MS)
+      if (drained === false) this.ctx.logger.warn('dsh-superagent shutdown: a handler ignored its stop signal for %d s; continuing without it', DRAIN_STOP_MS / 1000)
       // The workers' jobs and subagents stop too: their ends would start worker turns without the tool limits released below.
       this.watchdog?.stop()
       await this.executor.shutdown()
