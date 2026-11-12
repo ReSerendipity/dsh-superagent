@@ -22,6 +22,7 @@ https://github.com/ReSerendipity/dsh-superagent/security/advisories/new
 
 - 上游 [deepseek-ai/dsh-superagent-prototype](https://github.com/deepseek-ai/dsh-superagent-prototype) 的 `src/core/**` 与本仓逐字节相同，属于上游代码；该层的漏洞请同时报告给上游项目，本仓负责跟进合并。
 - 本插件以**完全权限**运行在操作者自己的机器上（主 Session 只读、执行器全量是产品设计），它的安全模型以「操作者信任本机」为前提；绕过这一前提的隔离类问题（例如工单之间的上下文越界、策略准入被绕过）在本文件范围内，操作系统级沙箱缺失不是漏洞。
+- CLI 服务管理器的优雅停止走一条**本机命名管道**（`\.<pipe>\dsh-superagent-<profile>-<digest>`），默认 DACL 下同一台机器上的任何本地进程都能写入 `stop` 停掉服务，请求缓冲有上限（>64 字节即断开）。这是「操作者信任本机」前提内的已知边界，不是漏洞；把服务跑在多用户机器上时应自行限制本地账户权限。
 
 第三方依赖的漏洞请报告给对应上游项目；本仓只负责升级到修复版本。
 

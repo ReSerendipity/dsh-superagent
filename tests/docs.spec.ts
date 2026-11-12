@@ -42,6 +42,14 @@ describe('documentation', () => {
     expect(numbers).toEqual([...numbers].sort((a, b) => a - b))
     expect(new Set(numbers).size).toBe(numbers.length)
   })
+  it('indexes every numbered document in the README, which is where a reader finds them', () => {
+    // The README's document table is the entry point; a new docs/NNN without a row there ships invisible.
+    const missing = numbered.filter(name => {
+      const number = name.slice(0, 3)
+      return !read('README.md').includes(`docs/${number}`)
+    })
+    expect(missing).toEqual([])
+  })
   it('links numbered documents only to earlier numbered documents', () => {
     const violations = numbered.flatMap(name => links(join(ROOT, 'docs', name)).flatMap(target => {
       const linked = resolve(ROOT, 'docs', target)

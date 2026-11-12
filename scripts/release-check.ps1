@@ -93,6 +93,9 @@ Check 'working tree clean' {
 }
 
 Check 'branch pushed' {
+  # A stale local origin/main reference would pass this check against a remote that moved; refresh it when
+  # the gate runs online (the offline run explicitly skips this gate anyway).
+  if (-not $SkipOnline) { & $git -C $root fetch origin main | Out-Null }
   $local = (& $git -C $root rev-parse HEAD).Trim()
   $remote = (& $git -C $root rev-parse 'origin/main').Trim()
   Need ($local -eq $remote) 'local HEAD differs from origin/main; push before publishing'
@@ -175,6 +178,13 @@ Check 'plugin tarball builds, is complete, and matches its checksum file' {
       'package/prompts/team/delivery.md', 'package/skills/dsh-superagent-github/SKILL.md', 'package/locale/zh.json')) {
     Need ($entries -contains $required) ('the tarball lacks ' + $required)
   }
+  # "Must not ship" is as binding as "must ship": a whole-directory file whitelist can pick up a stray file.
+  $forbidden = @('package/local/', 'package/AGENTS.md', 'package/.env', 'package/scripts/', 'package/dist/')
+  foreach ($banned in $forbidden) {
+    Need (-not ($entries | Where-Object { $_ -like ($banned + '*') })) ('the tarball carries ' + $banned)
+  }
+  # skills/ ships exactly its README index and the two SKILL.md files; anything else under it is a stray.
+  Need (($entries | Where-Object { $_ -like 'package/skills/*' }).Count -eq 3) ('the tarball carries unexpected files under skills/')
   Set-Variable -Name TarballDigest -Value $sha -Scope Script
   ($entries.Count.ToString() + ' entries, sha256 ' + $sha.Substring(0, 12) + '…')
 }
