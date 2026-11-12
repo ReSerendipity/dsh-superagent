@@ -2,7 +2,8 @@
 import { afterEach, beforeEach, expect, it, vi } from 'vitest'
 import { TICKET_STATES } from '../src/app/cards.ts'
 import { builtInBase, builtInParts, defaultPrompts } from '../src/app/prompts.ts'
-import { UserError } from '../src/core/index.ts'
+import { UserError, type Ticket } from '../src/core/index.ts'
+import type { Sessions } from '../src/app/sessions.ts'
 import { KV } from '../src/kv.ts'
 import { RESOURCES } from '../src/app/resources.ts'
 import { CliError, Commands } from '../src/infra/commands.ts'
@@ -505,7 +506,7 @@ it('briefs the dispatching chat of an ended task even when a restart lost the in
   const { ticket } = await h.acceptedTicket({ ...feishu('9', '@bot dispatch this'), meta: { chatSession: 'chat-x', dispatchedBy: 'chat-router' } })
   // A restart between dispatch and end empties the map; the persisted Trigger meta names the chat again.
   const internals = h.runtime as unknown as { chatTickets: Map<string, string>;
-    reportToChat(ticketId: string, outcome: string, ticket: typeof ticket | undefined, sessions: typeof h.runtime.sessions): void }
+    reportToChat(ticketId: string, outcome: string, ticket: Ticket | undefined, sessions: Sessions): void }
   internals.chatTickets.clear()
   const prompt = vi.spyOn(h.runtime.sessions, 'prompt').mockResolvedValue(undefined)
   internals.reportToChat(ticket.id, 'completed', h.runtime.store.tickets.get(ticket.id), h.runtime.sessions)
