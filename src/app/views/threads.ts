@@ -79,9 +79,10 @@ export function search(host: ViewHost, query: string, links: Pick<TextCache, 'en
   const reaches = (ticket: Ticket) => [...(ticket.follows ?? []).map(follow => follow.thread),
     ...view.threadsOf(ticket.id).map(thread => thread.key)]
   const matches = (ticket: Ticket) => reaches(ticket).some(key => named.threads.includes(key))
-  const byTitle = named.threads.length === 0 ? store.read.ticketsByTitle(value, 10)
-    : [...new Map([...store.tickets.list().filter(matches), ...store.read.ticketsByTitle(value, 10)].map(ticket => [ticket.id, ticket])).values()]
-  const tickets = [...new Map([...byTitle, ...store.tickets.list().filter(matches)].map(ticket => [ticket.id, ticket])).values()]
+  // The thread-reach scan runs once, and only when a Source resolved named threads; titles always come from SQL.
+  const byThread = named.threads.length === 0 ? [] : store.tickets.list().filter(matches)
+  const byTitle = store.read.ticketsByTitle(value, 10)
+  const tickets = [...new Map([...byThread, ...byTitle].map(ticket => [ticket.id, ticket])).values()]
     .sort(newestFirst).slice(0, 10).map(ticketSummary)
   // Omit automated triggers from threads already included in `threads`.
   const shownThreads = new Set(threads.map(thread => thread.key))
