@@ -1,5 +1,8 @@
 ﻿# Release rehearsal for DSH-Superagent: one command that says whether this checkout may be published.
 #
+# Historical reference only: `scripts/release-check.mjs` is the single entry point (`pnpm release:check`) and runs on
+# Windows, macOS and Linux; this PowerShell original is kept because ARCHITECTURE.md and docs/020 cite it.
+#
 #   powershell -NoProfile -ExecutionPolicy Bypass -File scripts\release-check.ps1
 #   powershell -NoProfile -ExecutionPolicy Bypass -File scripts\release-check.ps1 -SkipTests   # skips typecheck/tests, still builds lib
 #

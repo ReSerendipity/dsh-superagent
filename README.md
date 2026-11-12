@@ -58,7 +58,7 @@ Git 方式装的是 `main` 当前最新提交；`dsh plugin add` 把 spec 原样
 
 收件准入名单也必须非空（面板 设置 → 评估 → 谁可以派活，加一行 `local`），否则投单会被判 `not_a_member` 并静默归档，不写回信。
 
-tarball、本地目录、独立 profile 与常驻服务见 [WINDOWS-SETUP.md](docs/WINDOWS-SETUP.md)。发布状态：本仓自 `v0.1.0` 起建立公开基线，已发布到 npm 为 `@reserendipity/dsh-superagent`（当前版本以 npm 上的最新发布为准）；离线跑 `pnpm release:check -SkipOnline`（被跳过的在线检查会标成 `NOT VERIFIED`）。
+tarball、本地目录、独立 profile 与常驻服务见 [WINDOWS-SETUP.md](docs/WINDOWS-SETUP.md)。发布状态：本仓自 `v0.1.0` 起建立公开基线，已发布到 npm 为 `@reserendipity/dsh-superagent`（当前版本以 npm 上的最新发布为准）；离线跑 `pnpm release:check --skip-online`（被跳过的在线检查会标成 `NOT VERIFIED`）。
 
 ![插件管理器「已安装插件」：DSH-Superagent 开关为启用](https://gcore.jsdelivr.net/gh/ReSerendipity/dsh-superagent@main/docs/assets/readme-plugin-installed-20261108.png)
 
