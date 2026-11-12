@@ -21,6 +21,18 @@ export function verdictOf(setupProblem: boolean, problems: readonly { kind: stri
   return 'ok'
 }
 
+/** A stable identity per problem row: the list reorders every poll, and a row carries an open confirm dialog. */
+function problemKey(problem: Problem): string {
+  switch (problem.kind) {
+    case 'setup': return `setup:${problem.code}`
+    case 'source-error': return `source-error:${problem.source.id}:${problem.source.health.code ?? ''}`
+    case 'runtime-error': return `runtime-error:${problem.name}`
+    case 'eval-overdue': return `eval-overdue:${problem.thread.key}`
+    case 'eval-unavailable': return `eval-unavailable:${problem.decisionId}`
+    case 'outgoing': return `outgoing:${problem.outgoing.id}`
+    default: return problem.kind
+  }
+}
 function ProblemLine({ problem, onChanged }: { problem: Problem; onChanged: () => Promise<void> }) {
   const { t, call, navigate } = usePanel()
   const post = useAction((request: () => Promise<unknown>) => request(), { reload: onChanged })
@@ -169,7 +181,7 @@ export function OverviewPage() {
         : <Hint>{t('needsYouNone')}</Hint>}
     </Section>
     {data.problems.length > 0 && <Section title={t('problems')} count={data.problems.length}>
-      <ul className="dt-list dt-cards">{data.problems.map((problem, index) => <ProblemLine key={index} problem={problem}
+      <ul className="dt-list dt-cards">{data.problems.map(problem => <ProblemLine key={problemKey(problem)} problem={problem}
         onChanged={reload} />)}</ul>
     </Section>}
     <Section title={t('lastDay')} action={more({ page: 'trigger', query: { filter: 'recent' } })}>

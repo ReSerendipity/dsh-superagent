@@ -1,5 +1,5 @@
 /** Thread detail page: Trigger timeline with gap-free pagination, Decisions, subscribed Tickets, and correlated Threads. */
-import { useEffect, useState, type ReactNode } from 'react'
+import { type ReactNode, useEffect, useRef, useState } from 'react'
 import { ApiError, usePoll, type ThreadPageView, type TriggerRow } from './api.ts'
 import { Button, DisclosureRow, Icon, Tag } from './controls.tsx'
 import { decisionMark } from './marks.ts'
@@ -85,19 +85,21 @@ function useThreadTimeline(key: string, target: string | undefined) {
     return () => { active = false }
   }, [missing, call, key, target, notify])
   const gap = !!newest && gapBetween(newest, older)
+  // The run id replaces an `active` flag: a rerun (each poll refreshes `newest`) invalidates the previous
+  // loop's late result and failure toast, instead of stacking backfills that can no longer be cancelled.
+  const fillRun = useRef(0)
   useEffect(() => {
     if (!gap || !newest || !older) return
-    let active = true
+    const run = ++fillRun.current
     const fill = async () => {
-      let run = newest.timeline, cursor = newest.earlier
-      while (cursor !== null && !overlaps(run, older.triggers)) {
+      let list = newest.timeline, cursor = newest.earlier
+      while (cursor !== null && !overlaps(list, older.triggers)) {
         const page = await call('GET threads/:key', { key, query: { limit: PAGE, before: cursor } })
-        run = [...page.timeline, ...run]; cursor = page.earlier
+        list = [...page.timeline, ...list]; cursor = page.earlier
       }
-      if (active) setOlder({ triggers: byTime([...older.triggers, ...run]), cursor: overlaps(run, older.triggers) ? older.cursor : cursor })
+      if (run === fillRun.current) setOlder({ triggers: byTime([...older.triggers, ...list]), cursor: overlaps(list, older.triggers) ? older.cursor : cursor })
     }
-    fill().catch((failure: unknown) => { if (active) notify(errorText(failure)) })
-    return () => { active = false }
+    fill().catch((failure: unknown) => { if (run === fillRun.current) notify(errorText(failure)) })
   }, [gap, newest, older, call, key, notify])
   const earlier = useAction(async (shown: ThreadPageView) => {
     const page = await call('GET threads/:key', { key, query: { limit: PAGE, before: shown.earlier! } })

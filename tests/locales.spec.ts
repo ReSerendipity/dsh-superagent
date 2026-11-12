@@ -25,7 +25,7 @@ it('words a reason by its code with its values, each of a batch, and words a per
   expect(reasonLabel(t, 'retried')).toBe(zh['reason.retried'])
   expect(reasonLabel(t, [{ code: 'routed', values: { ticket: 't1' } }])).toBe('已转给工单 t1')
   expect(reasonLabel(t, [{ code: 'not_a_member', triggerId: '1' }, { code: 'no_mention', triggerId: '2' }]))
-    .toBe(`${zh['reason.not_a_member']}；${zh['reason.no_mention']}`)
+    .toBe(`${zh['reason.not_a_member']}${zh['listSeparator']}${zh['reason.no_mention']}`)
   expect(reasonLabel(t, [{ code: 'said', values: { text: 'The button is already blue' } }])).toBe('The button is already blue')
   // A code the panel has no words for reads as the host words it.
   expect(reasonLabel(t, { code: 'some_new_filter' })).toBe('some_new_filter')

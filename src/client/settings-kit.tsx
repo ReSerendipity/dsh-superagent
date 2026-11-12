@@ -1,6 +1,5 @@
 /** Shared settings context, block draft hook, form controls, Source schema field renderer, and configuration history. */
-import { cloneElement, createContext, useContext, useEffect, useId, useLayoutEffect, useRef, useState, type ReactElement,
-  type ReactNode } from 'react'
+import { cloneElement, createContext, type ReactElement, type ReactNode, useContext, useEffect, useId, useLayoutEffect, useMemo, useRef, useState } from 'react'
 import type { ApiResponse } from '../app/api.ts'
 import type { FieldSpec, Localized } from '../sources/kind.ts'
 import { usePoll, type HistoryView, type Settings, type SettingsView, type SourceView } from './api.ts'
@@ -24,8 +23,10 @@ export function SettingsProvider({ children }: { children: ReactNode }) {
   const { call } = usePanel()
   const { restarts } = usePanelData()
   const { data, error, reload } = usePoll(() => call('GET settings'), [call, restarts])
-  if (!data) return <LoadState error={error} loading />
-  return <SettingsContext.Provider value={{ settings: data, reload }}>
+  // A fresh object each render would push every consumer to re-render on each 5 s poll even when the settings never changed.
+  const value = useMemo(() => data ? { settings: data, reload } : undefined, [data, reload])
+  if (!data || !value) return <LoadState error={error} loading />
+  return <SettingsContext.Provider value={value}>
     {error && <LoadState error={error} loading={false} />}
     {children}
   </SettingsContext.Provider>

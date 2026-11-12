@@ -50,8 +50,8 @@ export function ChatRouterSettingsPage() {
           options={(['brief', 'none'] as const).map(mode => ({ value: mode, label: t(`chatRouterReply.${mode}`) }))} />
       </Section>
       <Field label={t('chatRouterMaxParallel')} hint={t('chatRouterMaxParallelHint')}>
-        <Input type="number" min={1} max={8} value={value.worker.maxParallel}
-          onChange={event => edit({ worker: { ...value.worker, maxParallel: Number(event.target.value) } })} />
+        <Input type="number" min={1} max={8} required value={String(value.worker.maxParallel ?? '')}
+          onChange={event => { const parsed = Number(event.target.value); if (event.target.value !== '' && parsed >= 1) edit({ worker: { ...value.worker, maxParallel: parsed } }) }} />
       </Field>
       <Hint>{t('chatRouterNote')}</Hint>
     </Fields>

@@ -81,6 +81,7 @@ export function TasksPane({ t, call, openSession }: {
   const [expanded, setExpanded] = useState<ReadonlySet<string>>(new Set())
   const [menu, setMenu] = useState<{ x: number; y: number; item: Item } | null>(null)
   const [updatedAt, setUpdatedAt] = useState('')
+  const [failure, setFailure] = useState<string | null>(null)
   useEffect(() => {
     if (!menu) return
     const close = () => setMenu(null)
@@ -101,7 +102,13 @@ export function TasksPane({ t, call, openSession }: {
   const refresh = () => { void reload(); setUpdatedAt(new Date().toLocaleTimeString()) }
   const act = async (route: 'POST tickets/:id/stop' | 'POST tickets/:id/retry', id: string) => {
     setMenu(null)
-    try { await call(route, { id }); await reload() } catch { /* the card keeps its state; the panel shows errors elsewhere */ }
+    try {
+      await call(route, { id }); await reload()
+      setFailure(null)
+    } catch (error) {
+      // This pane mounts beside the conversation, where no panel toast may be visible; say what failed here.
+      setFailure(error instanceof Error ? error.message : String(error))
+    }
   }
   const card = (item: Item) => <article key={item.ticket_id} className="dsh-task"
     onContextMenu={event => { event.preventDefault(); setMenu({ x: event.clientX, y: event.clientY, item }) }}>
@@ -140,7 +147,7 @@ export function TasksPane({ t, call, openSession }: {
           <input value={query} onChange={event => setQuery(event.target.value)} placeholder={t('chatRouterSearch')} aria-label={t('chatRouterSearch')} />
         </div>
       </>}
-      {error && <p className="dsh-tasks-hint" style={{ color: 'crimson' }}>{error.message}</p>}
+      {(error || failure) && <p className="dsh-tasks-hint" style={{ color: 'crimson' }}>{failure ?? error?.message}</p>}
       {all.length === 0
         ? <div className="dsh-tasks-empty"><EmptyIcon /><div>{t('chatRouterTasksEmpty')}</div></div>
         : items.length === 0

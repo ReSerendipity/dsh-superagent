@@ -29,12 +29,15 @@ export interface ApiMessages {
 }
 const isUserError = (code: unknown): code is UserErrorCode => typeof code === 'string' && Object.hasOwn(USER_ERRORS, code)
 
+/** A request that the host accepted but never answers must not freeze the view's polling queue forever. */
+const API_TIMEOUT_MS = 15_000
 /** Calls one management endpoint; the `x-orchestrator-request` header marks the request as originating from this page. */
 async function api<T>(messages: ApiMessages, path: string, method: string, body?: unknown): Promise<T> {
   let response: Response
   const json = body === undefined ? {} : { headers: { 'content-type': 'application/json' }, body: JSON.stringify(body) }
   try {
-    response = await fetch(`/orchestrator/api/${path}`, { method, ...json, headers: { 'x-orchestrator-request': '1', ...json.headers } })
+    response = await fetch(`/orchestrator/api/${path}`, { method, ...json, headers: { 'x-orchestrator-request': '1', ...json.headers },
+      signal: AbortSignal.timeout(API_TIMEOUT_MS) })
   } catch {
     throw new ApiError(messages.offline, 0, { unreachable: true })
   }
