@@ -2,7 +2,7 @@
 
 [![License: MIT](https://img.shields.io/badge/License-MIT-blue.svg)](LICENSE)
 [![Upstream](https://img.shields.io/badge/upstream-dsh--superagent--prototype-0969da)](https://github.com/deepseek-ai/dsh-superagent-prototype)
-[![Platform](https://img.shields.io/badge/platform-Windows%2010%2F11%20%C2%B7%20macOS%20%2F%20Linux%20planned-lightgrey)](#安装)
+[![Platform](https://img.shields.io/badge/platform-Windows%2010%2F11%20%C2%B7%20macOS%20%2F%20Linux%20%E9%80%82%E9%85%8D%E8%BF%9B%E8%A1%8C%E4%B8%AD-lightgrey)](#安装)
 [![Node](https://img.shields.io/badge/node-%5E22.19.0%20%7C%7C%20%3E%3D24-3fb950)](#安装)
 
 > **DSH-Superagent 是 DeepSeek Harness 的一个非官方插件**：把 GitHub 仓库（issue / PR / 评论 / CI）、本地收件目录或飞书群聊里的事件，变成一条条可执行的工单——每条工单在上下文隔离的 DSH 会话里完成，再把结果回贴到原处。
@@ -31,7 +31,7 @@ Git 方式装的是 `main` 当前最新提交；`dsh plugin add` 把 spec 原样
 
 仓库自带 `lib/` 构建产物，安装时不需要再构建。要求 Node `^22.19.0 || >=24`、DeepSeek Harness `>=0.2.1-alpha.2 <0.3.0`；一个 `stateDir` 只允许一个后端（锁保护）。
 
-**平台路线：** Windows 10/11 已完整验证；macOS 与 Linux 在支持路线上（后续适配与验证），bundle 未设平台门槛，三个平台均可安装。
+**平台路线：** 三平台 CI 已全绿。Windows 10/11 保持 Tier 1（已完整验证）；Linux 按 Tier 2 记录（端到端未验证）；macOS 保持 Tier 3（CI 仅覆盖 Node 测试层，真机未验证）。bundle 未设平台门槛，三个平台均可安装；对外口径仍是「适配进行中」。唯一权威的支持等级与差异台账见 [docs/028-platform-support.md](docs/028-platform-support.md)。
 
 **装完还要做一步？0.1.5 起不用了。** `stateDir` 现在是可选项：不配置时插件按 profile 派生独立目录 `<DSH home>/state/<profile>-superagent`（名为 `superagent` 的 profile 沿用历史的 `state/superagent`），「一个 `stateDir` 只允许一个后端」（`<stateDir>.lock`）的锁隔离语义原样保留，新装即用。要把状态目录放在别处（自定义位置、迁移旧数据、多实例）时，再在 `%USERPROFILE%\.dsh\profiles\<profile>\cordis.patch.yml` 显式覆盖：
 
@@ -58,7 +58,7 @@ Git 方式装的是 `main` 当前最新提交；`dsh plugin add` 把 spec 原样
 
 收件准入名单也必须非空（面板 设置 → 评估 → 谁可以派活，加一行 `local`），否则投单会被判 `not_a_member` 并静默归档，不写回信。
 
-tarball、本地目录、独立 profile 与常驻服务见 [WINDOWS-SETUP.md](docs/WINDOWS-SETUP.md)。发布状态：本仓自 `v0.1.0` 起建立公开基线，已发布到 npm 为 `@reserendipity/dsh-superagent`（当前版本以 npm 上的最新发布为准）；离线跑 `pnpm release:check --skip-online`（被跳过的在线检查会标成 `NOT VERIFIED`）。
+tarball、本地目录、独立 profile 与常驻服务见 [WINDOWS-SETUP.md](docs/WINDOWS-SETUP.md)。发布状态：本仓自 `v0.1.0` 起建立公开基线，已发布到 npm 为 `@reserendipity/dsh-superagent`（当前版本以 npm 上的最新发布为准）；离线跑 `pnpm release:check --skip-online`（被跳过的在线检查会标成 `NOT VERIFIED`，exit 2）。
 
 ![插件管理器「已安装插件」：DSH-Superagent 开关为启用](https://gcore.jsdelivr.net/gh/ReSerendipity/dsh-superagent@main/docs/assets/readme-plugin-installed-20261108.png)
 
@@ -139,7 +139,7 @@ It is built on the [deepseek-ai/dsh-superagent-prototype](https://github.com/dee
 
 **Optional — pin a build.** For a team-wide version, reproducing an issue or CI, append `#<full 40-character commit>` to the URL (`...git#<commit>`); the cost is that upgrading means editing the sha, otherwise the install stays on that old build. The repo ships built artifacts in `lib/`, so no build step is needed at install time. Requirements: Node `^22.19.0 || >=24`, DeepSeek Harness `>=0.2.1-alpha.2 <0.3.0`; one backend per state directory (lock-protected).
 
-**Honest limits.** Windows 10/11 is fully validated; macOS and Linux are on the support roadmap (adaptation and validation to follow) — the bundle sets no platform gate, so all three platforms install, with Windows the tested one. The plugin's POSIX branches exist but are not yet verified end to end. Executors run with full OS access by design (an operator-trust model, not a sandbox); the public baseline starts at v0.1.0, published on npm as `@reserendipity/dsh-superagent`; the project is maintained by one person. Differences from upstream are enumerated in [docs/WINDOWS-DELTA.md](docs/WINDOWS-DELTA.md).
+**Honest limits.** Windows 10/11 is fully validated (Tier 1); the three-platform CI matrix is green, with Linux recorded as Tier 2 (not yet verified end to end) and macOS kept at Tier 3 (CI covers only the Node test layer, with no real-machine verification). The plugin's POSIX branches are exercised by that CI, but end-to-end runs on POSIX are still unverified. The bundle sets no platform gate, so all three platforms install, with Windows the tested one. Executors run with full OS access by design (an operator-trust model, not a sandbox); the public baseline starts at v0.1.0, published on npm as `@reserendipity/dsh-superagent`; the project is maintained by one person. The authoritative support-level and difference ledger is [docs/028-platform-support.md](docs/028-platform-support.md); differences from upstream are enumerated in [docs/WINDOWS-DELTA.md](docs/WINDOWS-DELTA.md).
 
 **First use.** Pick a route first: **Mode B (`github`, default)** needs a dedicated agent account and a signed-in `gh` on the machine (the dispatching account must differ from the agent account); **Mode A (`mode: local`)** needs neither — drop `.md` files into the inbox directory to open tickets, delivered as a local commit on the ticket branch plus a reply file, merged by a person ([`docs/026`](docs/026-local-delivery.md)). Mode A keeps two deliberately unautomated gates: the GitHub Source must be `disabled: true` (otherwise health stays at `github: starting`) and the inbox admission list must be non-empty (add a `local` row, otherwise dropped files are judged `not_a_member` and archived without a reply). Then: Settings → Sources until each source reads ready; Settings → Eval to list who may dispatch; the Execution tab to watch tickets and reply posts; pause/resume whenever you need to intervene. The `dsh-superagent 执行器` / `dsh-superagent 主 Session` entries in the mode picker are presets for the plugin's two session roles — pick **Standard** for ordinary chats; preset rows have no hide setting, and both presets are functionally required.
 
@@ -174,6 +174,8 @@ It is built on the [deepseek-ai/dsh-superagent-prototype](https://github.com/dee
 | [`docs/020`](docs/020-release-checklist.md) | 发布检查清单：发布前逐项验证与回滚 |
 | [`docs/026`](docs/026-local-delivery.md) | `mode: local` 交付形态：选入路径（内置本地工作区）与默认值决策备忘、影响面与回滚 |
 | [`docs/027`](docs/027-chat-router.md) | 主对话总管模式：工具剥夺、强制派发、独立会话与上下文隔离（可选功能，默认关闭） |
+| [`docs/028`](docs/028-platform-support.md) | 平台支持矩阵与差异台账（支持等级、平台差异、证据索引；唯一权威） |
+| [`docs/029`](docs/029-manual-verification.md) | POSIX 服务启动器真机验证清单（待执行，不是验证结果） |
 
 ## 常见问题
 
@@ -202,7 +204,7 @@ It is built on the [deepseek-ai/dsh-superagent-prototype](https://github.com/dee
 src/             插件本体（TypeScript）：来源、核心、执行器、面板服务
 locale/          面板与插件页的显示名、描述（中英）
 prompts/         提示词段落
-docs/            编号设计文档（当前保留 000–015、017、019、020、026）与 Windows 操作说明
+docs/            编号设计文档（当前保留 000–015、017、019、020、026–029）与 Windows 操作说明
 scripts/         启动/停止/状态脚本
 tests/           单元与面板测试（文档与代码一致性也在其中）
 ```

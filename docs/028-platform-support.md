@@ -1,9 +1,9 @@
 # 平台支持矩阵与差异台账
 
-> 状态：**P1 文档收尾（2026-11-10）**。第三次三平台 CI（run 42837724202）已在
-> `windows-latest` / `ubuntu-latest` / `macos-latest` 全绿：`typecheck`、`build`、`vitest` 与 `lib` 一致性均通过。
-> 本仓是独立维护的跨平台发行版；Windows 是 Tier 1，Linux 按 Tier 2 记录（端到端未验），macOS 仍为 Tier 3。
-> 对外仍按「适配进行中」表述，直到端到端验证完成。CI 通道：三平台 matrix（`ubuntu-latest` / `macos-latest` / `windows-latest`）保留；公开仓的标准 GitHub-hosted
+> 状态：**P3 文档同步（2026-11-12）**。三平台 CI 已在 PR #30 / #31 / #32 与 main 上连续全绿（run 清单见 §4），
+> 本地发布门禁已改为跨平台的 Node 脚本。本仓是独立维护的跨平台发行版；Windows 是 Tier 1，Linux 按 Tier 2 记录
+> （端到端未验），macOS 仍为 Tier 3。对外仍按「适配进行中」表述，直到端到端验证完成。CI 通道：三平台 matrix
+> （`ubuntu-latest` / `macos-latest` / `windows-latest`）保留；公开仓的标准 GitHub-hosted
 > runner 免费，不因 macOS 计费删除该平台。macOS 采用双层口径：GitHub `macos-latest` 只验证测试层
 > （`typecheck` / `build` / `vitest` / `lib` 一致性），Mac 真机层只做代码静态审查，二者不混为一谈。
 > 本文档记录支持等级、平台差异与证据索引；它不替代各平台的验收记录。
@@ -16,7 +16,7 @@
 | **Tier 2** 在研支持 | 可安装、可回归，端到端未验 | CI 全绿 + 单元 / 契约测试通过；端到端尚未跑通，文档标注限制 |
 | **Tier 3** 仅可安装 | 无平台门槛，但无验证 | bundle 没有 `os` / `cpu` 门槛；无该平台 CI、无验证、无专属文档 |
 
-P1 的状态：Linux 已在 run 42837724202 三平台全绿后按 **Tier 2** 记录（端到端未验）；macOS 即使 CI 全绿也只证明测试层，真机层没有验证条件，
+当前状态：Linux 已在三平台 CI 全绿后按 **Tier 2** 记录（端到端未验）；macOS 即使 CI 全绿也只证明测试层，真机层没有验证条件，
 **保持 Tier 3**，不写成 Tier 2 / supported。Tier 1 还需要 `docs/WINDOWS-SETUP.md` §12.1 那种端到端记录，
 属于后续阶段。
 
@@ -159,7 +159,7 @@ PATH 剥离与幂等性；`tests/environment.spec.ts` 覆盖 POSIX 垫片的执�
 
 | 项 | 代码归属 | Windows | macOS / Linux | 状态 |
 | --- | --- | --- | --- | --- |
-| 本地发布门禁 | `package.json` `release:check` → `scripts/release-check.ps1` | PowerShell 可执行 | 无等价脚本 | 已知差异，后续阶段迁移 |
+| 本地发布门禁 | `package.json` `release:check` → `scripts/release-check.mjs` | Node 可执行 | Node 可执行（同一脚本） | 已跨平台；`release-check.ps1` 仅作历史参考 |
 | 飞书探针 | `src/deployment.ts` `resolveFeishuBot()` | `probe()` 不再外包 `env`，当前实现仍拼了 `env` 前缀，启用飞书 Source 时有已知风险 | `env` 前缀有效 | 已知问题，后续阶段修复 |
 | 桌面 Electron 外壳 | `windows-app/`（2026-11-07 移除） | 历史记录，不再是现行部件 | 同左 | 仅 provenance，不构成平台差异 |
 | 网络传输 | `SUPERAGENT_GIT_SSH`、代理环境变量 | 与平台无关 | 与平台无关 | 文档见 `WINDOWS-DELTA.md` §8 |
@@ -183,6 +183,10 @@ PATH 剥离与幂等性；`tests/environment.spec.ts` 覆盖 POSIX 垫片的执�
 | 第二次三平台 CI（run 42835530222，2026-11-10） | <https://github.com/ReSerendipity/dsh-superagent/actions/runs/42835530222>：`windows-latest` / `ubuntu-latest` 绿；`macos-latest` 仍 1 红（`tests/config-watch.spec.ts` 邻居误触发，`1 failed / 1325 passed / 5 skipped`）。F1 / F2 已在 Ubuntu 实测通过。F3 的首次修复只拦截了无文件名事件；`fired` 从 0 变 1，但无文件名分支本应因目标指纹未变而返回，反推出 macOS FSEvents 把邻居写入报成了匹配 `names` 的命名事件，`ebba31d` 的 `if (changed)` 分支因此绕过指纹比较。二次修复不再信任 `changed`，每个目录事件都核对被监听文件的 inode/mtime/ctime/size 指纹；邻居写入不改变指纹，原子保存仍改变 inode，待第三次 macOS CI 验证 |
 | POSIX CI 修复提交 | `ebba31d`（F1 `tests/deployment.spec.ts` 断言、F2 `src/sources/feishu-loops.ts` 跨流 health 竞态、F3 首次修复）；`ee39bd8`（F3 二次修复：`src/app/config-watch.ts` 不再信任 `fs.watch` 的 filename，统一核对被监听文件的指纹） |
 | 第三次三平台 CI（run 42837724202，2026-11-10） | <https://github.com/ReSerendipity/dsh-superagent/actions/runs/42837724202>：`windows-latest` / `ubuntu-latest` / `macos-latest` 全绿；P0 的 DoD D1/D2 达成，F1 / F2 / F3 清零。macOS 仍只证明测试层，见 §2.1 |
+| P1 第一批与后续三平台 CI（2026-11-10 至 11-11） | PR #30 的 run <https://github.com/ReSerendipity/dsh-superagent/actions/runs/42842220521>（P1 第一批）、<https://github.com/ReSerendipity/dsh-superagent/actions/runs/42843501651>（PR CI）、<https://github.com/ReSerendipity/dsh-superagent/actions/runs/42845506038>（聚合 check 修复）均三平台全绿 |
+| main 首跑与 rerun（run 42955791952） | <https://github.com/ReSerendipity/dsh-superagent/actions/runs/42955791952>：首跑 `ubuntu-latest` 因 `tests/config-watch.spec.ts` 的 burst 用例 flaky 红，rerun 全绿；随后 PR #31 / #32 的 main push CI 亦全绿 |
+| 跨平台本地发布门禁 | `scripts/release-check.mjs`（Node，ESM）：Windows / macOS / Linux 同一入口 `pnpm release:check`；保留 ps1 的全部检查项与 0 / 1 / 2 三档退出码 |
+| POSIX 真机验证清单 | `docs/029-manual-verification.md`（编号文档只能链接更早编号，故此处为纯文本提及）；**尚未执行**，不是验证结果 |
 
 ### 4.1 只能在 CI 验证的结论
 
@@ -197,7 +201,6 @@ PATH 剥离与幂等性；`tests/environment.spec.ts` 覆盖 POSIX 垫片的执�
 
 - **P1-5 服务启动器的真机验证**：契约层已在 CI 覆盖（`tests/service-script.spec.ts` 的 POSIX 分支，真 `fcntl.flock` / 真 `SIGINT`，但用假 `ps` / 假 `tmux`）；真实 `tmux` 交互、BSD/GNU `ps` 解析与真实 `dsh` 进程仍需在真机执行一次，清单见 `docs/029-manual-verification.md`（编号文档只允许链接到更早的编号，故此处不设链接）。开发机无 WSL 发行版，且 `ubuntu-24.04` 官方镜像不含 tmux——为一条低频路径给每次 CI 加 `apt-get install tmux` 不划算，故不做 CI 自动化。
 - macOS 真机的安装、DSH 桌面端、Gatekeeper / Keychain 与端到端首单（Mode A / Mode B）；Linux 的安装说明与端到端首单。
-- `release:check` 的 POSIX 实现。
 - `docs/WINDOWS-SETUP.md` / `WINDOWS-DELTA.md` 是否改名（决策待定）。
 
 ## 5. 维护约定
