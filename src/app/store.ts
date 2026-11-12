@@ -160,10 +160,12 @@ export class Store implements Repositories {
     if (this.depth) this.committed[this.depth - 1]!.push(action)
     else action()
   }
-  /** Reads a typed KV record by its key in `KV`. */
+  /** Reads a typed KV record by its key in `KV`; a value a crashed write left unparseable reads as absent. */
   get<V>(name: Key<V>): V | undefined {
     const row = this.db.prepare('SELECT value FROM kv WHERE key=?').get(name)
-    return row === undefined ? undefined : JSON.parse(String(row.value)) as V
+    if (row === undefined) return undefined
+    try { return JSON.parse(String(row.value)) as V }
+    catch { return undefined }
   }
   /** Writes a typed KV record under `name`. */
   set<V>(name: Key<V>, value: V): void {
@@ -182,8 +184,15 @@ export class Store implements Repositories {
 
   /** Versioned settings snapshots; the current settings are the snapshot of the latest revision. */
   private readonly settingsVersions = new Versions<SettingsVersion>(this, KV.settings.revision, KV.settings.version)
-  /** Current validated settings. */
-  settings(): Settings { return SettingsSchema.parse(this.settingsVersions.current()?.settings ?? {}) }
+  /** Current validated settings, cached per settings revision: hot paths (pause, policy, status publishing) read this often. */
+  private settingsCache?: { revision: number; value: Settings }
+  settings(): Settings {
+    const revision = this.get(KV.settings.revision) ?? 0
+    if (this.settingsCache?.revision === revision) return this.settingsCache.value
+    const value = SettingsSchema.parse(this.settingsVersions.current()?.settings ?? {})
+    this.settingsCache = { revision, value }
+    return value
+  }
   /** Revision of one settings block; each configuration page saves against its own block for optimistic concurrency. */
   blockRevision(block: SettingsSave): number { return this.get(KV.settings.block(block)) ?? 0 }
   /** Advances one block's revision without saving settings; an external declarative file changed the block. */
