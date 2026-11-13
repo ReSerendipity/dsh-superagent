@@ -106,8 +106,11 @@ export function executable(name: string, path: string, exclude?: string): string
   const bare = isWindows && !isAbsolute(name) && !/\.\w+$/.test(name)
   const extensions = bare ? (process.env.PATHEXT ?? '.COM;.EXE;.BAT;.CMD').split(';').filter(Boolean).map(extension => extension.toLowerCase()) : []
   const names = extensions.length > 0 ? extensions.map(extension => `${name}${extension}`) : [name]
+  // Directory-major, the order cmd/PowerShell resolve with: every PATH directory offers its whole PATHEXT
+  // series before the next directory is tried, so an earlier directory's gh.cmd beats a later gh.exe.
   const candidates = isAbsolute(name) ? names
-    : names.flatMap(candidate => path.split(delimiter).filter(dir => isAbsolute(dir) && !(exclude && sameDirectory(dir, exclude))).map(dir => join(dir, candidate)))
+    : path.split(delimiter).filter(dir => isAbsolute(dir) && !(exclude && sameDirectory(dir, exclude)))
+      .flatMap(dir => names.map(candidate => join(dir, candidate)))
   for (const candidate of candidates) {
     try { if (statSync(candidate).isFile()) { accessSync(candidate, constants.X_OK); return candidate } }
     catch { /* Not an executable file here; try the next PATH directory. */ }

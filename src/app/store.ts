@@ -190,7 +190,9 @@ export class Store implements Repositories {
     const revision = this.get(KV.settings.revision) ?? 0
     if (this.settingsCache?.revision === revision) return this.settingsCache.value
     const value = SettingsSchema.parse(this.settingsVersions.current()?.settings ?? {})
-    this.settingsCache = { revision, value }
+    // One shared object per revision: callers must treat settings as read-only (they all do), so a mutation
+    // cannot poison later readers the way it could not with the per-call parse this cache replaced.
+    this.settingsCache = { revision, value: Object.freeze(value) }
     return value
   }
   /** Revision of one settings block; each configuration page saves against its own block for optimistic concurrency. */

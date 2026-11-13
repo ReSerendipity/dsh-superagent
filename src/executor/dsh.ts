@@ -45,8 +45,8 @@ const fromPerson = (input?: TicketInput): boolean => input?.kind === 'trigger' ?
 class PrepareFailed extends Error {}
 const PASSING = new RegExp(['ECONNRESET', 'ECONNREFUSED', 'ETIMEDOUT', 'EAI_AGAIN', 'ENOTFOUND', 'EPIPE', 'UND_ERR', 'socket hang up', 'fetch failed',
   'network error', 'overloaded', 'rate limit'].join('|'), 'i')
-/** A bare status code only counts as transient when the text names it as an HTTP status, not as any number in the message. */
-const STATUS = /(?:\b(?:HTTP|status)\s*|\bcode\s*)(?:=|:)?\s*(408|429|5\d\d)\b/i
+/** A bare status code only counts as transient when the text names it as an HTTP status — including wire-format lines like `HTTP/1.1 500` — not as any number in the message. */
+const STATUS = /(?:\bHTTP(?:\/[\d.]+)?|\bstatus(?:\s+code)?|\bcode)\s*[=: ]?\s*\b(408|429|5\d\d)\b/i
 /**
  * True when an error represents a transient network or model-provider failure: an HTTP 408, 429, or 5xx status, or a
  * connection that was refused, reset, timed out, or could not resolve its host.

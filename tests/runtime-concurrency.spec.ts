@@ -803,7 +803,8 @@ it('tells a passing failure of the provider or the network from one that a later
     expect(transient(error)).toBe(false)
   }
   // A bare code in the text counts as transient only when it names itself an HTTP status.
-  for (const error of [new Error('gh: Server Error (HTTP 500)'), new Error('status 429: too many requests')]) {
+  for (const error of [new Error('gh: Server Error (HTTP 500)'), new Error('status 429: too many requests'),
+    new Error('HTTP/1.1 502 Bad Gateway'), new Error('status code 503: overloaded'), new Error('error code: 429')]) {
     expect(transient(error)).toBe(true)
   }
   // A bare number in a message is not a status: the text must name it as HTTP, status or code.

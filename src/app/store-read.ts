@@ -77,7 +77,8 @@ export function storeReads(db: DatabaseSync) {
   threadsPaged: (options: { since?: string; offset: number; limit: number }): { items: Thread[]; more: boolean } => {
     const recent = "COALESCE(json_extract(value, '$.lastAt'), json_extract(value, '$.createdAt'))"
     const where = options.since ? `WHERE ${recent} >= ?` : ''
-    const rows = db.prepare(`SELECT value FROM thread ${where} ORDER BY ${recent} DESC LIMIT ? OFFSET ?`)
+    // rowid breaks ties so threads written in the same millisecond keep one order across pages.
+    const rows = db.prepare(`SELECT value FROM thread ${where} ORDER BY ${recent} DESC, rowid DESC LIMIT ? OFFSET ?`)
       .all(...(options.since ? [options.since] : []), options.limit + 1, options.offset)
     return { items: rows.slice(0, options.limit).map(row => JSON.parse(String(row.value)) as Thread), more: rows.length > options.limit }
   },

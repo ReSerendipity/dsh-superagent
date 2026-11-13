@@ -111,7 +111,9 @@ export function acquireStateLock(
         removeOwner(stateDir)
         return own(acquire())
       }
-      throw error
+      // A non-ELOCKED reclaim failure is the real error; an ELOCKED with a live winner surfaces the
+      // acquisition that started this attempt, which is the error the operator needs to see.
+      throw (reclaim as { code?: unknown }).code === 'ELOCKED' ? error : reclaim
     }
   }
 }
