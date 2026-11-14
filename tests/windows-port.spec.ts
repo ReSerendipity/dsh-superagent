@@ -93,9 +93,10 @@ it('writes shims that strip their own directory from PATH', async () => {
   await writeEnvironment(deployment, ['python', 'gh', 'git', 'myblocked'])
   expect((await readdir(workerBin(stateDir))).sort()).toEqual(shims)
 
-  // The blocked-command message is cmd-escaped, so it does not depend on the schema's charset.
+  // The blocked-command message is quoted per platform: cmd-escaped on Windows, shell-quoted on POSIX -
+  // either way it does not depend on the schema's charset.
   await writeEnvironment({ ...deployment, github: { ...deployment.github, login: 'a&b<1>' } }, ['mycmd'])
-  expect(await readFile(shim('mycmd'), 'utf8')).toContain('a^&b^<1^>.')
+  expect(await readFile(shim('mycmd'), 'utf8')).toContain(windows ? 'a^&b^<1^>.' : `'a&b<1>.'`)
 })
 
 it('runs setup probes with the platform-specific environment and forwards Feishu notifier switches', async () => {
