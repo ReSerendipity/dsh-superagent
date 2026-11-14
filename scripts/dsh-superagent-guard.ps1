@@ -22,8 +22,11 @@ $Lock = Join-Path $Dir 'loop.pid'
 # aggressively, and a reused number must not suppress a needed guard or count as a running one.
 function Test-GuardAlive {
     if (-not (Test-Path $Lock)) { return $false }
-    try { $record = Get-Content $Lock -Raw | ConvertFrom-Json } catch {
-        try { $record = [pscustomobject]@{ pid = [int](Get-Content $Lock -Raw).Trim(); born = $null } } catch { return $false }
+    $raw = (Get-Content $Lock -Raw).Trim()
+    try { $record = $raw | ConvertFrom-Json } catch { $record = $null }
+    if ($null -eq $record -or $record -isnot [pscustomobject]) {
+        # Legacy 0.2.7 file: a bare pid. ConvertFrom-Json reads it as a scalar, so build the record here.
+        try { $record = [pscustomobject]@{ pid = [int]$raw; born = $null } } catch { return $false }
     }
     if (-not $record.pid) { return $false }
     $old = Get-Process -Id $record.pid -ErrorAction SilentlyContinue
@@ -35,7 +38,7 @@ if (Test-GuardAlive) {
     try { $old = (Get-Content $Lock -Raw | ConvertFrom-Json).pid } catch { $old = '?' }
     "guard already running (pid $old)"; exit 0
 }
-Set-Content $Lock (New-Object PSObject -Property @{ pid = $PID; born = (Get-Process -Id $PID).StartTime.Ticks }) -Encoding ascii
+Set-Content $Lock (@{ pid = $PID; born = (Get-Process -Id $PID).StartTime.Ticks } | ConvertTo-Json -Compress) -Encoding ascii
 
 function Note($line) { Add-Content (Join-Path $Dir 'watchdog.log') ("{0} GUARD {1}" -f (Get-Date).ToString('yyyy-MM-dd HH:mm:ss'), $line) -Encoding UTF8 }
 Note "loop started pid=$PID interval=15m"

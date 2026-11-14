@@ -89,9 +89,10 @@ def serves(args, profile):
             matched = True
         elif not word.startswith('-'):
             words.append(word)
-    # The service's argv carries no positional subcommand (`node lib/bin.js --profile p --no-open`), so any
-    # positional - `dsh --profile p doctor`, `plugin ...` - is someone else's dsh invocation, not this service.
-    return matched and not words
+    # The service is the headless host boot: both the tmux invocation and `dsh_command` carry `--no-open`,
+    # while a person's `dsh --profile p doctor` or `dsh plugin …` never does. Counting positionals cannot
+    # work - `ps` splits the script path on spaces, so the words after the profile are never empty.
+    return matched and '--no-open' in args
 
 
 def ps(*options, check=False):

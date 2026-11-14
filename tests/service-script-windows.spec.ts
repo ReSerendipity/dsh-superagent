@@ -63,7 +63,7 @@ describe.skipIf(!WINDOWS)('the Windows launcher branch', () => {
   // deliberately left to the end-to-end run, so this suite stays free of side effects.
 })
 
-describe('the PowerShell scripts that run unattended', () => {
+describe.skipIf(!WINDOWS)('the PowerShell scripts that run unattended', () => {
   it('parse as scripts at all, which the rest of the suite never checks', () => {
     // These run at logon or on a schedule where nobody watches; a syntax error surfaces only as silence.
     const scripts = ['dsh-superagent-guard.ps1', 'dsh-superagent-watchdog.ps1', 'release-check.ps1']
