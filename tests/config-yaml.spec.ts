@@ -115,3 +115,13 @@ it('refuses tabs, document markers, duplicate keys and the constructs it does no
 it('reports an empty document as no settings rather than as a failure', () => {
   expect(parseYaml('# nothing here\n\n').value).toBeNull()
 })
+
+it('refuses __proto__ and constructor keys in flow mappings, as block mappings already do', () => {
+  // A top-level flow document parses as a scalar key and is rejected by the settings schema's own unknown-key rule;
+  // the pollution vectors are the nested flow mappings, which take the same guard as block mappings.
+  for (const document of ['executor: {__proto__: {x: 1}, maxWorkers: 2}', 'executor: {constructor: 1}']) {
+    expect(() => parseYaml(document), document).toThrow(/is not a configuration key/)
+  }
+  // A quoted or dotted key that merely contains the words stays legal.
+  expect(parseYaml('executor: {constructor_timeout: 1}').value).toEqual({ executor: { constructor_timeout: 1 } })
+})

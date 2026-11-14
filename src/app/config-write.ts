@@ -381,6 +381,7 @@ export class DeclarativeWriteBack {
     try {
       next = declarativeFormat(path) === 'yaml' ? patchYaml(text, changes) : patchJson(text, changes)
     } catch (error) {
+      if (error instanceof DeclarativeWriteError) throw error // patchJson's own refusal is already worded for the panel
       // A document the loader tolerated on startup (warn + ignore) can still fail to patch; say the file is
       // the problem instead of letting a raw parser error reach the panel as an unclassified 500.
       throw new DeclarativeWriteError(`The declarative settings file could not be written (${path}): it does not patch cleanly (${describe(error)}); nothing was written`)

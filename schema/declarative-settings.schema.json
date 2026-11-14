@@ -173,7 +173,6 @@
                 }
               },
               "bots": {
-                "default": [],
                 "type": "array",
                 "items": {
                   "type": "object",

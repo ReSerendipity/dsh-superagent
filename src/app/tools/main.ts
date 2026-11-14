@@ -297,7 +297,9 @@ export function mainTools(host: MainToolsHost, agent: Agent): Tool[] {
         // external content - must not rewrite its own instructions; team sections and skills stay editable.
         // validate() first, so an unknown part still refuses with its own error.
         const overrides = host.prompts.validate(args.config).overrides ?? {}
-        if (JSON.stringify(overrides) !== JSON.stringify(host.prompts.current().config.overrides ?? {})) {
+        // Key order is normalized: an override object the user re-entered in another order changes nothing.
+        const normalize = (value: Record<string, unknown>) => JSON.stringify(Object.keys(value).sort().map(key => [key, value[key]]))
+        if (normalize(overrides) !== normalize(host.prompts.current().config.overrides ?? {})) {
           throw new Error('Built-in prompt overrides can only be changed in the management panel, not by a tool call')
         }
         const { context_delivery: _delivery, ...saved } = await savePrompts(host, args.config, args.baseRevision, 'tool')

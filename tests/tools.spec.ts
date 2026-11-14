@@ -92,9 +92,9 @@ it('refuses a prompt override from the tool - the main Session reads external co
   h.runtime.store.set(KV.prompts.revision, next + 1)
   h.runtime.prompts.save(read, next + 1, 'panel')
   expect(h.runtime.prompts.current().config.overrides).toEqual({ 'runtime/dispatch': dispatch })
-  // The tool describes the overrides once, in its schema.
+  // The tool's description names the panel-only boundary (the schema names the field exactly once).
   const tool = h.tools.get(h.runtime.masterId)!.get('orchestrator_prompts_save') as unknown as { description: string }
-  expect(tool.description).not.toContain('overrides')
+  expect(tool.description.toLowerCase()).toContain('overrides of built-in parts are panel-only')
 })
 
 it('keeps the main Session\'s resources from an Executor Session, which lists only its own', async () => {

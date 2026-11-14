@@ -143,9 +143,7 @@ class Reader {
       }
       const entry = this.splitEntry(line)
       if (entry.key === '<<') throw new YamlError(line.number, line.indent + 1, 'merge keys are not supported')
-      if (entry.key === '__proto__' || entry.key === 'constructor') {
-        throw new YamlError(line.number, line.indent + 1, `"${entry.key}" is not a configuration key`)
-      }
+      this.reservedKey(entry.key, line.number, line.indent + 1)
       if (Object.prototype.hasOwnProperty.call(result, entry.key)) {
         throw new YamlError(line.number, line.indent + 1, 'duplicate key "' + entry.key + '"')
       }
@@ -275,6 +273,11 @@ class Reader {
     })
   }
 
+  /** Refuses the keys an object literal would misuse; block mappings and flow mappings share one rule. */
+  private reservedKey(key: string, line: number, column: number): void {
+    if (key === '__proto__' || key === 'constructor') throw new YamlError(line, column, `"${key}" is not a configuration key`)
+  }
+
   private flowMapping(text: string, line: number, column: number, path: string): Record<string, unknown> {
     const result: Record<string, unknown> = {}
     for (const part of this.flowParts(this.flowInner(text, '}', line, column), line, column)) {
@@ -282,6 +285,7 @@ class Reader {
       if (colon < 0) throw new YamlError(line, column, 'expected a "key: value" pair inside a flow mapping')
       const key = this.scalar(part.slice(0, colon).trim(), line, column)
       if (typeof key !== 'string') throw new YamlError(line, column, 'mapping keys must be strings')
+      this.reservedKey(key, line, column)
       if (Object.prototype.hasOwnProperty.call(result, key)) throw new YamlError(line, column, 'duplicate key "' + key + '"')
       const child = path ? path + '.' + key : key
       this.lineAt.set(child, line)

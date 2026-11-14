@@ -496,3 +496,13 @@ describe('bots and events without a sender', () => {
       ['ci', { listedUnaddressed: false, unlistedAddressed: false, unlistedUnaddressed: false }]])
   })
 })
+
+it('keeps an illegal bots value loud instead of silently emptying the bot list', () => {
+  // The schema declares bots so editors complete it; an illegal VALUE still refuses on save (the Source
+  // kind's strict schema judges the ids), rather than being caught into an empty list and persisted.
+  expect(() => SettingsSchema.parse({ policy: { sources: { github: { allowed: [], admission: {}, bots: 'all' } } } })).toThrow()
+  expect(() => SettingsSchema.parse({ policy: { sources: { github: { allowed: [], admission: {}, bots: [{ id: '' }] } } } })).toThrow()
+  const legal = SettingsSchema.parse({ policy: { sources: { github: { allowed: [], admission: {}, bots: [{ id: 'dependabot[bot]' }] } } } })
+  expect(legal.policy.sources.github!.bots).toEqual([{ id: 'dependabot[bot]' }])
+  expect(SettingsSchema.parse({ policy: { sources: { github: { allowed: [] } } } }).policy.sources.github!.bots).toBeUndefined()
+})

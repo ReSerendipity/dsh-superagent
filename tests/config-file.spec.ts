@@ -2,7 +2,7 @@
 import { mkdtemp, rm, writeFile } from 'node:fs/promises'
 import { tmpdir } from 'node:os'
 import { join } from 'node:path'
-import { expect, it } from 'vitest'
+import { expect, it, vi } from 'vitest'
 import { loadDeclarative, mergeDeclarative, declarativeFileNames, resolveDeclarativePath } from '../src/app/config-file.ts'
 import { SettingsSchema } from '../src/policy.ts'
 
@@ -165,4 +165,24 @@ it('resolves the .yaml sibling of the configured file, and keeps the configured 
   } finally {
     await rm(dir, { recursive: true, force: true })
   }
+})
+
+it('tolerates the $schema directive the docs recommend, refuses unknown $ directives, and warns only on a missed prune', async () => {
+  const base = SettingsSchema.parse({ sources: { github: { enabled: true, config: { repository: 'acme/widgets' } } } })
+  // $schema is the documented usage; it must not reject the whole file.
+  const withSchema = mergeDeclarative(base, { $schema: 'https://example.schema.json', sources: { github: { enabled: false, config: {} } } })
+  expect(withSchema.sources.github!.enabled).toBe(false)
+  // A typo in a directive fails loudly instead of silently undoing nothing.
+  expect(() => mergeDeclarative(base, { $prunes: { sources: ['github'] } })).toThrow(/Unknown directive/)
+  // A prune that hits removes the stored instance silently; one that names no stored Source warns once.
+  const warn = vi.spyOn(console, 'warn').mockImplementation(() => {})
+  try {
+    const hit = mergeDeclarative(base, { $prune: { sources: ['github'] } })
+    expect(hit.sources.github).toBeUndefined()
+    expect(warn).not.toHaveBeenCalled()
+    const miss = mergeDeclarative(base, { $prune: { sources: ['no-such-source'] } })
+    expect(miss.sources.github!.enabled).toBe(true)
+    expect(warn).toHaveBeenCalledTimes(1)
+    expect(String(warn.mock.calls[0]![0])).toContain('no-such-source')
+  } finally { warn.mockRestore() }
 })
