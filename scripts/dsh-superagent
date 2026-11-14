@@ -89,10 +89,11 @@ def serves(args, profile):
             matched = True
         elif not word.startswith('-'):
             words.append(word)
-    # The service is the headless host boot: both the tmux invocation and `dsh_command` carry `--no-open`,
-    # while a person's `dsh --profile p doctor` or `dsh plugin …` never does. Counting positionals cannot
-    # work - `ps` splits the script path on spaces, so the words after the profile are never empty.
-    return matched and '--no-open' in args
+    # A person's `dsh --profile p doctor` or `dsh plugin …` names the profile but is not the service; any
+    # other dsh host naming the profile counts, so two hosts are refused rather than started. Counting
+    # positionals cannot work - `ps` splits the script path on spaces, so the words are never empty.
+    person = {'plugin', 'doctor'}
+    return matched and not any(word in person for word in words)
 
 
 def ps(*options, check=False):

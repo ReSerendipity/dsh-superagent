@@ -88,6 +88,8 @@ function useThreadTimeline(key: string, target: string | undefined) {
   // The run id replaces an `active` flag: a rerun (each poll refreshes `newest`) invalidates the previous
   // loop's late result and failure toast, instead of stacking backfills that can no longer be cancelled.
   const fillRun = useRef(0)
+  const mounted = useRef(true)
+  useEffect(() => () => { mounted.current = false }, [])
   useEffect(() => {
     if (!gap || !newest || !older) return
     const run = ++fillRun.current
@@ -99,7 +101,7 @@ function useThreadTimeline(key: string, target: string | undefined) {
       }
       if (run === fillRun.current) setOlder({ triggers: byTime([...older.triggers, ...list]), cursor: overlaps(list, older.triggers) ? older.cursor : cursor })
     }
-    fill().catch((failure: unknown) => { if (run === fillRun.current) notify(errorText(failure)) })
+    fill().catch((failure: unknown) => { if (mounted.current && run === fillRun.current) notify(errorText(failure)) })
   }, [gap, newest, older, call, key, notify])
   const earlier = useAction(async (shown: ThreadPageView) => {
     const page = await call('GET threads/:key', { key, query: { limit: PAGE, before: shown.earlier! } })

@@ -25,7 +25,9 @@ export function verdictOf(setupProblem: boolean, problems: readonly { kind: stri
 function problemKey(problem: Problem): string {
   switch (problem.kind) {
     case 'setup': return `setup:${problem.code}`
-    case 'source-error': return `source-error:${problem.source.id}:${problem.source.health.code ?? ''}`
+    // The health partition name matters: one Source can declare several entries (feishu runs 'feishu' and
+    // 'history'), and two erroring partitions of one instance must not share a React key.
+    case 'source-error': return `source-error:${problem.source.id}:${problem.source.health.name ?? ''}:${problem.source.health.code ?? ''}`
     case 'runtime-error': return `runtime-error:${problem.name}`
     case 'eval-overdue': return `eval-overdue:${problem.thread.key}`
     case 'eval-unavailable': return `eval-unavailable:${problem.decisionId}`

@@ -94,9 +94,8 @@ export function SessionButton({ sessionId, label,
   return <Button variant={variant} size="sm" icon={<Icon name="session" size={14} />}
     onClick={() => { openSession(sessionId).catch(error => notify(errorText(error))) }}>{label ?? t('openSession')}</Button>
 }
-/** Only http(s) and the Feishu applink scheme render as links; the backend produces these today, this keeps it true. */
-export const safeHref = (href: string): string =>
-  /^https:\/\//.test(href) || /^https:\/\/applink\.feishu\.cn\//.test(href) ? href : ''
+/** Only https URLs render as links; the backend produces GitHub pages and Feishu applinks (both https) today. */
+export const safeHref = (href: string): string => /^https:\/\//.test(href) ? href : ''
 export function ExternalLink({ href, children, icon = 'external' }: { href: string; children: ReactNode; icon?: IconName }) {
   return <a className="dt-inline-link dt-icon-link" href={safeHref(href)} {...external}><Icon name={icon} size={13} />{children}</a>
 }
