@@ -21,7 +21,7 @@ export function valueLabel(t: T, group: string, key: string | undefined): string
 /** Format one or more structured or raw reasons in the active UI language, truncating multi-line host errors to their first line. */
 export function reasonLabel(t: T, reason: string | Reason | readonly Reason[] | undefined): string {
   if (typeof reason === 'string') return reason ? label(t, { code: reason }) : ''
-  return [reason ?? []].flat().map(item => label(t, item)).filter(Boolean).join('；')
+  return [reason ?? []].flat().map(item => label(t, item)).filter(Boolean).join(t('listSeparator'))
 }
 function label(t: T, reason: Reason): string {
   const key = `reason.${reason.code}` as DshSuperagentKey

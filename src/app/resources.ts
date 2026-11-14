@@ -51,7 +51,10 @@ export const RESOURCES: readonly { name: string; holds: string; executor?: true 
   { name: 'models', holds: 'model providers, the DSH default and each role\'s model' },
   { name: 'models/<provider>', holds: 'one provider\'s models' },
   { name: 'feishu/<trigger-id>/…', holds: 'a Feishu original, as the dsh-superagent-feishu skill describes', executor: true },
-  { name: 'github/…', holds: 'a GitHub original, as the dsh-superagent-github skill describes', executor: true },
+  // Not ticket-scoped, unlike `feishu/<trigger-id>/…`: a worker may need a related Issue's original, and its
+  // shell already reaches the whole repository through gh - the tool's grammar says so instead of promising
+  // the isolation `ticket/` and `trigger/` provide.
+  { name: 'github/…', holds: 'any GitHub original in the repository, not scoped to this ticket, as the dsh-superagent-github skill describes', executor: true },
 ]
 export const resourceGrammar = (executor: boolean): string => RESOURCES.filter(resource => !executor || resource.executor)
   .map(resource => `${resource.name}: ${resource.holds}`).join('; ')

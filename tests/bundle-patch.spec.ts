@@ -40,6 +40,12 @@ it('replaces the base root of the workspace and session stores with the per-inst
   expect(configOf('session-persistence-jsonl').root).not.toBe('/base/sessions')
 })
 
+it('keeps its header honest about the optional stateDir, which a fresh install runs without', () => {
+  const header = readFileSync(join(import.meta.dirname, '..', 'cordis.patch.yml'), 'utf8').split('\n').slice(0, 3).join('\n')
+  expect(header).not.toMatch(/refuses to start without stateDir/)
+  expect(header).toMatch(/since 0\.1\.5 it is optional/)
+})
+
 it('defines the worker preset Executor Sessions run under, with a shell that moves long commands to the background', async () => {
   const rows = await patched()
   expect(rows.map(row => row.id)).toEqual(['storage-json', 'session-persistence-jsonl', 'dsh-superagent', 'dsh-superagent-github', 'dsh-superagent-feishu', 'dsh-superagent-inbox',

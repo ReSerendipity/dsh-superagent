@@ -46,5 +46,9 @@ export function allowedChatTools(settings: ChatRouterSettings): string[] {
 /** Trims a worker report to a short brief. The full transcript deliberately stays in the worker session. */
 export function briefOf(text: string, max = 400): string {
   const clean = text.replace(/\r/g, '').split('\n').map(line => line.trim()).filter(Boolean).join('\n')
-  return clean.length <= max ? clean : `${clean.slice(0, max)}\n…(truncated; the full report stays in the worker session)`
+  if (clean.length <= max) return clean
+  // Cut on whole characters: a split surrogate pair would end the brief in a lone half.
+  let cut = clean.slice(0, max)
+  if (/[\uD800-\uDBFF]$/.test(cut) && /^[\uDC00-\uDFFF]/.test(clean.slice(max, max + 1))) cut = cut.slice(0, -1)
+  return `${cut}\n…(truncated; the full report stays in the worker session)`
 }

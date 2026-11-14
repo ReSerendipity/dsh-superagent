@@ -1,7 +1,7 @@
 /** The right-pane tab: the tickets a chief-of-staff chat dispatched, as searchable cards with per-task actions. */
 import { useEffect, useState } from 'react'
 import { usePoll, type Call } from './api.ts'
-import type { T } from './text.ts'
+import { errorText, type T } from './text.ts'
 
 /**
  * The pane brings its own stylesheet: the panel's `client.css` is injected inside its own React tree, which this
@@ -81,6 +81,7 @@ export function TasksPane({ t, call, openSession }: {
   const [expanded, setExpanded] = useState<ReadonlySet<string>>(new Set())
   const [menu, setMenu] = useState<{ x: number; y: number; item: Item } | null>(null)
   const [updatedAt, setUpdatedAt] = useState('')
+  const [failure, setFailure] = useState<string | null>(null)
   useEffect(() => {
     if (!menu) return
     const close = () => setMenu(null)
@@ -98,10 +99,16 @@ export function TasksPane({ t, call, openSession }: {
     if (next.has(id)) next.delete(id); else next.add(id)
     return next
   })
-  const refresh = () => { void reload(); setUpdatedAt(new Date().toLocaleTimeString()) }
+  const refresh = () => { void reload().then(() => setFailure(null)).catch(() => {}); setUpdatedAt(new Date().toLocaleTimeString()) }
   const act = async (route: 'POST tickets/:id/stop' | 'POST tickets/:id/retry', id: string) => {
     setMenu(null)
-    try { await call(route, { id }); await reload() } catch { /* the card keeps its state; the panel shows errors elsewhere */ }
+    try {
+      await call(route, { id }); await reload()
+      setFailure(null)
+    } catch (error) {
+      // This pane mounts beside the conversation, where no panel toast may be visible; say what failed here.
+      setFailure(error instanceof Error ? error.message : String(error))
+    }
   }
   const card = (item: Item) => <article key={item.ticket_id} className="dsh-task"
     onContextMenu={event => { event.preventDefault(); setMenu({ x: event.clientX, y: event.clientY, item }) }}>
@@ -118,8 +125,8 @@ export function TasksPane({ t, call, openSession }: {
       {item.ended?.at && <span className="dsh-task-time">{new Date(item.ended.at).toLocaleString()}</span>}
       {item.report_state && <span className="dsh-task-note">{item.report_state}</span>}
       {item.chat_session && <button type="button" className="dsh-task-note dsh-task-link"
-        onClick={() => { void openSession(item.chat_session) }}>{t('chatRouterFrom')} {item.chat_session.slice(-8)}</button>}
-      <button type="button" className="dsh-task-open" onClick={() => { void openSession(item.worker_session) }}>{t('openWorkerSession')}</button>
+        onClick={() => { void openSession(item.chat_session).catch(error => setFailure(errorText(error))) }}>{t('chatRouterFrom')} {item.chat_session.slice(-8)}</button>}
+      <button type="button" className="dsh-task-open" onClick={() => { void openSession(item.worker_session).catch(error => setFailure(errorText(error))) }}>{t('openWorkerSession')}</button>
     </div>
   </article>
   return <>
@@ -140,7 +147,7 @@ export function TasksPane({ t, call, openSession }: {
           <input value={query} onChange={event => setQuery(event.target.value)} placeholder={t('chatRouterSearch')} aria-label={t('chatRouterSearch')} />
         </div>
       </>}
-      {error && <p className="dsh-tasks-hint" style={{ color: 'crimson' }}>{error.message}</p>}
+      {(error || failure) && <p className="dsh-tasks-hint" style={{ color: 'crimson' }}>{failure ?? error?.message}</p>}
       {all.length === 0
         ? <div className="dsh-tasks-empty"><EmptyIcon /><div>{t('chatRouterTasksEmpty')}</div></div>
         : items.length === 0
@@ -151,7 +158,7 @@ export function TasksPane({ t, call, openSession }: {
           </>}
     </div>
     {menu && <div className="dsh-task-menu" style={{ left: menu.x, top: menu.y }} onClick={event => event.stopPropagation()}>
-      <button type="button" onClick={() => { void openSession(menu.item.worker_session) }}>{t('openWorkerSession')}</button>
+      <button type="button" onClick={() => { void openSession(menu.item.worker_session).catch(error => setFailure(errorText(error))) }}>{t('openWorkerSession')}</button>
       <button type="button" onClick={() => { void act('POST tickets/:id/retry', menu.item.ticket_id) }}>{t('chatRouterRetry')}</button>
       <button type="button" onClick={() => { void act('POST tickets/:id/stop', menu.item.ticket_id) }}>{t('chatRouterStop')}</button>
     </div>}

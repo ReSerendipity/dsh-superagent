@@ -1,6 +1,6 @@
 import { S as $strip, _ as output, b as $loose, c as ZodObject, f as ZodString, h as ZodURL, i as ZodEnum, l as ZodOptional, n as ZodBoolean, r as ZodDefault, s as ZodNumber, t as ZodArray, x as $strict } from "./schemas-lx-F2nnt.js";
 import { F as Thread, U as Trigger } from "./intake-OhnAYFN6.js";
-import { _ as Tally, g as SourceRegistry, n as SourceKind, r as SourceContext } from "./kind-B-WulCxy.js";
+import { _ as Tally, g as SourceRegistry, n as SourceKind, r as SourceContext } from "./kind-DgfPhFf6.js";
 import { Context } from "@deepseek-ai/cordis";
 //#region src/sources/feishu-read.d.ts
 /** Retained source message reference anchoring context reads; `at` is the timestamp around which `chatAround` queries. */
@@ -48,7 +48,9 @@ declare const withMentionNames: (text: string, mentions: {
 }[]) => string;
 /**
  * Parses a Feishu message timestamp into an ISO-8601 string: live events and the history API return epoch milliseconds as a
- * string, whereas topic/thread pages return a local timestamp string such as `2026-09-11 12:00`.
+ * string, whereas topic/thread pages return a local timestamp string such as `2026-09-11 12:00`, read in the host's own
+ * time zone - the zone the topic page rendered it in for this machine. Epoch values are exact everywhere; only the
+ * topic-page string carries the zone ambiguity, and no client-side signal can resolve it.
  */
 declare function feishuTime(value: string): string;
 /** Converts a normalized Feishu event into a Trigger, returning undefined for messages sent by the bot itself. */

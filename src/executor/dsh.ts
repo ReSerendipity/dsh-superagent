@@ -44,7 +44,9 @@ const fromPerson = (input?: TicketInput): boolean => input?.kind === 'trigger' ?
  */
 class PrepareFailed extends Error {}
 const PASSING = new RegExp(['ECONNRESET', 'ECONNREFUSED', 'ETIMEDOUT', 'EAI_AGAIN', 'ENOTFOUND', 'EPIPE', 'UND_ERR', 'socket hang up', 'fetch failed',
-  'network error', 'overloaded', 'rate limit', '\\b(?:408|429|50[0-4])\\b'].join('|'), 'i')
+  'network error', 'overloaded', 'rate limit'].join('|'), 'i')
+/** A bare status code only counts as transient when the text names it as an HTTP status — including wire-format lines like `HTTP/1.1 500` — not as any number in the message. */
+const STATUS = /(?:\bHTTP(?:\/[\d.]+)?|\bstatus(?:\s+code)?|\bcode)\s*[=: ]?\s*\b(408|429|5\d\d)\b/i
 /**
  * True when an error represents a transient network or model-provider failure: an HTTP 408, 429, or 5xx status, or a
  * connection that was refused, reset, timed out, or could not resolve its host.
@@ -53,7 +55,7 @@ export function transient(error: unknown): boolean {
   const status = (error as { status?: unknown } | undefined)?.status
   if (typeof status === 'number') return status === 408 || status === 429 || status >= 500
   const text = error instanceof Error ? `${error.name} ${error.message} ${String((error as { code?: unknown }).code ?? '')}` : String(error)
-  return PASSING.test(text)
+  return PASSING.test(text) || STATUS.test(text)
 }
 /** Appends a stable 12-character ticket ID suffix to a validated English worktree name. */
 const ticketWorktreeName = (name: string, id: string): string => `${WorktreeNameSchema.parse(name)}-${id.slice(0, 12)}`
@@ -274,7 +276,6 @@ export class DshExecutor implements Executor {
         })
     }
     await mkdir(directory, { recursive: true })
-    await verifyDirectory(directory, this.host.context.subprocess, this.host.lifetime)
   }
   /** Enqueues a `launch` effect for an accepted or resumed assignment; launches start in queue order as worker slots free up. */
   start(ticket: Ticket, assignment: Assignment): void {
@@ -447,11 +448,17 @@ export class DshExecutor implements Executor {
     const source = sourceTrigger(this.host, ticket)
     const workspace = ticket.execution?.directory ?? ''
     if (!current()) return
-    // Prepare the workspace directory once; an existing directory counts as already prepared, including worktrees created before `prepare` commands existed.
-    if (!await stat(workspace).then(() => true, () => false)) {
+    // Prepare the workspace directory once; an existing directory counts as already prepared, including worktrees
+    // created before `prepare` commands existed. A file occupying the path is not a prepared directory.
+    const info = await stat(workspace).catch(() => undefined)
+    if (info && !info.isDirectory()) throw new Error(`The workspace of ticket ${ticket.id} is a file, not a directory: ${workspace}`)
+    if (!info) {
       await this.prepareDirectory(ticket)
       if (!current()) return
     }
+    // The repository git config is verified on every launch, not only when the directory is first created: a
+    // retry or a crash recovery reuses the directory, and its config can change between Assignments.
+    await verifyDirectory(workspace, this.host.context.subprocess, this.host.lifetime)
     if (!current()) return
     const sessionId = workerSessionId(ticket.id)
     const agent = await this.host.sessions.ensure(sessionId, workspace, ticket.title, 'worker')

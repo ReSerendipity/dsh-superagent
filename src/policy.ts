@@ -9,6 +9,7 @@ import { key, type AssessmentOutcome, type Mandate, type Policy, type PolicyEffe
   type Trigger, type ActorRef, type GateResult } from './core/index.ts'
 import { sameName } from './infra/text.ts'
 import { WORKER_COMMANDS } from './infra/environment.ts'
+import { ABSOLUTE_PATH } from './infra/platform.ts'
 import { ChatRouterSettingsSchema } from './chat-router/config.ts'
 
 export const RuleIdSchema = z.string().regex(/^[a-zA-Z0-9_-]{1,80}$/)
@@ -75,7 +76,11 @@ export const AllowedSchema = z.object({ id: z.string().trim().min(1).max(200), n
 const Weak = z.enum(['inferred', 'ignore'])
 export const AdmissionRowSchema: z.ZodType<AdmissionRow> = z.object({ listedUnaddressed: Weak.optional(), unlistedAddressed: z.enum(['explicit', 'inferred', 'ignore']).optional(), unlistedUnaddressed: Weak.optional() }).strict()
 export const AdmissionTableSchema = z.record(z.string(), AdmissionRowSchema)
-export const SourcePolicySchema = z.object({ allowed: z.array(AllowedSchema).default([]), admission: AdmissionTableSchema.default({}) }).catchall(z.unknown())
+export const SourcePolicySchema = z.object({ allowed: z.array(AllowedSchema).default([]), admission: AdmissionTableSchema.default({}),
+  // Declared so the JSON Schema carries it: undeclared, the editor neither completes it nor flags a typo.
+  // An illegal bots VALUE stays loud: the catch-free optional hands it to the Source kind's strict schema,
+  // which refuses it on save instead of silently emptying the bot list.
+  bots: z.array(AllowedSchema).optional() }).catchall(z.unknown())
 export type SourcePolicy = z.infer<typeof SourcePolicySchema>
 export const PolicyConfigSchema = z.object({
   rules: z.array(RuleSchema).refine(rules => new Set(rules.map(rule => rule.id)).size === rules.length, 'Duplicate rule IDs').default(DEFAULT_RULES),
@@ -94,7 +99,7 @@ const CommandNameSchema = z.string().regex(/^[A-Za-z0-9._-]+$/).refine(name => n
 export const ExecutorConfigSchema = z.object({
   model: RoleModelSchema.nullable().default(null),
   maxWorkers: z.number().int().min(LIMITS.maxWorkers.min).max(LIMITS.maxWorkers.max).default(3),
-  directory: z.string().trim().refine(path => path === '' || path.startsWith('/'), 'An absolute path, or empty for <stateDir>/work').default(''),
+  directory: z.string().trim().refine(path => path === '' || ABSOLUTE_PATH.test(path), 'An absolute path, or empty for <stateDir>/work').default(''),
   prepare: z.string().max(LIMITS.prepareCommand).default(''),
   blockedCommands: z.array(CommandNameSchema).default([]),
   // The external control loop (article §6) and Router sharding (article §2.1) are runtime policy a person tunes here;

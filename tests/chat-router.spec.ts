@@ -1,7 +1,9 @@
 import { mkdtempSync, mkdirSync, readFileSync, writeFileSync } from 'node:fs'
 import { tmpdir } from 'node:os'
-import { join } from 'node:path'
+import { dirname, join } from 'node:path'
 import { describe, expect, it } from 'vitest'
+import { fileURLToPath } from 'node:url'
+import { CHAT_ROUTER_PROMPT } from '../src/chat-router/host.ts'
 import { CHAT_TOOLS, ChatRouterSettingsSchema, DEFAULT_CHAT_ROUTER_SETTINGS, allowedChatTools, briefOf } from '../src/chat-router/config.ts'
 import { chatThreadKey, isChatRouterSession } from '../src/chat-router/match.ts'
 import { chatSessionFrom, submitChatTicket } from '../src/chat-router/submit.ts'
@@ -118,4 +120,55 @@ describe('chat reply watcher', () => {
     const watcher = new ChatReplyWatcher(root, async () => { throw new Error('must not send') })
     expect(await watcher.tick()).toBe(0)
   })
+
+  it('skips an overlapping tick instead of racing itself on the same reply', async () => {
+    inboxRoot = mkdtempSync(join(tmpdir(), 'dsh-chat-brief-'))
+    const done = join(inboxRoot, 'done')
+    mkdirSync(done, { recursive: true })
+    writeFileSync(join(done, 'chat-task-1.md'), '<!-- chat-session: session-aaa -->\n# task\n')
+    writeFileSync(join(done, 'chat-task-1.reply.md'), '完成')
+    let release!: () => void
+    const gate = new Promise<void>(resolve => { release = resolve })
+    const sent: string[] = []
+    const watcher = new ChatReplyWatcher(root, async sessionId => { sent.push(sessionId); await gate })
+    const first = watcher.tick()
+    expect(await watcher.tick()).toBe(0)
+    release()
+    expect(await first).toBe(1)
+    expect(sent).toEqual(['session-aaa'])
+    expect(await watcher.tick()).toBe(0)
+  })
+})
+
+describe('brief truncation', () => {
+  it('cuts on whole characters, never mid-surrogate', () => {
+    const text = `中文${'😀'.repeat(300)}尾部`
+    const brief = briefOf(text, 50)
+    expect(brief.length).toBeLessThan(text.length)
+    expect(brief).toContain('…(truncated')
+    expect(brief).toContain('😀')
+    // A lone surrogate iterates as one broken unit; a whole-character cut has none.
+    expect([...brief.split('\n')[0]!].some(ch => ch.length === 1 && /[\uD800-\uDFFF]/.test(ch))).toBe(false)
+  })
+})
+
+describe('submission collisions', () => {
+  it('keeps two dispatches of one title that land in the same millisecond', () => {
+    const root = mkdtempSync(join(tmpdir(), 'dsh-chat-router-collide-'))
+    const first = submitChatTicket(root, 'same title', 'v1', 'session-aaa')
+    // A collision needs the same millisecond stamp; fake the clock between the two writes.
+    const stamp = (first.file.match(/chat-same-title-(.+)\.md$/) ?? [])[1]
+    expect(stamp).toBeDefined()
+    const second = submitChatTicket(root, 'same title', 'v2', 'session-aaa')
+    expect(second.file).not.toBe(first.file)
+    expect(readFileSync(join(root, first.file), 'utf8')).toContain('v1')
+    expect(readFileSync(join(root, second.file), 'utf8')).toContain('v2')
+  })
+})
+
+it('keeps the shipped chat-router.md identical to the prompt the runtime actually uses', () => {
+  // The runtime runs the inline copy; the .md is what a reader or team override flow sees, and the two
+  // copies are hand-maintained, so drift is caught here instead of in production wording.
+  const shipped = readFileSync(join(dirname(fileURLToPath(import.meta.url)), '..', 'prompts', 'chat-router.md'), 'utf8').trim()
+  expect(CHAT_ROUTER_PROMPT.trim()).toBe(shipped)
 })

@@ -94,11 +94,13 @@ export function SessionButton({ sessionId, label,
   return <Button variant={variant} size="sm" icon={<Icon name="session" size={14} />}
     onClick={() => { openSession(sessionId).catch(error => notify(errorText(error))) }}>{label ?? t('openSession')}</Button>
 }
+/** Only https URLs render as links; the backend produces GitHub pages and Feishu applinks (both https) today. */
+export const safeHref = (href: string): string => /^https:\/\//.test(href) ? href : ''
 export function ExternalLink({ href, children, icon = 'external' }: { href: string; children: ReactNode; icon?: IconName }) {
-  return <a className="dt-inline-link dt-icon-link" href={href} {...external}><Icon name={icon} size={13} />{children}</a>
+  return <a className="dt-inline-link dt-icon-link" href={safeHref(href)} {...external}><Icon name={icon} size={13} />{children}</a>
 }
 export function ActionLink({ href, children, icon = 'external' }: { href: string; children: ReactNode; icon?: IconName }) {
-  return <a className="dt-btn dt-btn-outline dt-btn-sm" href={href} {...external}><span className="dt-btn-icon"><Icon name={icon}
+  return <a className="dt-btn dt-btn-outline dt-btn-sm" href={safeHref(href)} {...external}><span className="dt-btn-icon"><Icon name={icon}
     size={14} /></span>{children}</a>
 }
 export function StageMark({ state, icon, label }: { state: DotState; icon: IconName; label: string }) {

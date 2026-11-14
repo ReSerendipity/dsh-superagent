@@ -1,5 +1,35 @@
 # DSH-Superagent Changelog
 
+## [0.2.8] — 2026-11-13
+
+深度审查修复批次（2026-11-12/13 全仓审查，报告见 `local/review-2026-11-12.md`）：6 条 P1、20 余条 P2 与 P3 卫生项全部处理，测试基线 1307 passed / 49 skipped。
+
+### Fixed
+
+- **Windows 运行期 `.cmd` 包装 CLI 全部 EINVAL**（P1）：setup 探针经 `runAsWorker` 能启动 `.cmd` 包装器，而轮询/回帖/git 的 `Commands.run` 与飞书 consume 直接 `execFile`/`spawn`，Node 因 CVE-2024-27980 加固直接拒绝。`infra/platform` 新增 `runtimeArgv`，三处 spawn 收敛到同一 argv 形态（`cmd.exe /d /c` + 程序与参数分立），Windows 契约测试真跑验证。
+- **`executable()` 不展开 PATHEXT**（P1）：Windows 上 `cli: "gh"` 恒失败；裸命令名现按 PATHEXT 展开（与 CreateProcess 同序），含反斜杠的相对名被拒绝而非静默拼接。
+- **inbox 半写入文件被吞成工单并重复建单**（P1）：接件加 2 秒稳定性门，云同步落地/慢拷贝的文件等下一轮整读；归档移动仍是游标。
+- **多实例同 kind 的门按 kind 而非实例**（P1，过渡方案）：多实例仍被 setup 拒绝（docs/010 维持），但单个以自定义 id 存储的实例现在按**自己的**配置判定 scope 与 thread context，不再落到 schema 默认值静默失效。
+- **登录自启 VBS 是语法错误的**（P1）：`sh.Run` 引号 4 个应为 3 个——每次安装都写出坏 VBS，守卫从未自启过；同时让发射行逃出括号块（检出路径含 `)` 会击穿块解析），错误路径改 goto。`tests/guard-installer.spec.ts` 按 cmd/wscript 双重语义解析生成文本钉死。
+- **policy/prompts 可被主 Session 工具改写**（P2）：tool origin 改 policy 块或改 prompt overrides 一律拒绝并指向面板（与 `panelOnlyEnvironment` 同型）；Source 自身名单同步与面板不受影响，团队段落/技能仍可由工具编辑。
+- **chat 回信简报链**：Mode A 回信简报改 `queue`（steer 对空闲聊天静默丢弃，与进程内路径注释一致）；`ChatReplyWatcher.tick` 加重入守卫；`chatTickets` 重启后从持久化 Trigger meta 兜底恢复；brief 截断不再切碎代理对。
+- **watchdog**：digest 的 queued 只数等槽位的工单（原来把等人的也算进去）；`watchdogMinutes` 保存后下一 tick 即生效（原来要重启，而 instance-status 却已报新值）。
+- **worker git 配置检查**：`verifyDirectory` 白名单扩到 `http.*` 整族（`sslVerify=false` 会放走 credential helper 的令牌）与 `url.*.insteadOf`，且**每次 launch** 复查而非只在建目录时；工作区路径被文件占位时报清晰错误。
+- **状态锁回收竞争**：两个进程同时回收死锁时败者不再抛 ELOCKED，胜者若也死了再试一轮。
+- **关停**：effect handler 无视停止信号时 `drain()` 以 30 秒为限，超时继续释放锁；Router 分片与 Watchdog 会话也纳入取消列表。
+- **声明式配置链**：YAML `__proto__`/`constructor` 键响亮拒绝（原来静默吞掉并变异原型）；未知 `$` 指令拒绝（`$prunes` 拼写错误原来无声消失）；`$prune` 指向不存在的 Source 告警；补丁失败的文件报 `DeclarativeWriteError` 而非裸 500；替换写入先 fsync 再 rename；`patchJson` 路径遍历 hasOwn 守卫；面板同毫秒同题建单不再互相覆盖。
+- **client**：API 请求带 15 秒超时（挂起请求不再冻结该视图的轮询队列与 reload）；右栏任务动作失败就地显示错误（原来 `catch {}` 全吞，且 tasks-pane 零测试——现补齐 PS 语法门同级的用例）；概览问题行稳定 key（轮询重排不再把确认弹窗错位到别的问题上）；gap 回填失败不再每 5 秒弹一次 toast；外链只渲染 http(s)/飞书 applink；settings provider context 记忆化；`reasonLabel` 用字典分隔符；chatRouter `maxParallel` 清空不再瞬间变 0；`{{双花括号}}` 占位符渲染残留修复并加渲染级断言。
+- **sendGithub 幂等**：outbox 已有的 delivered 回执现在短路全量翻页扫描（千评论 issue 每条消息省 ~34 次 API 调用），扫描仅作为响应丢失的恢复路径；评论分页 `per_page=100`；渠道首次有了直接测试。
+- **脚本链**：`dsh-superagent.cmd` 引号包裹 Python 路径（Program Files 安装可用）；服务 pid 记录进程创建时间（Windows PID 复用不再造成幽灵服务/守卫永久压制）；guard 启动前先查 disabled 标记；watchdog 签名剔除易变字段并合并路径转义（同一故障不再重启后重复 ALERT）；控制管道丢弃超限请求；`serves()` 收紧到无位置参数的服务形态；PowerShell 三脚本有了语法门测试。
+- **schema**：`policy.sources.<id>.bots` 声明进 `SourcePolicySchema` 并重新生成 JSON Schema——编辑器可补全，拼错 `bot` 不再静默清空机器人名单。
+- **文档**：`cordis.patch.yml` 头注释与 0.1.5 起的可选 stateDir 一致；SECURITY.md 写明控制管道的本地信任边界；README 文档索引完整性由测试锁定；`github/` 资源说明明示「不按工单隔离」；`CHAT_ROUTER_PROMPT` 与随包 .md 一致且有同步测试。
+- **杂项**：`transient()` 只认被点名的 HTTP/status/code 数字（`limit 500 reached` 不再买指数退避）；`runAsWorker` 空错误不再回显整条 argv；migration 的 NaN 游标键/孤儿行/死旗标防御补齐；`Store.get` 对损坏 JSON 读作缺失而非启动失败；`Store.settings()` 按版本缓存；线程列表与工单标题搜索下推 SQL；`KV.feishu.seen` 封顶；inbox 健康详情带最近一次错误；收件文件 URL 百分号编码；issue 标题 mention 与正文同等计为 addressed；被删除实例的健康条目释放。
+
+### Notes
+
+- 审查方法与逐条证据：`local/review-2026-11-12.md`（本仓本地保留）。
+- `src/core/**` 与上游逐字节一致经复核未变；本批次全部改动在平台层。
+
 ## [0.2.7] — 2026-11-10
 
 首个通过端到端 MVP 验收的版本（5/5：派发新单 → 独立工单与 worker → 真实执行 → 右栏可见 → 完成回投）。

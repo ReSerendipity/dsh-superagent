@@ -38,6 +38,11 @@ const BLOCKS: Record<'policy' | 'eval' | 'executor' | 'source' | 'chatRouter', B
       return { ...policy, sources: sources.validatePolicy(policy.sources) }
     },
     merge: (settings, value) => ({ ...settings, policy: value as SettingsValue['policy'] }),
+    // Only the management panel (and a Source's own list sync) may change who may originate work or add a
+    // rule: the main Session reads external content, and one injected turn must not rewrite its own gate.
+    guard: (current, candidate, origin) => {
+      if (origin === 'tool' && JSON.stringify(current.policy) !== JSON.stringify(candidate.policy)) throw new Error('The admission lists and policy rules can only be changed in the management panel, not by a tool call')
+    },
   },
   eval: { parse: value => EvalConfigSchema.parse(value), merge: (settings, value) => ({ ...settings, eval: value as SettingsValue['eval'] }) },
   executor: {

@@ -13,10 +13,15 @@ export function threadList(host: ViewHost, filter: ThreadFilter, offset: number,
   const open = new Set(store.tickets.open().map(ticket => ticket.id))
   const live = (thread: Thread) => thread.subscriptions.some(id => open.has(id))
   const lastAt = (thread: Thread) => thread.lastAt ?? thread.createdAt
-  const kept = (thread: Thread) => filter === 'recent' ? lastAt(thread) >= since
-    : filter === 'all' || (filter === 'subscribed' ? live(thread) : !!thread.evaluating || awaitingEval(view, thread).length > 0)
-  const candidates = filter === 'subscribed' ? store.read.subscribedThreads()
-    : filter === 'evaluating' ? store.threads.active() : store.threads.list()
+  // `recent` and `all` order by last activity over every thread, so their filter, order and page push down to SQL;
+  // `subscribed` and `evaluating` start from sets that are already small and keep their view-layer predicates.
+  if (filter === 'recent' || filter === 'all') {
+    const result = store.read.threadsPaged({ since: filter === 'recent' ? since : undefined, offset, limit })
+    // The page shape matches `page()` for the panel's LoadMore; a SQL count would cost a second query for a total nobody shows.
+    return { items: result.items.map(thread => threadSummary(view, thread)), next_offset: result.more ? offset + limit : null }
+  }
+  const kept = (thread: Thread) => filter === 'subscribed' ? live(thread) : !!thread.evaluating || awaitingEval(view, thread).length > 0
+  const candidates = filter === 'subscribed' ? store.read.subscribedThreads() : store.threads.active()
   const threads = candidates.filter(kept).sort((a, b) => lastAt(b).localeCompare(lastAt(a)))
   const result = page(threads, offset, limit)
   return { ...result, items: result.items.map(thread => threadSummary(view, thread)) }
@@ -65,15 +70,20 @@ export function search(host: ViewHost, query: string, links: Pick<TextCache, 'en
   const terms = new Set([value, ...named.terms])
   for (const [name, url] of links.entries()) if (url === value) terms.add(name.split(':').at(-1)!)
   const found = new Map<string, Trigger>()
-  for (const term of terms) for (const trigger of store.read.search(term)) found.set(trigger.id, trigger)
+  for (const term of [...terms].slice(0, 8)) for (const trigger of store.read.search(term)) found.set(trigger.id, trigger)
   const threads = named.threads.flatMap(key => { const thread = store.threads.get(key); return thread ? [threadSummary(view, thread)]
     : [] })
+  // Match tickets by title in SQL (newest first) and by the threads they own or subscribe to in the view layer;
+  // the thread-reach scan only runs when a Source resolved named threads (Feishu AppLinks, #N references).
   const lower = value.toLowerCase()
-  // Match tickets by threads they own (e.g., bound PRs) or subscribe to, as well as by title.
   const reaches = (ticket: Ticket) => [...(ticket.follows ?? []).map(follow => follow.thread),
     ...view.threadsOf(ticket.id).map(thread => thread.key)]
-  const matches = (ticket: Ticket) => reaches(ticket).some(key => named.threads.includes(key)) || ticket.title.toLowerCase().includes(lower)
-  const tickets = store.tickets.list().filter(matches).sort(newestFirst).slice(0, 10).map(ticketSummary)
+  const matches = (ticket: Ticket) => reaches(ticket).some(key => named.threads.includes(key))
+  // The thread-reach scan runs once, and only when a Source resolved named threads; titles always come from SQL.
+  const byThread = named.threads.length === 0 ? [] : store.tickets.list().filter(matches)
+  const byTitle = store.read.ticketsByTitle(value, 10)
+  const tickets = [...new Map([...byThread, ...byTitle].map(ticket => [ticket.id, ticket])).values()]
+    .sort(newestFirst).slice(0, 10).map(ticketSummary)
   // Omit automated triggers from threads already included in `threads`.
   const shownThreads = new Set(threads.map(thread => thread.key))
   const item = (trigger: Trigger) => {

@@ -802,6 +802,15 @@ it('tells a passing failure of the provider or the network from one that a later
   for (const error of [Object.assign(new Error('x'), { status: 400 }), Object.assign(new Error('x'), { status: 401 }), new Error('context too long'), 'LlmError: offline']) {
     expect(transient(error)).toBe(false)
   }
+  // A bare code in the text counts as transient only when it names itself an HTTP status.
+  for (const error of [new Error('gh: Server Error (HTTP 500)'), new Error('status 429: too many requests'),
+    new Error('HTTP/1.1 502 Bad Gateway'), new Error('status code 503: overloaded'), new Error('error code: 429')]) {
+    expect(transient(error)).toBe(true)
+  }
+  // A bare number in a message is not a status: the text must name it as HTTP, status or code.
+  for (const error of [new Error('limit 500 reached'), new Error('issue #429 moved'), new Error('port 502 in use')]) {
+    expect(transient(error)).toBe(false)
+  }
 })
 it('reports a worker waiting when its turn ends after a person answered its blocked report', async () => {
   const one = await h.acceptedTicket(feishu('1', '@bot 修一'))

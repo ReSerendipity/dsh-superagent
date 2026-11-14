@@ -22,8 +22,8 @@ const now = (): string => new Date().toISOString()
 export class Passes {
   private timer?: ReturnType<typeof setInterval>
   private stopped = false
-  private pumping?: Promise<void>
-  private pumpAgain?: Promise<void>
+  private pumping?: Promise<boolean>
+  private pumpAgain?: Promise<boolean>
   constructor(private readonly host: PassesHost) {}
   start(): void { if (!this.stopped) this.timer = setInterval(() => { this.request() }, 2000) }
   stop(): Promise<unknown> {
@@ -39,8 +39,10 @@ export class Passes {
   }
   request(): void {
     const { health } = this.host
-    this.pump().then(() => {
-      if (health.get()?.state !== 'error' || this.host.lifetime.aborted) return
+    this.pump().then(ran => {
+      // Only a pass that actually ran clears an error: a request while waiting for setup or closing returns
+      // without running, and resetting the entry then would hide the failure it reports.
+      if (!ran || health.get()?.state !== 'error' || this.host.lifetime.aborted) return
       health.set({ state: 'ready', detail: 'Orchestrator is ready', at: now() })
     }, (error: unknown) => { health.set({ state: 'error', detail: `A pass failed: ${String(error)}`, at: now() }) })
   }
@@ -52,11 +54,11 @@ export class Passes {
       if (!this.pumping && !this.pumpAgain) return
     }
   }
-  /** Run one pass, coalescing concurrent callers into a single follow-up pass. */
-  async pump(): Promise<void> {
+  /** Run one pass, coalescing concurrent callers into a single follow-up pass; resolves false when nothing ran. */
+  async pump(): Promise<boolean> {
     // Do not assess, dispatch, or send while waiting for setup; queued work waits for the restart that completes setup.
-    if (!this.host.configured() || this.host.closing()) return
-    if (!this.pumping) return this.pumping = this.pumpOnce().finally(() => { this.pumping = undefined })
+    if (!this.host.configured() || this.host.closing()) return false
+    if (!this.pumping) return this.pumping = this.pumpOnce().finally(() => { this.pumping = undefined }).then(() => true)
     const next = () => { this.pumpAgain = undefined; return this.pump() }
     return this.pumpAgain ??= this.pumping.then(next, next)
   }

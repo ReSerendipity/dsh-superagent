@@ -4,6 +4,7 @@ import { basename } from 'node:path'
 import { promisify } from 'node:util'
 import { z } from 'zod'
 import type { Deployment } from '../deployment.ts'
+import { runtimeArgv } from './platform.ts'
 
 const exec = promisify(execFile)
 const TIMEOUT_MS = 90_000
@@ -67,7 +68,11 @@ export class Commands {
   withSignal(signal?: AbortSignal): Commands { return signal ? new Commands(this.resolved, this.environment, AbortSignal.any([this.signal, signal])) : this }
   async run(program: string, args: string[], cwd?: string): Promise<string> {
     try {
-      const { stdout } = await exec(program, args, { cwd, signal: this.signal, timeout: TIMEOUT_MS, maxBuffer: 16 * 1024 * 1024,
+      // A batch wrapper goes to cmd.exe with the program and arguments kept separate, as `runAsWorker` does:
+      // Node refuses to spawn `.cmd`/`.bat` directly (the CVE-2024-27980 hardening), so the wrapper the setup
+      // probe validated must be served the same way when the pollers and channels run it.
+      const [shell, ...rest] = [...runtimeArgv(program, args)]
+      const { stdout } = await exec(shell!, rest, { cwd, signal: this.signal, timeout: TIMEOUT_MS, maxBuffer: 16 * 1024 * 1024,
         env: { ...process.env, ...this.environment, GH_PROMPT_DISABLED: '1', LARKSUITE_CLI_NO_UPDATE_NOTIFIER: '1', LARKSUITE_CLI_NO_SKILLS_NOTIFIER: '1' } })
       return stdout
     } catch (error) { throw commandError(error, program) }

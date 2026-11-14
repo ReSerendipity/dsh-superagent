@@ -5,6 +5,8 @@ import { reasonLabel, type T } from '../src/client/text.ts'
 import { REASONS, USER_ERRORS } from '../src/core/index.ts'
 
 const placeholders = (text: string) => [...text.matchAll(/\{(\w+)\}/g)].map(match => match[1]).sort()
+/** What the host's interpolator leaves behind for a template, with every placeholder resolved. */
+const render = (text: string) => text.replace(/\{(\w+)\}/g, '<$1>')
 
 it('names the same placeholders in both languages', () => {
   const keys = Object.keys(zh) as DshSuperagentKey[]
@@ -12,12 +14,18 @@ it('names the same placeholders in both languages', () => {
   expect(keys.filter(key => !zh[key] || !en[key])).toEqual([])
 })
 
+it('renders both languages without stray braces the interpolator would leave on screen', () => {
+  // The host interpolates single-brace names; a doubled `{{name}}` keeps its outer braces in the rendered text.
+  const keys = Object.keys(zh) as DshSuperagentKey[]
+  expect(keys.filter(key => /[{}]/.test(render(zh[key])) || /[{}]/.test(render(en[key])))).toEqual([])
+})
+
 it('words a reason by its code with its values, each of a batch, and words a person or an assessor wrote as written', () => {
   const t = ((key: DshSuperagentKey, values: Record<string, string> = {}) => (zh[key] ?? key).replace(/\{(\w+)\}/g, (_match, name: string) => values[name] ?? '')) as T
   expect(reasonLabel(t, 'retried')).toBe(zh['reason.retried'])
   expect(reasonLabel(t, [{ code: 'routed', values: { ticket: 't1' } }])).toBe('已转给工单 t1')
   expect(reasonLabel(t, [{ code: 'not_a_member', triggerId: '1' }, { code: 'no_mention', triggerId: '2' }]))
-    .toBe(`${zh['reason.not_a_member']}；${zh['reason.no_mention']}`)
+    .toBe(`${zh['reason.not_a_member']}${zh['listSeparator']}${zh['reason.no_mention']}`)
   expect(reasonLabel(t, [{ code: 'said', values: { text: 'The button is already blue' } }])).toBe('The button is already blue')
   // A code the panel has no words for reads as the host words it.
   expect(reasonLabel(t, { code: 'some_new_filter' })).toBe('some_new_filter')

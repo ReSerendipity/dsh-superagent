@@ -34,6 +34,10 @@ const REQUIRED_ENTRIES = [
   'package/skills/dsh-superagent-github/SKILL.md',
   'package/locale/zh.json',
 ]
+// "Must not ship" binds as hard as "must ship": the `files` whitelist names whole directories, so a stray
+// file dropped into one of them would pack silently. skills/ ships exactly its README and two SKILL.md files.
+const FORBIDDEN_PREFIXES = ['package/local/', 'package/AGENTS.md', 'package/.env', 'package/scripts/', 'package/dist/']
+const SKILLS_ENTRIES = 3
 
 // ---------------------------------------------------------------- options
 
@@ -213,6 +217,8 @@ check('working tree clean', () => {
 })
 
 check('branch pushed', () => {
+  // A stale local origin/main reference passes against a remote that moved; refresh it when the gate runs online.
+  if (!options.skipOnline) run(git, ['-C', root, 'fetch', 'origin', 'main'])
   const local = runChecked(git, ['-C', root, 'rev-parse', 'HEAD'], 'git')
   const remote = runChecked(git, ['-C', root, 'rev-parse', 'origin/main'], 'git')
   need(local === remote, 'local HEAD differs from origin/main; push before publishing')
@@ -299,6 +305,10 @@ check('plugin tarball builds, is complete, and matches its checksum file', () =>
   need(listing.status === 0, `tar -tzf exited ${listing.status}${tail(listing.stderr)}`)
   const entries = String(listing.stdout ?? '').split(/\r?\n/).map(line => line.trim()).filter(Boolean)
   for (const required of REQUIRED_ENTRIES) need(entries.includes(required), `the tarball lacks ${required}`)
+  for (const banned of FORBIDDEN_PREFIXES) {
+    need(!entries.some(entry => entry.startsWith(banned)), `the tarball carries ${banned}`)
+  }
+  need(entries.filter(entry => entry.startsWith('package/skills/')).length === SKILLS_ENTRIES, 'the tarball carries unexpected files under skills/')
   tarballDigest = digest
   return `${entries.length} entries, sha256 ${digest.slice(0, 12)}…`
 })

@@ -66,8 +66,8 @@ declare module '@deepseek-ai/cordis' {
  * messages other Sessions, or edits documents.
  */
 /** What a main Session keeps: its own tools, the shell it actually has, and the job controls it must not spend time waiting on. */
-const MASTER_TOOLS = ['skill', 'bash', 'pwsh', 'read', 'read_image', 'job_output', 'job_list', 'job_kill']
-const WORK_TOOLS = ['read', 'write', 'edit', 'read_image', 'glob', 'grep', 'bash', 'pwsh', 'job_output', 'job_list', 'job_kill', 'web_search',
+export const MASTER_TOOLS = ['skill', 'bash', 'pwsh', 'read', 'read_image', 'job_output', 'job_list', 'job_kill']
+export const WORK_TOOLS = ['read', 'write', 'edit', 'read_image', 'glob', 'grep', 'bash', 'pwsh', 'job_output', 'job_list', 'job_kill', 'web_search',
   'web_fetch', 'skill', 'todo_write', 'subagent', 'list_subagent_models', 'send_message', 'list_agents', 'interrupt_agent']
 /** What the main Session is told when it would wait: what it waits for comes to it, and a waiting step holds back the next. */
 const NO_WAIT = 'Reports, follow_up notices, new candidates and a background job\'s end with its output arrive by themselves as messages; '

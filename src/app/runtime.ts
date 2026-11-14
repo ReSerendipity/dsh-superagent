@@ -27,7 +27,7 @@ import { MasterAssessor } from './assessment.ts'
 import { KV } from '../kv.ts'
 import { Store } from './store.ts'
 import { evalsHealth } from './views/overview.ts'
-import { executorLoad } from './views/tickets.ts'
+import { executorLoad, queuedForSlot } from './views/tickets.ts'
 import { INSTANCE_STATUS_INTERVAL_MS, INSTANCE_STATUS_SCHEMA, touchInstanceStatus, writeInstanceStatus, type InstanceStatus } from './instance-status.ts'
 import { acquireStateLock } from './state-lock.ts'
 import { dataHomeProblem } from './instance-roots.ts'
@@ -43,6 +43,7 @@ import { HealthBoard } from '../infra/health.ts'
 import { Outbox } from './outbox.ts'
 import { Passes } from './passes.ts'
 import { Setup } from './setup.ts'
+import { until } from '../executor/background.ts'
 import { feishuSettings } from '../sources/feishu.ts'
 import { health, type Health, type SourceContext, type SourceHost } from '../sources/host.ts'
 import { Sessions } from './sessions.ts'
@@ -78,6 +79,9 @@ function changedBlocks(from: SettingsValue, to: SettingsValue): SettingsSave[] {
   }
   return blocks
 }
+
+/** How long a shutdown waits for effect handlers before continuing without them. */
+const DRAIN_STOP_MS = 30_000
 
 /**
  * Composition root of dsh-superagent that connects `Store`, `Setup`, `Engine`, `SourceRegistry`, `Effects`, `Outbox`, `Passes`, `Sessions`, `Settings`, `Prompts`, `DshExecutor`, and `MasterAssessor`.
@@ -264,8 +268,10 @@ export class Runtime extends Service implements SourceHost {
       this.statusTimer = setInterval(() => { this.publishStatus('running') }, INSTANCE_STATUS_INTERVAL_MS)
       this.statusTimer.unref?.()
       // Mode A reply files are the bridge back to the main chat that dispatched a task: only a bounded brief is sent.
+      // `queue`, not `steer`: a chat that dispatched and then finished its turn is idle, and steer only reaches a
+      // running turn - the brief was silently dropped for exactly the normal "dispatch, wait, hear back" sequence.
       const briefs = new ChatReplyWatcher(chatInboxRoot, async (sessionId, text) => {
-        try { await sessions.prompt(sessionId, `chat-brief:${key(text)}`, text, 'steer') }
+        try { await sessions.prompt(sessionId, `chat-brief:${key(text)}`, text, 'queue') }
         catch { /* The main chat may have been closed; the reply itself stays archived under done/. */ }
       })
       const briefTimer = setInterval(() => {
@@ -341,7 +347,10 @@ export class Runtime extends Service implements SourceHost {
    * transcript stays in its Session; the chat gets the outcome and the report summary, so it never has to poll.
    */
   private reportToChat(ticketId: string, outcome: string, ticket: Ticket | undefined, sessions: Sessions): void {
-    const chatSession = this.chatTickets.get(ticketId)
+    // The in-memory map covers the common case; a restart between dispatch and end falls back to the persisted
+    // Trigger, whose meta carries the dispatching chat's session id.
+    const chatSession = (this.chatTickets.get(ticketId)
+      ?? (ticket !== undefined ? this.store.triggers.get(ticket.origin.triggerId)?.meta.chatSession : undefined)) as string | undefined
     if (!chatSession) return
     this.chatTickets.delete(ticketId)
     const summary = ticket?.assignments.at(-1)?.report?.summary?.trim()
@@ -356,7 +365,7 @@ export class Runtime extends Service implements SourceHost {
   checkSetup(): void { this.setup.check() }
   receive(trigger: Trigger): ReceiveResult { return this.passes.receive(trigger) }
   idle(): Promise<void> { return this.passes.idle() }
-  pump(): Promise<void> { return this.passes.pump() }
+  pump(): Promise<boolean> { return this.passes.pump() }
   sendReplies(): Promise<void> { return this.outbox.sent() }
   private closing(): boolean { return this.closingFlag }
   /** Hold evaluation, dispatch, and outbound delivery while paused or awaiting setup; sources still record incoming triggers. */
@@ -439,8 +448,12 @@ export class Runtime extends Service implements SourceHost {
   private async ensureRouterSession(id: string): Promise<void> {
     if (id === this.masterId || this.routerSessions.has(id)) return
     const index = this.routerIdsValue.indexOf(id)
-    await this.sessions.ensure(id, this.machine.stateDir, `dsh-superagent orchestrator shard ${index}`, 'orchestrator')
+    // Reserve before the await: two assessments hashing to one uncreated shard would otherwise each call
+    // sessions.ensure for it, and the loser fails its candidate card on a session-already-exists error.
     this.routerSessions.add(id)
+    try {
+      await this.sessions.ensure(id, this.machine.stateDir, `dsh-superagent orchestrator shard ${index}`, 'orchestrator')
+    } catch (error) { this.routerSessions.delete(id); throw error }
     this.reportRouterHealth()
   }
   /** The Router Session that owns a Thread: the master while sharding is off, else the shard the Thread hashes to. */
@@ -508,7 +521,9 @@ export class Runtime extends Service implements SourceHost {
     return {
       tickets,
       running: tickets.reduce((sum, ticket) => sum + ticket.states.filter(state => state === 'running').length, 0),
-      queued: this.store.tickets.open().length,
+      // The digest's queued is the executorLoad definition - waiting for a slot, not merely open - so a ticket
+      // waiting for a person does not read as queue pressure the Watchdog model would intervene on.
+      queued: open.filter(queuedForSlot).length,
       maxWorkers: this.store.settings().executor.maxWorkers,
       problems: watchdogProblems(this.board.all),
       apiBase: `http://127.0.0.1:${process.env.DSH_SUPERAGENT_WATCHDOG_API_PORT ?? 3082}/orchestrator/api`,
@@ -572,10 +587,16 @@ export class Runtime extends Service implements SourceHost {
     this.closingFlag = true; const passes = this.passes.stop(); this.stopped.abort()
     try {
       this.assessor.stop()
-      const ids = [this.masterId, ...this.store.tickets.list().map(ticket => workerSessionId(ticket.id))]
+      // The workers' turns stop with the tickets'; the Router shards and the Watchdog Session end their turns too,
+      // so a fiber restart does not leave an old shard finishing a turn beside the new instance.
+      const ids = [...new Set([...this.routerIdsValue, ...(this.watchdogId ? [this.watchdogId] : []),
+        ...this.store.tickets.list().map(ticket => workerSessionId(ticket.id))])]
       const agents = ids.map(id => this.ctx.agents.get(id as SessionId)).filter((agent): agent is Agent => agent !== undefined)
       for (const agent of agents) agent.cancel({ kind: 'user' }, { keepInbox: true })
-      await Promise.allSettled([passes, this.effects.drain(), ...agents.map(agent => agent.whenIdle())])
+      // A handler that ignores the abort signal must not hold the state directory lock hostage: give the drain a
+      // deadline, then keep shutting down and say what was left behind.
+      const drained = await until(Promise.allSettled([passes, this.effects.drain(), ...agents.map(agent => agent.whenIdle())]), undefined, DRAIN_STOP_MS)
+      if (drained === false) this.ctx.logger.warn('dsh-superagent shutdown: a handler ignored its stop signal for %d s; continuing without it', DRAIN_STOP_MS / 1000)
       // The workers' jobs and subagents stop too: their ends would start worker turns without the tool limits released below.
       this.watchdog?.stop()
       await this.executor.shutdown()

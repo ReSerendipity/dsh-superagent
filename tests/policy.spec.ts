@@ -271,6 +271,16 @@ it('renames the variables a stored prepare command reads from earlier project na
   expect(settings.executor.prepare).toBe('git worktree add "$DSH_SUPERAGENT_DIR" -b "agent/${DSH_SUPERAGENT_NAME}" "refs/x/$DSH_SUPERAGENT_TICKET"')
 })
 
+it('accepts drive-qualified absolute paths for the executor directory on every platform, and still rejects relative ones', () => {
+  // Windows paths must parse on POSIX runners too: the schema has no platform branch, so one rule serves both.
+  for (const directory of ['D:/tickets', 'D:\\tickets', 'C:/work', '/srv/work']) {
+    expect(SettingsSchema.parse({ executor: { directory } }).executor.directory, directory).toBe(directory)
+  }
+  expect(SettingsSchema.parse({ executor: { directory: '' } }).executor.directory).toBe('')
+  expect(() => SettingsSchema.parse({ executor: { directory: 'tickets' } })).toThrow()
+  expect(() => SettingsSchema.parse({ executor: { directory: './tickets' } })).toThrow()
+})
+
 it('reads a stored GitHub Source configuration that names a merge account without it', () => {
   const settings = SettingsSchema.parse(migrateSettings({ sources: { github: { enabled: true, config: { repository: 'acme/widgets', cli: 'gh-agent', mergeCli: 'gh-merge-account', pollSeconds: 120 } } } }))
   expect(settings.sources.github!.config).toEqual({ repository: 'acme/widgets', cli: 'gh-agent', pollSeconds: 120 })
@@ -485,4 +495,14 @@ describe('bots and events without a sender', () => {
       ['comments', { listedUnaddressed: false, unlistedAddressed: true, unlistedUnaddressed: false }],
       ['ci', { listedUnaddressed: false, unlistedAddressed: false, unlistedUnaddressed: false }]])
   })
+})
+
+it('keeps an illegal bots value loud instead of silently emptying the bot list', () => {
+  // The schema declares bots so editors complete it; an illegal VALUE still refuses on save (the Source
+  // kind's strict schema judges the ids), rather than being caught into an empty list and persisted.
+  expect(() => SettingsSchema.parse({ policy: { sources: { github: { allowed: [], admission: {}, bots: 'all' } } } })).toThrow()
+  expect(() => SettingsSchema.parse({ policy: { sources: { github: { allowed: [], admission: {}, bots: [{ id: '' }] } } } })).toThrow()
+  const legal = SettingsSchema.parse({ policy: { sources: { github: { allowed: [], admission: {}, bots: [{ id: 'dependabot[bot]' }] } } } })
+  expect(legal.policy.sources.github!.bots).toEqual([{ id: 'dependabot[bot]' }])
+  expect(SettingsSchema.parse({ policy: { sources: { github: { allowed: [] } } } }).policy.sources.github!.bots).toBeUndefined()
 })

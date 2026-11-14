@@ -72,6 +72,12 @@ export function mergeDeclarative(current: Settings, declared: unknown, lineAt?: 
   // nothing about them. `$prune` names what must disappear: a file that only adds and overrides cannot undo a
   // Source an earlier file declared, which would leave a stale instance in the stored settings forever.
   const raw = (declared ?? {}) as Record<string, unknown>
+  // Unknown directives are refused loudly, like every other key this loader reads: a typo such as `$prunes`
+  // would otherwise vanish and silently undo nothing, which the "typo must fail loudly" contract forbids.
+  // `$schema` is tolerated: docs/009 §10 tells editors to name their schema in the file's first line.
+  const known = ['$prune', '$schema']
+  const unknown = Object.keys(raw).filter(name => name.startsWith('$') && !known.includes(name))
+  if (unknown.length) throw new Error(`Unknown directive${unknown.length > 1 ? 's' : ''} in the declarative settings file: ${unknown.join(', ')}`)
   const prune = (raw.$prune ?? {}) as { sources?: string[] }
   const declaredBlocks = Object.fromEntries(Object.entries(raw).filter(([name]) => !name.startsWith('$')))
   const parsed = SettingsSchema.partial().safeParse(declaredBlocks)
@@ -79,7 +85,12 @@ export function mergeDeclarative(current: Settings, declared: unknown, lineAt?: 
   const data = parsed.data as Record<string, unknown>
   const merged = { ...current, ...data } as Settings
   const sources = { ...current.sources } as Record<string, unknown>
+  // A prune naming no stored Source is a no-op, which the JSON Schema's description calls a failure; warn so
+  // the discrepancy is visible without refusing a file whose prune is merely idempotent. Computed before the
+  // deletes: afterwards every pruned id is absent by construction and the warning would fire on every hit.
+  const missing = (prune.sources ?? []).filter(id => current.sources[id] === undefined)
   for (const id of prune.sources ?? []) delete sources[id]
+  if (missing.length) console.warn(`dsh-superagent: $prune names no stored Source: ${missing.join(', ')}`)
   merged.sources = { ...sources, ...(data.sources as object ?? {}) } as Settings['sources']
   if (data.policy) merged.policy = { ...current.policy, ...(data.policy as object) } as Settings['policy']
   // Parse again so cross-block invariants (a Source kind whose config a Policy part names) are checked once merged.

@@ -5,7 +5,7 @@ import { Icon, Tag } from './controls.tsx'
 import { decisionMark, threadMark, ticketMark } from './marks.ts'
 import { usePanel } from './provider.tsx'
 import { actorName, localized, readableMarkers, reasonLabel, valueLabel } from './text.ts'
-import { ActionLink, ConfirmButton, LabelValue, SessionButton, StageMark, When } from './widgets.tsx'
+import { ActionLink, ConfirmButton, LabelValue, SessionButton, StageMark, When, safeHref } from './widgets.tsx'
 
 export function TicketLine({ ticket, question, onChanged, context }: {
   ticket: TicketRow; question?: boolean; onChanged?: () => Promise<void>; context?: boolean
@@ -110,7 +110,7 @@ function ThreadChip({ thread }: { thread: Pick<ThreadFacts, 'source' | 'facts' |
       {fact.label && <span className="dt-chip-label">{localized(t, fact.label)}</span>}{localized(t, fact.value)}
     </span>)}
   </>
-  return thread.url ? <a className="dt-chip dt-chip-link" href={thread.url} target="_blank" rel="noopener noreferrer" title={thread.title}>
+  return thread.url ? <a className="dt-chip dt-chip-link" href={safeHref(thread.url)} target="_blank" rel="noopener noreferrer" title={thread.title}>
     {cells}<span className="dt-chip-open"><Icon name="external" size={11} /></span>
   </a> : <span className="dt-chip">{cells}</span>
 }

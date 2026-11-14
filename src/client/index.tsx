@@ -83,7 +83,11 @@ export function apply(ctx: ClientContext): void {
   const call = caller(() => messages(t))
   const openSession = async (id: string): Promise<void> => {
     try { await openKnownSession(ctx.sessions, id as SessionId, target => { ctx.uiWorkspace.openSession(target) }, new AbortController().signal) }
-    catch (error) { console.warn('dsh-superagent: cannot open Session', error) }
+    catch (error) {
+      // The pane's callers surface this in place; the warn keeps a breadcrumb for sessionless mounts.
+      console.warn('dsh-superagent: cannot open Session', error)
+      throw error
+    }
   }
   // The right-pane tab: register the tab TYPE first (what the sidebar lists), then the body under the same key.
   // Without the type the sidebar has nothing to list, and with `id` instead of `key` the body is never found.

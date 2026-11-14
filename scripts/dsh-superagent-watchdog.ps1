@@ -104,7 +104,14 @@ switch ($code) {
         }
     }
     { $_ -eq 2 -or $_ -eq 3 } {
-        $sig = ($json -replace '\d{4}-\d\d-\d\dT[\d:.]+Z', 'T' -replace '\s+', ' ' -replace '\\\\', '\')
+        # The signature must survive a service restart: timestamps collapse, doubled backslashes (JSON escaping
+        # of Windows paths) collapse to one, and the volatile pids/cwd fields are dropped before hashing. When
+        # the status output was not pure JSON (a warning or traceback mixed in), hash the raw text instead, or
+        # every such failure would share one constant signature and swallow each other's alerts.
+        $parsed = $null
+        try { $parsed = $json | ConvertFrom-Json } catch { }
+        if ($parsed) { $sig = (($parsed | Select-Object * -ExcludeProperty pids, cwd) | ConvertTo-Json -Compress -Depth 10) } else { $sig = $json }
+        $sig = ($sig -replace '\d{4}-\d\d-\d\dT[\d:.]+Z', 'T' -replace '\s+', ' ' -replace '\\\\', '\')
         $hash = [BitConverter]::ToString((New-Object Security.Cryptography.SHA256Managed).ComputeHash(
             [Text.Encoding]::UTF8.GetBytes($sig))).Replace('-', '').Substring(0, 16).ToLower()
         $kind = if ($code -eq 2) { 'part-error' } else { 'setup-pending' }

@@ -2,7 +2,7 @@
 import type { Context } from '@deepseek-ai/cordis'
 import { UserError } from '../core/index.ts'
 import { SETUP_FIELDS, localDeployment, resolveDeployment, resolveFeishuBot, workerProbe, type Deployment, type Machine } from '../deployment.ts'
-import { agentVariables, applyEnvironment, verifyEnvironment, withoutDirectory, workerBin, writeEnvironment } from '../infra/environment.ts'
+import { agentVariables, applyEnvironment, runAsWorker, verifyEnvironment, withoutDirectory, workerBin, writeEnvironment } from '../infra/environment.ts'
 import { instancesOf, type Settings, type SettingsBlock } from '../policy.ts'
 import { SetupError, type SetupProblem } from '../setup.ts'
 
@@ -103,6 +103,14 @@ export class Setup {
       this.resolvedId = undefined
       const local = localDeployment(machine)
       context.logger.info('dsh-superagent has no GitHub Source: tickets arrive on the inbox and deliver as local commits')
+      // There is no gh probe in local mode, so check git itself - which delivers local commits - now, instead
+      // of failing a ticket with an ENOENT after it was accepted. `git init -b` needs 2.28.
+      const version = await runAsWorker(context.subprocess, ['git', '--version'], machine.stateDir,
+        AbortSignal.any([this.host.lifetime, AbortSignal.timeout(60_000)])).catch(() => '')
+      const atLeast = /^git version (\d+)\.(\d+)/.exec(version.trim())
+      if (!atLeast || Number(atLeast[1]) * 100 + Number(atLeast[2]) < 228) {
+        throw new SetupError('gitUnavailable', { output: version.trim() || 'git --version produced nothing' })
+      }
       return this.applyEnvironmentFor(local, settings)
     }
     // Several GitHub Sources are describable now (an instance names its kind), but one deployment is still resolved
@@ -142,6 +150,9 @@ export class Setup {
       throw new SetupError('environmentFailed', { output: error instanceof Error ? error.message : String(error) })
     }
     await writeEnvironment(resolved, settings.executor.blockedCommands).catch(machineProblem)
+    // A re-run must not stack its PATH insert on the previous run's, whose restore callback this would
+    // otherwise overwrite: restore first, so the new snapshot records the operator's own environment.
+    this.restore()
     this.restoreEnvironment = applyEnvironment(this.variables, machine.stateDir, this.path)
     await verifyEnvironment(resolved, context.subprocess, lifetime).catch((error: unknown) => {
       this.restore()

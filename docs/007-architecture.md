@@ -486,6 +486,9 @@ Some generic modules still refer directly to GitHub or Feishu:
 | `tests/model-surface.spec.ts` | Everything models read: tools, prompts, skills and inputs, checked against the tool schemas, the execution environment and the glossary, within a size budget per role |
 | `tests/deployment.spec.ts`, `tests/environment.spec.ts`, `tests/index.spec.ts` | The plugin configuration and setup, the agent's process environment, the plugin entry |
 | `tests/windows-port.spec.ts` | The Windows port of the agent environment: batch shims and the marker they carry, the commands they block, and the agent account's `GH_CONFIG_DIR` |
+| `tests/github-channel.spec.ts` | The GitHub outbound channel: delivered receipts short-circuit the marker sweep, the idempotent POST carries its marker, and a deleted target reads as gone |
+| `tests/red-line.spec.ts` | The product red line as regressions: the main Session's allow list carries no write/web/subagent tool, the router preset is file-locked at the DSH layer and free of web/todo/subagent rows, and the worker preset keeps the full work surface |
+| `tests/guard-installer.spec.ts` | The logon starter `scripts/install-guard-startup.cmd` emits: VBScript quote pairing survives parsing, and the emitting lines stay out of parenthesized blocks |
 | `tests/service-script.spec.ts` | `scripts/dsh-superagent` against fake `ps`, `tmux` and `dsh` |
 | `tests/client.spec.tsx`, `tests/navigation.spec.ts`, `tests/controls.spec.tsx` | The client plugin's registration and polling, Session navigation and route memory, the local controls, and the panel's imports, which have no cycle |
 | `tests/panel-overview.spec.tsx`, `panel-source.spec.tsx`, `panel-trigger.spec.tsx`, `panel-eval.spec.tsx`, `panel-execution.spec.tsx` | Each page of the panel, against a fake management API answered by route |

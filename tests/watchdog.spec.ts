@@ -1,6 +1,6 @@
 // The Watchdog digest: what the external control loop is told, and what it is asked to judge (article §6).
-import { expect, it } from 'vitest'
-import { assignmentStates, quietMinutes, stalledIds, watchdogChanged, watchdogDigest, watchdogDue, watchdogProblems } from '../src/app/watchdog.ts'
+import { expect, it, vi } from 'vitest'
+import { WatchdogLoop, assignmentStates, quietMinutes, stalledIds, watchdogChanged, watchdogDigest, watchdogDue, watchdogProblems } from '../src/app/watchdog.ts'
 
 const snapshot = {
   tickets: [{ id: 't1', title: 'Add a Getting started section', states: ['running'], quietMinutes: 42, stalled: false }],
@@ -72,4 +72,30 @@ it('stays silent when nothing changed and speaks for an unhealthy part or a stan
   // The same instruction every tick is not news: an idle system must cost no model turn.
   expect(watchdogDue({ ...quiet, guidance: 'prefer small PRs' }, { ...quiet, guidance: 'prefer small PRs' }, 45)).toBe(false)
   expect(watchdogDigest({ ...snapshot, guidance: 'prefer small PRs' }, 30)).toContain('Standing instruction from the operator')
+})
+
+it('re-arms its timer when the cadence changes, and starts a loop that began while the cadence was off', async () => {
+  vi.useFakeTimers()
+  try {
+    let every = 0
+    const delivered: number[] = []
+    const loop = new WatchdogLoop({ everyMinutes: () => every, digest: () => 'digest', deliver: async () => { delivered.push(delivered.length) }, log: () => {} })
+    // A start while the cadence is off arms nothing; turning it on later still starts the loop.
+    loop.start()
+    await vi.advanceTimersByTimeAsync(120 * 60_000)
+    expect(delivered).toEqual([])
+    every = 15
+    loop.start()
+    await vi.advanceTimersByTimeAsync(15 * 60_000)
+    expect(delivered).toEqual([0])
+    // A cadence change takes effect from the next tick without a restart.
+    every = 45
+    await loop.tick()
+    expect(delivered).toEqual([0, 1])
+    await vi.advanceTimersByTimeAsync(15 * 60_000)
+    expect(delivered).toEqual([0, 1])
+    await vi.advanceTimersByTimeAsync(30 * 60_000)
+    expect(delivered).toEqual([0, 1, 2])
+    loop.stop()
+  } finally { vi.useRealTimers() }
 })

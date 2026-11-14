@@ -123,6 +123,25 @@ describe('setup', () => {
     program(join(dir, 'bin', 'lark-cli'), 'echo "not configured" >&2; exit 1')
     await refuses('feishuCliFailed', { output: expect.stringContaining('not configured') })
   })
+  it('resolves a bare command name through PATHEXT on Windows, and keeps the POSIX rule elsewhere', () => {
+    const bin = mkdtempSync(join(tmpdir(), 'dsh-executable-'))
+    try {
+      // A plain file is enough: executable() only resolves the path, and Windows grants X_OK to every file.
+      writeFileSync(join(bin, 'gh.exe'), '')
+      if (WINDOWS) {
+        expect(executable('gh', bin)).toBe(join(bin, 'gh.exe'))
+        writeFileSync(join(bin, 'gh.cmd'), '')
+        expect(executable('gh', bin)).toBe(join(bin, 'gh.exe'))
+        expect(executable(join(bin, 'gh.cmd'), bin)).toBe(join(bin, 'gh.cmd'))
+        expect(() => executable('nothing-here', bin)).toThrow('nothing-here is not an executable file on PATH')
+        expect(() => executable('bin\\gh', bin)).toThrow('must be a command name or an absolute path')
+      } else {
+        expect(() => executable('gh', bin)).toThrow('gh is not an executable file on PATH')
+        program(join(bin, 'gh'), '')
+        expect(executable('gh', bin)).toBe(join(bin, 'gh'))
+      }
+    } finally { rmSync(bin, { recursive: true, force: true }) }
+  })
 })
 
 describe('local mode', () => {

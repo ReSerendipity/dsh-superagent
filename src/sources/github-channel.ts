@@ -4,7 +4,7 @@ import type { OutboundMessage } from '../core/index.ts'
 import { CliError } from '../infra/commands.ts'
 import { sameName } from '../infra/text.ts'
 import type { SourceContext } from './host.ts'
-import type { ChannelLink, ChannelLinks } from './kind.ts'
+import type { ChannelLink, ChannelLinks, DeliveredMessage } from './kind.ts'
 import { githubAddress, githubPage } from './github-trigger.ts'
 
 const CommentSchema = z.looseObject({
@@ -15,11 +15,15 @@ const gone = (error: unknown): boolean => error instanceof CliError
   && (error.code === 410 || (error.code === 403 && /locked/i.test(error.message)))
 const missing = (error: unknown): boolean => error instanceof CliError && (error.code === 404 || error.code === 410)
 /** Posts a comment or review-thread reply with an embedded HTML marker so retries do not create duplicate comments. */
-export async function sendGithub(host: Pick<SourceContext, 'commands'>, message: OutboundMessage): Promise<'sent' | 'gone'> {
+export async function sendGithub(host: Pick<SourceContext, 'commands'>, message: OutboundMessage, delivered?: readonly DeliveredMessage[]): Promise<'sent' | 'gone'> {
   const { commands } = host
   const { repository, github } = commands.deployment
   const number = Number(message.channel.address.number)
   if (!number) throw new Error('Missing GitHub reply target')
+  // The outbox's receipts already prove this message was delivered; the marker scan below is only the recovery
+  // path for a POST whose response was lost. Short-circuiting keeps a hot thread at one POST per message
+  // instead of a full pagination sweep per delivery.
+  if (delivered?.some(item => item.id === message.id)) return 'sent'
   try {
     // Retained trigger URLs also route replies queued before thread-aware delivery.
     const address = githubAddress(message.channel.address.url ?? '', repository)
@@ -34,7 +38,7 @@ export async function sendGithub(host: Pick<SourceContext, 'commands'>, message:
     const marker = `<!-- dsh-superagent:${message.id} -->`
     const mine = (comment: z.infer<typeof CommentSchema>) => sameName(comment.user?.login ?? '', github.login)
       && (rootId === undefined || comment.in_reply_to_id === rootId) && (comment.body ?? '').includes(marker)
-    if ((await commands.pages(CommentSchema, path)).some(mine)) return 'sent'
+    if ((await commands.pages(CommentSchema, `${path}?per_page=100`)).some(mine)) return 'sent'
     const target = rootId === undefined ? path : `${path}/${rootId}/replies`
     await commands.api(z.unknown(), target, '--method', 'POST', '-f', `body=${message.text}\n\n${marker}`)
     return 'sent'

@@ -93,6 +93,10 @@ declare const SettingsSchema: ZodObject<{
         name: ZodOptional<ZodString>;
       }, $strict>>>;
       admission: ZodDefault<ZodRecord<ZodString, ZodType<AdmissionRow, unknown, $ZodTypeInternals<AdmissionRow, unknown>>>>;
+      bots: ZodOptional<ZodArray<ZodObject<{
+        id: ZodString;
+        name: ZodOptional<ZodString>;
+      }, $strict>>>;
     }, $catchall<ZodUnknown>>>>;
   }, $strict>>;
   eval: ZodDefault<ZodObject<{
@@ -206,6 +210,10 @@ declare class SourceRegistry implements SourceScope {
           name?: string | undefined;
         }[];
         admission: Record<string, AdmissionRow>;
+        bots?: {
+          id: string;
+          name?: string | undefined;
+        }[] | undefined;
       }>;
     };
     eval: {
@@ -273,6 +281,10 @@ declare class SourceRegistry implements SourceScope {
           name?: string | undefined;
         }[];
         admission: Record<string, AdmissionRow>;
+        bots?: {
+          id: string;
+          name?: string | undefined;
+        }[] | undefined;
       }>;
     };
     eval: {
@@ -352,6 +364,10 @@ declare class SourceRegistry implements SourceScope {
           name?: string | undefined;
         }[];
         admission: Record<string, AdmissionRow>;
+        bots?: {
+          id: string;
+          name?: string | undefined;
+        }[] | undefined;
       }>;
     };
     eval: {
@@ -426,6 +442,10 @@ declare class SourceRegistry implements SourceScope {
           name?: string | undefined;
         }[];
         admission: Record<string, AdmissionRow>;
+        bots?: {
+          id: string;
+          name?: string | undefined;
+        }[] | undefined;
       }>;
     };
     eval: {
@@ -496,6 +516,10 @@ declare class SourceRegistry implements SourceScope {
           name?: string | undefined;
         }[];
         admission: Record<string, AdmissionRow>;
+        bots?: {
+          id: string;
+          name?: string | undefined;
+        }[] | undefined;
       }>;
     };
     eval: {
@@ -579,6 +603,10 @@ declare class SourceRegistry implements SourceScope {
           name?: string | undefined;
         }[];
         admission: Record<string, AdmissionRow>;
+        bots?: {
+          id: string;
+          name?: string | undefined;
+        }[] | undefined;
       }>;
     };
     eval: {
@@ -647,6 +675,10 @@ declare class SourceRegistry implements SourceScope {
           name?: string | undefined;
         }[];
         admission: Record<string, AdmissionRow>;
+        bots?: {
+          id: string;
+          name?: string | undefined;
+        }[] | undefined;
       }>;
     };
     eval: {
@@ -691,6 +723,15 @@ declare class SourceRegistry implements SourceScope {
       };
     };
   }): ScopeResult;
+  /**
+   * The stored entry a Trigger of this kind reads its scope and context from: the entry named after the kind, or -
+   * while one instance per kind is the supported shape (docs/010) - the kind's only other stored instance, whose id
+   * may name a repository. Without this, a single instance stored under a custom id would be gated by schema
+   * defaults instead of its own configuration.
+   */
+  private entryFor;
+  /** The kind's single enabled instance stored under a custom id, when there is exactly one (docs/010 keeps multi-instance refused). */
+  private onlyInstance;
   /** Falls back to schema defaults and disables the instance when stored configuration fails validation. */
   private resolve;
 }
@@ -703,6 +744,7 @@ declare const SETUP_PROBLEMS: {
   readonly multipleSourcesUnsupported: readonly ["deployment", "This process serves one context boundary, but these GitHub Sources were configured: {sources}. Run one instance per repository (or per team sharing memory and credentials) instead of adding repositories here; see docs/011."];
   readonly multiAccountUnsupported: readonly ["deployment", "These GitHub Sources use different agent accounts: {accounts}. One process serves several repositories only when they share one account, until per-instance accounts land (docs/010-multi-source.md)."];
   readonly environmentFailed: readonly ["deployment", "Preparing the agent environment failed."];
+  readonly gitUnavailable: readonly ["deployment", "git is unavailable; the local mode needs git 2.28 or later to commit tickets."];
   readonly repositoryUnset: readonly ["github", "The GitHub Source names no repository."];
   readonly agentCliUnset: readonly ["github", "The agent GitHub CLI is not set."];
   readonly agentCliMissing: readonly ["github", "The agent GitHub CLI was not found."];

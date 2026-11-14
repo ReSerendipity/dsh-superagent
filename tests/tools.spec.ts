@@ -2,7 +2,8 @@
 import { afterEach, beforeEach, expect, it, vi } from 'vitest'
 import { TICKET_STATES } from '../src/app/cards.ts'
 import { builtInBase, builtInParts, defaultPrompts } from '../src/app/prompts.ts'
-import { UserError } from '../src/core/index.ts'
+import { UserError, type Ticket } from '../src/core/index.ts'
+import type { Sessions } from '../src/app/sessions.ts'
 import { KV } from '../src/kv.ts'
 import { RESOURCES } from '../src/app/resources.ts'
 import { CliError, Commands } from '../src/infra/commands.ts'
@@ -72,23 +73,28 @@ it('lists in prompts the built-in parts whose text changed since the team overro
   expect(defaults.parts).toEqual(Object.fromEntries(Object.entries(builtInParts()).map(([key, part]) => [key, part.text])))
 })
 
-it('saves with the prompt save tool an override without its base, refuses a part no version has, and drops a removed one read back', async () => {
+it('refuses a prompt override from the tool - the main Session reads external content - and saves one from the panel', async () => {
   const save = (overrides: Record<string, unknown>) => h.runTool(h.runtime.masterId, 'orchestrator_prompts_save',
     { config: { ...defaultPrompts(), overrides }, baseRevision: h.runtime.prompts.current().revision })
   await expect(save({ constructor: { text: 'x' } })).rejects.toThrow(new UserError('unknownPromptPart', { part: 'constructor' }))
-  await save({ 'runtime/dispatch': { text: '## dispatch\nOurs.' } })
+  await expect(save({ 'runtime/dispatch': { text: '## dispatch\nOurs.' } })).rejects.toThrow('only be changed in the management panel')
+  expect(h.runtime.prompts.current().config.overrides).toBeUndefined()
+  // The panel (and a team section edit through the tool) keep working: overrides save panel-side, then a tool
+  // save of the configuration as read changes nothing override-wise and still applies.
   const dispatch = { text: '## dispatch\nOurs.', base: builtInBase(builtInParts()['runtime/dispatch'].text) }
+  const { revision } = h.runtime.prompts.current()
+  h.runtime.prompts.save({ ...defaultPrompts(), overrides: { 'runtime/dispatch': dispatch } }, revision, 'panel')
   expect(h.runtime.prompts.current().config.overrides).toEqual({ 'runtime/dispatch': dispatch })
   // The saved version overrides a part this version no longer has: saving back the configuration as read drops it.
-  const { revision } = h.runtime.prompts.current(), read = { ...defaultPrompts(), overrides: { 'runtime/dispatch': dispatch,
+  const { revision: next } = h.runtime.prompts.current(), read = { ...defaultPrompts(), overrides: { 'runtime/dispatch': dispatch,
     'runtime/retired': { text: 'Old.', base: 'b' } } }
-  h.runtime.store.set(KV.prompts.version(revision + 1), { revision: revision + 1, previousRevision: revision, savedAt: '', source: 'panel', config: read })
-  h.runtime.store.set(KV.prompts.revision, revision + 1)
-  await h.runTool(h.runtime.masterId, 'orchestrator_prompts_save', { config: read, baseRevision: revision + 1 })
+  h.runtime.store.set(KV.prompts.version(next + 1), { revision: next + 1, previousRevision: next, savedAt: '', source: 'panel', config: read })
+  h.runtime.store.set(KV.prompts.revision, next + 1)
+  h.runtime.prompts.save(read, next + 1, 'panel')
   expect(h.runtime.prompts.current().config.overrides).toEqual({ 'runtime/dispatch': dispatch })
-  // The tool describes the overrides once, in its schema.
+  // The tool's description names the panel-only boundary (the schema names the field exactly once).
   const tool = h.tools.get(h.runtime.masterId)!.get('orchestrator_prompts_save') as unknown as { description: string }
-  expect(tool.description).not.toContain('overrides')
+  expect(tool.description.toLowerCase()).toContain('overrides of built-in parts are panel-only')
 })
 
 it('keeps the main Session\'s resources from an Executor Session, which lists only its own', async () => {
@@ -494,4 +500,15 @@ it('gives a worker the other messages of the request its ticket was accepted fro
   const page = await h.runTool(`worker-${ticket.id}`, 'orchestrator_read', { resource: `ticket/${ticket.id}` })
   expect(page).toMatchObject({ batch: [{ trigger_id: other, read: `trigger/${other}` }] })
   expect(await h.runTool(`worker-${ticket.id}`, 'orchestrator_read', { resource: `trigger/${other}` })).toMatchObject({ trigger_id: other })
+})
+
+it('briefs the dispatching chat of an ended task even when a restart lost the in-memory mapping', async () => {
+  const { ticket } = await h.acceptedTicket({ ...feishu('9', '@bot dispatch this'), meta: { chatSession: 'chat-x', dispatchedBy: 'chat-router' } })
+  // A restart between dispatch and end empties the map; the persisted Trigger meta names the chat again.
+  const internals = h.runtime as unknown as { chatTickets: Map<string, string>;
+    reportToChat(ticketId: string, outcome: string, ticket: Ticket | undefined, sessions: Sessions): void }
+  internals.chatTickets.clear()
+  const prompt = vi.spyOn(h.runtime.sessions, 'prompt').mockResolvedValue(undefined)
+  internals.reportToChat(ticket.id, 'completed', h.runtime.store.tickets.get(ticket.id), h.runtime.sessions)
+  expect(prompt).toHaveBeenCalledWith('chat-x', `chat-brief:${ticket.id}`, expect.stringContaining(`Task ${ticket.id}`), 'queue')
 })

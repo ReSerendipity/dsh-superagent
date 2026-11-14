@@ -5,12 +5,12 @@
  */
 import { lstat, mkdir, readdir, readFile, rename, unlink, writeFile } from 'node:fs/promises'
 import { realpathSync } from 'node:fs'
-import { join, resolve } from 'node:path'
+import { basename, join, resolve } from 'node:path'
 import type { SubprocessOutputReader, SubprocessRuntime } from '@deepseek-ai/dsh-subprocess'
 import type { Deployment } from '../deployment.ts'
 import { SetupError } from '../setup.ts'
 import { CliError } from './commands.ts'
-import { isBatchWrapper, isWindows, pathDelimiter, shimBody, shimMode, shimName } from './platform.ts'
+import { isWindows, pathDelimiter, runtimeArgv, shimBody, shimMode, shimName } from './platform.ts'
 
 const MARKER = '# Written by dsh-superagent on every start; edits are lost.'
 /**
@@ -32,6 +32,9 @@ export const workerGitConfig = (stateDir: string): string => join(stateDir, 'wor
 export const agentGhConfig = (stateDir: string): string => join(stateDir, 'gh-config')
 const shellQuote = (value: string): string => `'${value.replaceAll("'", "'\\''")}'`
 const gitQuote = (value: string): string => `"${value.replace(/[\\"]/g, char => `\\${char}`)}"`
+/** Quotes a literal for a batch `echo` line, which cmd re-parses; the message must not depend on a schema's charset. */
+const batchQuote = (message: string): string => message.replaceAll('^', '^^').replaceAll('%', '%%')
+  .replaceAll('&', '^&').replaceAll('|', '^|').replaceAll('<', '^<').replaceAll('>', '^>')
 export const credentialHelper = (cli: string): string => `!${shellQuote(cli)} auth git-credential`
 
 export function sameDirectory(a: string, b: string): boolean {
@@ -96,16 +99,25 @@ export async function writeEnvironment(deployment: Pick<Deployment, 'stateDir' |
   const dir = workerBin(stateDir)
   await mkdir(dir, { recursive: true })
   await mkdir(agentGhConfig(stateDir), { recursive: true })
-  const before = await readdir(dir)
-  for (const name of before) { const file = join(dir, name); if (!await written(file)) throw new SetupError('foreignFile', { file }) }
+  const before: string[] = []
+  for (const name of await readdir(dir)) {
+    // A temp file a crashed write of ours left behind carries our own naming scheme: remove it instead of
+    // failing setup on a file only dsh-superagent could have written.
+    if (/^\..+\.\d+\.tmp$/.test(name)) { await unlink(join(dir, name)).catch(() => {}); continue }
+    before.push(name)
+    const file = join(dir, name)
+    if (!await written(file)) throw new SetupError('foreignFile', { file })
+  }
   // Workers may be running concurrently: write each shim to a temp file and atomically rename it so no command ever resolves past the shim directory.
   const kept = new Set<string>()
   const shim = async (name: string, body: string): Promise<void> => {
     const entry = shimName(name)
     const temporary = join(dir, `.${name}.${process.pid}.tmp`)
-    // A batch file is reachable through PATHEXT; an extensionless `#!/bin/sh` file is invisible to a Windows PATH lookup.
-    await writeFile(temporary, shimBody(MARKER, body), { mode: shimMode() })
-    await rename(temporary, join(dir, entry))
+    try {
+      // A batch file is reachable through PATHEXT; an extensionless `#!/bin/sh` file is invisible to a Windows PATH lookup.
+      await writeFile(temporary, shimBody(MARKER, body), { mode: shimMode() })
+      await rename(temporary, join(dir, entry))
+    } catch (error) { await unlink(temporary).catch(() => {}); throw error }
     kept.add(entry)
   }
   const withoutShims = [
@@ -129,7 +141,7 @@ export async function writeEnvironment(deployment: Pick<Deployment, 'stateDir' |
     ? `${withoutShimsWindows}\r\n"${program}" %*\r\nexit /b %ERRORLEVEL%`
     : `${withoutShims}\nexec ${shellQuote(program)} "$@"`
   const fail = (message: string): string => isWindows
-    ? `>&2 echo ${message}\r\nexit /b 1`
+    ? `>&2 echo ${batchQuote(message)}\r\nexit /b 1`
     : `echo ${shellQuote(message)} >&2\nexit 1`
   if (github.cli) await shim('gh', run(github.cli))
   await shim('lark-cli', feishu ? run(feishu.cli) : fail('lark-cli is unavailable: this installation has no Feishu bot.'))
@@ -168,18 +180,18 @@ export function applyEnvironment(variables: Record<string, string | undefined>, 
 
 /** Spawns a command through the DSH subprocess runtime, which strips credential-shaped environment variables. */
 export async function runAsWorker(subprocess: SubprocessRuntime, argv: string[], cwd: string, signal: AbortSignal, env?: Record<string, string>): Promise<string> {
-  // Node refuses to spawn `.cmd`/`.bat` directly (the CVE-2024-27980 hardening), so a batch wrapper CLI — the account model
-  // docs/006-deployment.md describes — is handed to cmd.exe, which is also the only place its quoting rules apply.
-  const batch = isBatchWrapper(argv[0] ?? '')
-  // Hand the program and its arguments as SEPARATE argv entries: Node then quotes each one for cmd, whereas joining
-  // them into one command line lets cmd re-parse the quotes and hand the program literal backslash-quotes.
-  const spawnArgv = batch ? ['cmd.exe', '/d', '/c', argv[0]!, ...argv.slice(1)] : argv
+  // `runtimeArgv` hands a batch wrapper CLI to cmd.exe (Node refuses to spawn `.cmd`/`.bat` directly - the
+  // CVE-2024-27980 hardening) with the program and its arguments as SEPARATE argv entries: Node then quotes
+  // each one for cmd, whereas joining them into one command line lets cmd re-parse the quotes and hand the
+  // program literal backslash-quotes. The setup probe and every runtime command share this shape.
+  const spawnArgv = runtimeArgv(argv[0] ?? '', argv.slice(1))
   const handle = subprocess.spawn({ argv: spawnArgv, cwd, graceMs: 2000, signal, ...env ? { env } : {}, stdio: { stdin: 'ignore', stdout: { maxBytes: 1 << 20 }, stderr: { maxBytes: 1 << 16 } } })
   const { exitCode } = await handle.done
   const read = (reader: SubprocessOutputReader | undefined): string => reader?.readFrom(0).text ?? ''
   if (exitCode === 0) return read(handle.collected.stdout)
   const ended = exitCode === null ? 'was stopped before it finished' : `exited with ${exitCode}`
-  throw new CliError(read(handle.collected.stderr).trim() || `${argv.join(' ')} ${ended}`, undefined, exitCode ?? undefined)
+  // Only the program and the ending: argv may carry message text or a URL with credentials, which `commandError` never echoes.
+  throw new CliError(read(handle.collected.stderr).trim() || `${basename(argv[0] ?? 'command')} ${ended}`, undefined, exitCode ?? undefined)
 }
 
 /** Verifies that worker git invocations resolve the deployment's GitHub credential helper. */
@@ -193,11 +205,13 @@ export async function verifyEnvironment(deployment: Pick<Deployment, 'github' | 
 }
 
 /**
- * Verifies that a ticket directory's local or worktree git config defines no custom `credential.*` or `http.*extraheader`
- * keys, which the agent's git would read from the repository's own config and act on.
+ * Verifies that a ticket directory's local or worktree git config defines no custom `credential.*`, `http.*` or
+ * `url.*.insteadOf` keys, which the agent's git would read from the repository's own config and act on: an
+ * `http.<url>.sslVerify = false` lets a man-in-the-middle take the credential helper's token, and an insteadOf
+ * rewrite can move github.com traffic to any host.
  */
 export async function verifyDirectory(directory: string, subprocess: SubprocessRuntime, signal: AbortSignal): Promise<void> {
-  const keys = ['git', 'config', '-z', '--show-scope', '--get-regexp', '^(credential\\..*|http\\..*extraheader)$']
+  const keys = ['git', 'config', '-z', '--show-scope', '--get-regexp', '^(credential\\..*|http\\..*|url\\..*insteadOf)$']
   // `git config --get-regexp` exits with code 1 when no keys match.
   const output = await runAsWorker(subprocess, keys, directory, AbortSignal.any([signal, AbortSignal.timeout(60_000)]))
     .catch((error: unknown) => { if (error instanceof CliError && error.exitCode === 1) return ''; throw error })

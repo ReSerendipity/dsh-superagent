@@ -56,6 +56,7 @@ echo "exit=$?"
 - 期望：退出码 `0`；`tmux has-session -t =dsh-$P` 成功；日志出现在 `.artifacts/dsh-superagent-$P-<YYYYMMDD-HHMMSS>-<pid>.log`。
 - 记录：`tmux list-panes -t =dsh-$P -F '#{pane_pid}'` 的 pid，应等于服务进程 pid（启动器用 `exec` 替换 shell，pane pid 就是 DSH 服务本身）。
 - 失败排查：`Both dsh and tmux must be on PATH.` → 依赖缺失；`already running` → 先 `stop`；端口被占 → 改 profile 的 `webserver.port` 或加 `--patch` overlay。
+- **已知警示（Windows 实机冒烟 2026-11-13 发现）**：一个只通过 `dsh plugin --profile <p> add …` 创建、从未被桌面应用打开过的 CLI profile，宿主组合停在 `4 entries did not activate`（`sessionController` / `workspaceRegistry` / `webServer` 不激活），web 端口不监听 → 健康门永不过 → `start` 按设计超时（退出码 1）且**进程保留**。这不是启动器的错；L2 要过，先用桌面应用打开一次该 profile（或确认 CLI 宿主激活核心服务的正确方式），再跑本清单。
 
 ### L3 · `status` 的四个退出码
 
@@ -207,6 +208,21 @@ curl -s -H 'x-orchestrator-request: 1' "http://127.0.0.1:<port>/orchestrator/api
 | M4 APFS 大小写 |  |  |  |  |
 
 ---
+
+## 5.5 Windows 启动器实机冒烟（已执行，2026-11-13）
+
+本仓开发机就是 Windows；POSIX 清单之外，Windows 分支按同参数形状（`dsh --profile <p> --no-open`）做了一轮真实 start→status→stop 冒烟（临时 profile `dsh-smoke-20261113a`，跑完已删除）。结果：
+
+| 链路 | 结果 |
+| --- | --- |
+| cmd 垫片 + 带空格路径的 Python（`C:\Program Files\PyManager\python.exe`） | ✓ 垫片引号启动修复实机验证通过 |
+| `start` 生成 detached 子进程并记录 `service.pid`（含创建时间戳） | ✓ `{"pid": 124900, "born": 134390012676690034}` |
+| pid 身份检查（死 pid → 无幽灵；活 pid → 上报） | ✓ profile 未创建时子进程秒退，`status` 报 `pids: []`；装插件后活进程报 `pids: [124900]` |
+| `stop` 经命名管道 → SIGINT → 优雅退出 | ✓ `stop` 退出码 0，`tasklist` 确认进程死亡，`manually_stopped: true` |
+| `start` 健康门 | ✗ 见上方 L2 警示：裸 CLI profile 的宿主组合不激活 `webServer`，健康门按设计超时（进程保留，退出码 1） |
+| 清理 | ✓ profile、state 目录、锁、控制目录与日志全部删除 |
+
+结论：服务管理器机制链（spawn / pid 身份 / status / 管道停止 / 优雅退出）在 Windows 实机全部成立；`start` 的健康门依赖宿主核心服务激活，把 L2 的警示在 POSIX 真机上同样验证一遍。
 
 ## 6. 关闭条件
 

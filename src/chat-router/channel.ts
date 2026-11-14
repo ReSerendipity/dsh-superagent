@@ -13,34 +13,42 @@ export type ChatReplySender = (sessionId: string, text: string) => Promise<void>
  */
 export class ChatReplyWatcher {
   private readonly seen = new Set<string>()
+  /** Guards re-entrancy: a tick that runs past the next interval would otherwise race itself on the same file. */
+  private running = false
   /** `root` is a function because the inbox Source may not be enabled when the plugin starts. */
   constructor(private readonly root: () => string, private readonly send: ChatReplySender, private readonly max = 400) {}
 
-  /** Returns how many new briefs were delivered. Safe to call on every poll tick. */
+  /** Returns how many new briefs were delivered. Safe to call on every poll tick; an overlapping tick is skipped. */
   async tick(): Promise<number> {
-    let done: string
-    try { done = join(this.root(), 'done') }
-    catch { return 0 }
-    if (!existsSync(done)) return 0
-    let sent = 0
-    const names = readdirSync(done).filter(name => name.endsWith('.reply.md')).sort()
-    for (const name of names) {
-      if (this.seen.has(name)) continue
-      let reply: string
-      try { reply = readFileSync(join(done, name), 'utf8') }
-      catch { continue }
-      const original = join(done, name.replace(/\.reply\.md$/, '.md'))
-      let sessionId: string | undefined
-      try { if (existsSync(original)) sessionId = chatSessionFrom(readFileSync(original, 'utf8')) }
-      catch { /* The archived task may have been removed; the reply marker is the fallback. */ }
-      sessionId ??= chatSessionFrom(reply)
-      if (!sessionId) { this.seen.add(name); continue }
-      try {
-        await this.send(sessionId, `Task result (brief):\n${briefOf(reply, this.max)}`)
-        this.seen.add(name)
-        sent++
-      } catch { /* Leave it unseen so the next tick retries the delivery. */ }
-    }
-    return sent
+    if (this.running) return 0
+    this.running = true
+    try {
+      let done: string
+      try { done = join(this.root(), 'done') }
+      catch { return 0 }
+      if (!existsSync(done)) return 0
+      let sent = 0
+      const names = readdirSync(done).filter(name => name.endsWith('.reply.md')).sort()
+      for (const name of names) {
+        if (this.seen.has(name)) continue
+        let reply: string
+        try { reply = readFileSync(join(done, name), 'utf8') }
+        catch { continue }
+        const original = join(done, name.replace(/\.reply\.md$/, '.md'))
+        let sessionId: string | undefined
+        try { if (existsSync(original)) sessionId = chatSessionFrom(readFileSync(original, 'utf8')) }
+        catch { /* The archived task may have been removed; the reply marker is the fallback. */ }
+        // The reply-file fallback trusts worker output, which external content could steer; it only runs when the
+        // archived task file is gone, and the brief carries nothing but a short result text either way.
+        sessionId ??= chatSessionFrom(reply)
+        if (!sessionId) { this.seen.add(name); continue }
+        try {
+          await this.send(sessionId, `Task result (brief):\n${briefOf(reply, this.max)}`)
+          this.seen.add(name)
+          sent++
+        } catch { /* Leave it unseen so the next tick retries the delivery. */ }
+      }
+      return sent
+    } finally { this.running = false }
   }
 }

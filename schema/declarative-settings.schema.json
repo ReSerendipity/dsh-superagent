@@ -171,6 +171,27 @@
                   },
                   "additionalProperties": false
                 }
+              },
+              "bots": {
+                "type": "array",
+                "items": {
+                  "type": "object",
+                  "properties": {
+                    "id": {
+                      "type": "string",
+                      "minLength": 1,
+                      "maxLength": 200
+                    },
+                    "name": {
+                      "type": "string",
+                      "maxLength": 100
+                    }
+                  },
+                  "required": [
+                    "id"
+                  ],
+                  "additionalProperties": false
+                }
               }
             },
             "additionalProperties": {}

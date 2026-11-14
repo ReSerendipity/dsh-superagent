@@ -98,8 +98,10 @@ function triggerTimes(store: Store): void {
     const at = isoTime(String(row.at))
     if (at !== row.at) store.db.prepare("UPDATE trigger SET at = ?, value = json_set(value, '$.at', ?) WHERE id = ?").run(at, at, String(row.id))
   }
+  // Only rows whose trigger still exists: an orphan row would take NULL from the subquery and violate
+  // trigger_thread's NOT NULL, rolling the whole migration back.
   store.db.exec(`UPDATE trigger_thread SET at = (SELECT at FROM trigger WHERE trigger.id = trigger_thread.id)
-    WHERE at <> (SELECT at FROM trigger WHERE trigger.id = trigger_thread.id)`)
+    WHERE id IN (SELECT id FROM trigger) AND at <> (SELECT at FROM trigger WHERE trigger.id = trigger_thread.id)`)
   for (const thread of store.threads.list()) {
     const createdAt = isoTime(thread.createdAt), lastAt = thread.lastAt === undefined ? undefined : isoTime(thread.lastAt)
     if (createdAt === thread.createdAt && lastAt === thread.lastAt) continue
@@ -515,6 +517,8 @@ function backfillThreadTimes(store: Store): void {
       lastAt: !thread.lastAt || last.at > thread.lastAt ? last.at : thread.lastAt }
     store.threads.save({ ...thread, ...times })
   }
+  // The flag makes the backfill idempotent on its own; DEAD_KEYS still clears the legacy name afterwards.
+  store.set('thread-times-backfilled' as Key<string>, 'true')
 }
 
 /** Upgrade stored source state (Feishu topics, direct-chat flags, thread links, GitHub cursors, and pending assessments) to schema 11. */
@@ -589,7 +593,16 @@ function issueSourceRecords(store: Store): void {
 function githubCursors(store: Store): void {
   for (const name of [...store.keys('github-thread:'), ...store.keys('thread-since:github:')]) {
     const at = store.get<string>(name as Key<string>)
-    const cursor = KV.github.cursor(Number(name.slice(name.lastIndexOf(':') + 1)))
+    const number = Number(name.slice(name.lastIndexOf(':') + 1))
+    // A legacy key whose tail is not an issue number has no cursor to consolidate into; renaming it out of
+    // the scanned prefixes keeps it from regenerating a `github-cursor:NaN` entry every migration.
+    if (!Number.isInteger(number) || number <= 0) {
+      const value = store.get<string>(name as Key<string>)
+      if (value !== undefined) store.set(`unreadable-cursor:${name}` as Key<string>, value)
+      store.delete(name)
+      continue
+    }
+    const cursor = KV.github.cursor(number)
     const current = store.get(cursor)
     if (at && !(current && current >= at)) store.set(cursor, at)
     store.delete(name)

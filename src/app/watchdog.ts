@@ -100,6 +100,8 @@ export const watchdogProblems = (health: Readonly<Record<string, { state: string
  */
 export class WatchdogLoop {
   private timer?: ReturnType<typeof setInterval>
+  /** The cadence the running timer was armed at; a settings change re-arms it on the next tick. */
+  private armedMinutes?: number
   /** When `tick()` last ran; read by the instance status file, never used to decide whether to tick. */
   lastTickAt: string | null = null
   constructor(private readonly host: {
@@ -110,19 +112,29 @@ export class WatchdogLoop {
   }) {}
 
   start(): void {
+    if (this.timer) return
     const every = this.host.everyMinutes()
-    if (every <= 0 || this.timer) return
-    this.timer = setInterval(() => { void this.tick() }, every * 60_000)
-    // Never hold the process open for the watchdog alone.
-    this.timer.unref?.()
+    if (every > 0) this.arm(every)
   }
   stop(): void {
     if (this.timer) clearInterval(this.timer)
     this.timer = undefined
+    this.armedMinutes = undefined
+  }
+  private arm(every: number): void {
+    if (this.timer) clearInterval(this.timer)
+    this.timer = setInterval(() => { void this.tick() }, every * 60_000)
+    // Never hold the process open for the watchdog alone.
+    this.timer.unref?.()
+    this.armedMinutes = every
   }
   /** One digest delivery; public so a restart or a test can drive it without waiting for the interval. */
   async tick(): Promise<void> {
-    if (this.host.everyMinutes() <= 0) return
+    const every = this.host.everyMinutes()
+    if (every <= 0) return
+    // A settings change takes effect without a restart: the tick re-arms the timer, and a loop started while
+    // the cadence was off (which arms nothing) starts now. The instance status reports the same value.
+    if (this.timer === undefined || this.armedMinutes !== every) this.arm(every)
     this.lastTickAt = new Date().toISOString()
     try {
       const text = this.host.digest()

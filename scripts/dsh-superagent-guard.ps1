@@ -18,16 +18,34 @@ $Dir = Join-Path $env:APPDATA 'Superagent\watchdog'
 New-Item -ItemType Directory -Force -Path $Dir | Out-Null
 $Lock = Join-Path $Dir 'loop.pid'
 
-$alive = $false
-if (Test-Path $Lock) {
-    $old = (Get-Content $Lock -Raw).Trim()
-    $alive = [bool](Get-Process -Id $old -ErrorAction SilentlyContinue)
+# The pid file carries the recorded process's creation time (its StartTime ticks): Windows reuses pids
+# aggressively, and a reused number must not suppress a needed guard or count as a running one.
+function Test-GuardAlive {
+    if (-not (Test-Path $Lock)) { return $false }
+    $raw = (Get-Content $Lock -Raw).Trim()
+    try { $record = $raw | ConvertFrom-Json } catch { $record = $null }
+    if ($null -eq $record -or $record -isnot [pscustomobject]) {
+        # Legacy 0.2.7 file: a bare pid. ConvertFrom-Json reads it as a scalar, so build the record here.
+        try { $record = [pscustomobject]@{ pid = [int]$raw; born = $null } } catch { return $false }
+    }
+    if (-not $record.pid) { return $false }
+    $old = Get-Process -Id $record.pid -ErrorAction SilentlyContinue
+    if (-not $old) { return $false }
+    return ($null -eq $record.born -or $old.StartTime.Ticks -eq [long]$record.born)
 }
-if ($alive) { "guard already running (pid $old)"; exit 0 }
-Set-Content $Lock $PID -Encoding ascii
+$old = $null
+if (Test-GuardAlive) {
+    try { $old = (Get-Content $Lock -Raw | ConvertFrom-Json).pid } catch { $old = '?' }
+    "guard already running (pid $old)"; exit 0
+}
+Set-Content $Lock (@{ pid = $PID; born = (Get-Process -Id $PID).StartTime.Ticks } | ConvertTo-Json -Compress) -Encoding ascii
 
 function Note($line) { Add-Content (Join-Path $Dir 'watchdog.log') ("{0} GUARD {1}" -f (Get-Date).ToString('yyyy-MM-dd HH:mm:ss'), $line) -Encoding UTF8 }
 Note "loop started pid=$PID interval=15m"
+
+# A disabled marker set while the guard was away means the operator wants nothing started either: check
+# before the boot bring-up, not only inside the loop.
+if (Test-Path (Join-Path $Dir 'disabled')) { Note 'disabled marker found before boot start; loop exits'; Remove-Item $Lock -ErrorAction SilentlyContinue; exit 0 }
 
 # At logon the backend is not running by itself; bring it up once now (honours manual stop).
 $first = & $Service --respect-stop status 2>&1 | Out-String

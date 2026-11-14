@@ -29,16 +29,28 @@ export interface ApiMessages {
 }
 const isUserError = (code: unknown): code is UserErrorCode => typeof code === 'string' && Object.hasOwn(USER_ERRORS, code)
 
+/**
+ * A request that the host accepted but never answers must not freeze the view's polling queue forever. The
+ * budget matches the host's own probe budget (60 s per command): saving a Source runs gh/lark probes inline,
+ * and a client that gives up earlier reports the host offline while the save is still running.
+ */
+const API_TIMEOUT_MS = 60_000
 /** Calls one management endpoint; the `x-orchestrator-request` header marks the request as originating from this page. */
 async function api<T>(messages: ApiMessages, path: string, method: string, body?: unknown): Promise<T> {
   let response: Response
   const json = body === undefined ? {} : { headers: { 'content-type': 'application/json' }, body: JSON.stringify(body) }
+  let text: string
   try {
-    response = await fetch(`/orchestrator/api/${path}`, { method, ...json, headers: { 'x-orchestrator-request': '1', ...json.headers } })
-  } catch {
+    response = await fetch(`/orchestrator/api/${path}`, { method, ...json, headers: { 'x-orchestrator-request': '1', ...json.headers },
+      signal: AbortSignal.timeout(API_TIMEOUT_MS) })
+    text = await response.text()
+  } catch (error) {
+    if (error instanceof DOMException && error.name === 'TimeoutError') {
+      // The host accepted the connection but did not answer in time - it is alive, so "offline" would lie.
+      throw new ApiError(messages.serverError(0), 0, { unreachable: true })
+    }
     throw new ApiError(messages.offline, 0, { unreachable: true })
   }
-  const text = await response.text()
   let value: unknown
   try { value = text ? JSON.parse(text) : {} } catch { value = undefined }
   if (!response.ok) {

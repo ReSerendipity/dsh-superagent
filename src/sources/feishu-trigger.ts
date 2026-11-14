@@ -20,7 +20,9 @@ export const withMentionNames = (text: string, mentions: { key?: string | undefi
   mentions.reduce((result, mention) => mention.key && mention.name ? result.replaceAll(mention.key, `@${mention.name}`) : result, text)
 /**
  * Parses a Feishu message timestamp into an ISO-8601 string: live events and the history API return epoch milliseconds as a
- * string, whereas topic/thread pages return a local timestamp string such as `2026-09-11 12:00`.
+ * string, whereas topic/thread pages return a local timestamp string such as `2026-09-11 12:00`, read in the host's own
+ * time zone - the zone the topic page rendered it in for this machine. Epoch values are exact everywhere; only the
+ * topic-page string carries the zone ambiguity, and no client-side signal can resolve it.
  */
 export function feishuTime(value: string): string {
   const time = /^\d+$/.test(value) ? Number(value) : Date.parse(value)

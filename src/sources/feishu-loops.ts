@@ -7,6 +7,7 @@ import { threadKey, type Thread, type Trigger } from '../core/index.ts'
 import { feishuChatLink } from './feishu-channel.ts'
 import type { FeishuBot } from '../deployment.ts'
 import { validItems, type Tally } from '../infra/commands.ts'
+import { runtimeArgv } from '../infra/platform.ts'
 import { readFeishu, type FeishuRef } from './feishu-read.ts'
 import { feishuRef, feishuTime, feishuTrigger, HistoricalMessageSchema, historyEvent, HistoryPageSchema, SOURCE, topicEvent }
   from './feishu-trigger.ts'
@@ -17,6 +18,8 @@ import type { FeishuConfig } from './feishu.ts'
 
 export const runFeishu = (ctx: SourceContext, signal: AbortSignal): Promise<unknown> =>
   Promise.allSettled([watch, backfillLoop, chatNamesLoop].map(loop => loop(ctx, signal)))
+/** How many seen message ids a thread's checkpoint keeps; an aged-out id only costs a duplicate trigger, which the Engine drops. */
+const SEEN_WINDOW = 500
 const enabled = (ctx: SourceContext): FeishuConfig | undefined => ctx.config<FeishuConfig>(SOURCE)
 const bot = (ctx: SourceContext): FeishuBot => {
   const resolved = ctx.deployment.feishu
@@ -68,7 +71,10 @@ async function watch(ctx: SourceContext, signal: AbortSignal): Promise<void> {
 export const consumerRetry = (previous: number | undefined, ranMs: number): number =>
   previous === undefined || ranMs >= 60_000 ? 1000 : Math.min(previous * 2, 60_000)
 async function consume(ctx: SourceContext, signal: AbortSignal): Promise<void> {
-  const child = spawn(bot(ctx).cli, ['event', 'consume', 'im.message.receive_v1', '--as', 'bot'],
+  // A batch wrapper goes to cmd.exe with the program and arguments kept separate (Node refuses to spawn
+  // `.cmd`/`.bat` directly), the same way the setup probe and `Commands` serve the same CLI.
+  const argv = [...runtimeArgv(bot(ctx).cli, ['event', 'consume', 'im.message.receive_v1', '--as', 'bot'])]
+  const child = spawn(argv[0]!, argv.slice(1),
     { stdio: ['pipe', 'pipe', 'pipe'], env: { ...process.env, LARKSUITE_CLI_NO_UPDATE_NOTIFIER: '1',
       LARKSUITE_CLI_NO_SKILLS_NOTIFIER: '1' } })
   const stdout = createInterface({ input: child.stdout }); const stderr = createInterface({ input: child.stderr })
@@ -262,7 +268,10 @@ async function pollThread(ctx: SourceContext, thread: Thread, signal?: AbortSign
       await receive(ctx, trigger)
     }
     result.messages.forEach(message => known.add(message.message_id))
-    ctx.state.set(checkpoint, [...known])
+    // Bound the stored window: an id that ages out can only cost a re-offered trigger, which the Engine
+    // deduplicates by id, while an unbounded set grows with every message the thread ever had.
+    const ids = [...known]
+    ctx.state.set(checkpoint, ids.length > SEEN_WINDOW ? ids.slice(-SEEN_WINDOW) : ids)
     if (initialized && encounteredKnown) break
     resource = result.next_resource
   }
