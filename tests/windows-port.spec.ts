@@ -96,7 +96,8 @@ it('writes shims that strip their own directory from PATH', async () => {
   // The blocked-command message is quoted per platform: cmd-escaped on Windows, shell-quoted on POSIX -
   // either way it does not depend on the schema's charset.
   await writeEnvironment({ ...deployment, github: { ...deployment.github, login: 'a&b<1>' } }, ['mycmd'])
-  expect(await readFile(shim('mycmd'), 'utf8')).toContain(windows ? 'a^&b^<1^>.' : `'a&b<1>.'`)
+  // POSIX shellQuote wraps the whole message in single quotes, so the login appears mid-string as-is.
+  expect(await readFile(shim('mycmd'), 'utf8')).toContain(windows ? 'a^&b^<1^>.' : 'a&b<1>.')
 })
 
 it('runs setup probes with the platform-specific environment and forwards Feishu notifier switches', async () => {
