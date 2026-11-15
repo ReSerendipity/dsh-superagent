@@ -150,6 +150,7 @@ $prune:
 - `watchdogStallMinutes`：停滞判定阈值（默认 45）
 - `watchdogGuidance`：常驻指令，随摘要下发给 Watchdog
 - `routerShards`：Router 分片数（默认 1；**改后需重启**，分片会话在启动时解析）
+- `commandPolicy`：参数级命令策略，形如 `{ "enforce": false, "default": "allow", "approvalTtlMinutes": 10, "rules": [ { "id": "force-push", "match": ["git", "push", "--force"], "decision": "forbid" } ] }`。`match` 是 argv 前缀（首个 token 为命令名、大小写不敏感，其后逐字匹配），命中取最长前缀、同长取最严；`decision` 为 `allow` / `prompt` / `forbid`。默认 `enforce: false` 为 record-only：决策只写入 `stateDir/command-audit.jsonl`，不拦截命令，`gh`、`git`、`lark-cli` 的交付链路不受影响。开启 `enforce: true` 后在 DSH 的 `tools/pre-execute` 前置判定（结构化 argv，不改 Windows shim）：`forbid` 直接拒绝，`prompt` 写入 `stateDir/approvals.jsonl` 等人工审批，超过 `approvalTtlMinutes`（1–1440，默认 10）未处理即按超时拒绝；主会话用 `orchestrator_command_approve` / `orchestrator_command_deny` 处理待决项，审批人与结果写入审计。面板暂不提供该字段的编辑器，改本文件即可。
 
 机器配置（`cordis.patch.yml`）只保留启动接线：`stateDir` 与 `configPath`。把旧键写回机器配置会得到一条明确的报错，提示已移到 Execution settings。
 

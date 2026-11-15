@@ -122,6 +122,25 @@ declare const SettingsSchema: ZodObject<{
     directory: ZodDefault<ZodString>;
     prepare: ZodDefault<ZodString>;
     blockedCommands: ZodDefault<ZodArray<ZodString>>;
+    commandPolicy: ZodDefault<ZodObject<{
+      enforce: ZodDefault<ZodBoolean>;
+      default: ZodDefault<ZodEnum<{
+        allow: "allow";
+        prompt: "prompt";
+        forbid: "forbid";
+      }>>;
+      rules: ZodDefault<ZodArray<ZodObject<{
+        id: ZodString;
+        match: ZodArray<ZodString>;
+        decision: ZodEnum<{
+          allow: "allow";
+          prompt: "prompt";
+          forbid: "forbid";
+        }>;
+        reason: ZodOptional<ZodString>;
+      }, $strict>>>;
+      approvalTtlMinutes: ZodDefault<ZodNumber>;
+    }, $strict>>;
     watchdogMinutes: ZodDefault<ZodNumber>;
     watchdogStallMinutes: ZodDefault<ZodNumber>;
     watchdogGuidance: ZodDefault<ZodString>;
@@ -235,6 +254,17 @@ declare class SourceRegistry implements SourceScope {
       directory: string;
       prepare: string;
       blockedCommands: string[];
+      commandPolicy: {
+        enforce: boolean;
+        default: "allow" | "prompt" | "forbid";
+        rules: {
+          id: string;
+          match: string[];
+          decision: "allow" | "prompt" | "forbid";
+          reason?: string | undefined;
+        }[];
+        approvalTtlMinutes: number;
+      };
       watchdogMinutes: number;
       watchdogStallMinutes: number;
       watchdogGuidance: string;
@@ -306,6 +336,17 @@ declare class SourceRegistry implements SourceScope {
       directory: string;
       prepare: string;
       blockedCommands: string[];
+      commandPolicy: {
+        enforce: boolean;
+        default: "allow" | "prompt" | "forbid";
+        rules: {
+          id: string;
+          match: string[];
+          decision: "allow" | "prompt" | "forbid";
+          reason?: string | undefined;
+        }[];
+        approvalTtlMinutes: number;
+      };
       watchdogMinutes: number;
       watchdogStallMinutes: number;
       watchdogGuidance: string;
@@ -389,6 +430,17 @@ declare class SourceRegistry implements SourceScope {
       directory: string;
       prepare: string;
       blockedCommands: string[];
+      commandPolicy: {
+        enforce: boolean;
+        default: "allow" | "prompt" | "forbid";
+        rules: {
+          id: string;
+          match: string[];
+          decision: "allow" | "prompt" | "forbid";
+          reason?: string | undefined;
+        }[];
+        approvalTtlMinutes: number;
+      };
       watchdogMinutes: number;
       watchdogStallMinutes: number;
       watchdogGuidance: string;
@@ -467,6 +519,17 @@ declare class SourceRegistry implements SourceScope {
       directory: string;
       prepare: string;
       blockedCommands: string[];
+      commandPolicy: {
+        enforce: boolean;
+        default: "allow" | "prompt" | "forbid";
+        rules: {
+          id: string;
+          match: string[];
+          decision: "allow" | "prompt" | "forbid";
+          reason?: string | undefined;
+        }[];
+        approvalTtlMinutes: number;
+      };
       watchdogMinutes: number;
       watchdogStallMinutes: number;
       watchdogGuidance: string;
@@ -541,6 +604,17 @@ declare class SourceRegistry implements SourceScope {
       directory: string;
       prepare: string;
       blockedCommands: string[];
+      commandPolicy: {
+        enforce: boolean;
+        default: "allow" | "prompt" | "forbid";
+        rules: {
+          id: string;
+          match: string[];
+          decision: "allow" | "prompt" | "forbid";
+          reason?: string | undefined;
+        }[];
+        approvalTtlMinutes: number;
+      };
       watchdogMinutes: number;
       watchdogStallMinutes: number;
       watchdogGuidance: string;
@@ -628,6 +702,17 @@ declare class SourceRegistry implements SourceScope {
       directory: string;
       prepare: string;
       blockedCommands: string[];
+      commandPolicy: {
+        enforce: boolean;
+        default: "allow" | "prompt" | "forbid";
+        rules: {
+          id: string;
+          match: string[];
+          decision: "allow" | "prompt" | "forbid";
+          reason?: string | undefined;
+        }[];
+        approvalTtlMinutes: number;
+      };
       watchdogMinutes: number;
       watchdogStallMinutes: number;
       watchdogGuidance: string;
@@ -700,6 +785,17 @@ declare class SourceRegistry implements SourceScope {
       directory: string;
       prepare: string;
       blockedCommands: string[];
+      commandPolicy: {
+        enforce: boolean;
+        default: "allow" | "prompt" | "forbid";
+        rules: {
+          id: string;
+          match: string[];
+          decision: "allow" | "prompt" | "forbid";
+          reason?: string | undefined;
+        }[];
+        approvalTtlMinutes: number;
+      };
       watchdogMinutes: number;
       watchdogStallMinutes: number;
       watchdogGuidance: string;

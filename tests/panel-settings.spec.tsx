@@ -4,6 +4,7 @@ import { act } from 'react'
 import { createRoot } from 'react-dom/client'
 import { Fields } from '../src/client/settings-kit.tsx'
 import { expect, it, onTestFinished } from 'vitest'
+import { DEFAULT_COMMAND_POLICY } from '../src/command-policy.ts'
 import { zh } from '../src/client/locales.ts'
 import { usePanel, mount, remount, settle, all, find, tab, click, type, text, field } from './fixtures/panel.tsx'
 import { server } from './fixtures/panel-server.ts'
@@ -54,7 +55,8 @@ it('saves the Eval block on the Policy settings and the Executor with its execut
   expect([...document.querySelectorAll('#dt-worker-model-efforts option')].map(option => option.getAttribute('value'))).toEqual(['high'])
   await click(zh.save)
   expect(server.settings.executor).toEqual({ maxWorkers: 5, directory: '/srv/work',
-    prepare: 'git worktree add "$DSH_SUPERAGENT_DIR"', blockedCommands: ['gh-personal', 'gh.other'], model: { provider: 'worker-provider',
+    prepare: 'git worktree add "$DSH_SUPERAGENT_DIR"', blockedCommands: ['gh-personal', 'gh.other'], commandPolicy: DEFAULT_COMMAND_POLICY,
+    model: { provider: 'worker-provider',
       model: 'worker-model', reasoningEffort: 'high' }, watchdogMinutes: 30, watchdogStallMinutes: 45, watchdogGuidance: '', routerShards: 1 })
   expect(server.requests.filter(request => request.method === 'PUT').map(request => request.path)).toEqual(['settings/eval',
     'settings/executor'])

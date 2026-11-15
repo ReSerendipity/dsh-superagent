@@ -263,6 +263,43 @@
         "directory": "",
         "prepare": "",
         "blockedCommands": [],
+        "commandPolicy": {
+          "enforce": false,
+          "default": "allow",
+          "approvalTtlMinutes": 10,
+          "rules": [
+            {
+              "id": "force-push",
+              "match": [
+                "git",
+                "push",
+                "--force"
+              ],
+              "decision": "forbid",
+              "reason": "A force-push rewrites published history; a ticket branch must move forward."
+            },
+            {
+              "id": "force-push-short",
+              "match": [
+                "git",
+                "push",
+                "-f"
+              ],
+              "decision": "forbid",
+              "reason": "The short spelling of force-push."
+            },
+            {
+              "id": "repo-delete",
+              "match": [
+                "gh",
+                "repo",
+                "delete"
+              ],
+              "decision": "forbid",
+              "reason": "A worker deletes a branch or a remote, never the repository."
+            }
+          ]
+        },
         "watchdogMinutes": 30,
         "watchdogStallMinutes": 45,
         "watchdogGuidance": "",
@@ -322,6 +359,110 @@
             "type": "string",
             "pattern": "^[A-Za-z0-9._-]+$"
           }
+        },
+        "commandPolicy": {
+          "default": {
+            "enforce": false,
+            "default": "allow",
+            "approvalTtlMinutes": 10,
+            "rules": [
+              {
+                "id": "force-push",
+                "match": [
+                  "git",
+                  "push",
+                  "--force"
+                ],
+                "decision": "forbid",
+                "reason": "A force-push rewrites published history; a ticket branch must move forward."
+              },
+              {
+                "id": "force-push-short",
+                "match": [
+                  "git",
+                  "push",
+                  "-f"
+                ],
+                "decision": "forbid",
+                "reason": "The short spelling of force-push."
+              },
+              {
+                "id": "repo-delete",
+                "match": [
+                  "gh",
+                  "repo",
+                  "delete"
+                ],
+                "decision": "forbid",
+                "reason": "A worker deletes a branch or a remote, never the repository."
+              }
+            ]
+          },
+          "type": "object",
+          "properties": {
+            "enforce": {
+              "default": false,
+              "type": "boolean"
+            },
+            "default": {
+              "default": "allow",
+              "type": "string",
+              "enum": [
+                "allow",
+                "prompt",
+                "forbid"
+              ]
+            },
+            "rules": {
+              "default": [],
+              "maxItems": 200,
+              "type": "array",
+              "items": {
+                "type": "object",
+                "properties": {
+                  "id": {
+                    "type": "string",
+                    "pattern": "^[a-zA-Z0-9_-]{1,80}$"
+                  },
+                  "match": {
+                    "minItems": 1,
+                    "maxItems": 8,
+                    "type": "array",
+                    "items": {
+                      "type": "string",
+                      "minLength": 1,
+                      "maxLength": 200
+                    }
+                  },
+                  "decision": {
+                    "type": "string",
+                    "enum": [
+                      "allow",
+                      "prompt",
+                      "forbid"
+                    ]
+                  },
+                  "reason": {
+                    "type": "string",
+                    "maxLength": 300
+                  }
+                },
+                "required": [
+                  "id",
+                  "match",
+                  "decision"
+                ],
+                "additionalProperties": false
+              }
+            },
+            "approvalTtlMinutes": {
+              "default": 10,
+              "type": "integer",
+              "minimum": 1,
+              "maximum": 1440
+            }
+          },
+          "additionalProperties": false
         },
         "watchdogMinutes": {
           "default": 30,

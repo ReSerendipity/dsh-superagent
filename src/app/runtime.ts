@@ -41,6 +41,9 @@ import { eventNotice, followupNotice } from './notices.ts'
 import { pullEndNotices } from '../sources/github-pull.ts'
 import { HealthBoard } from '../infra/health.ts'
 import { Outbox } from './outbox.ts'
+import { ProgressNotifier } from './progress.ts'
+import { CommandAudit, commandAuditFile } from './command-audit.ts'
+import { Approvals, CommandGate, approvalsFile } from './command-gate.ts'
 import { Passes } from './passes.ts'
 import { Setup } from './setup.ts'
 import { until } from '../executor/background.ts'
@@ -100,6 +103,10 @@ export class Runtime extends Service implements SourceHost {
   readonly executor: DshExecutor
   readonly assessor: MasterAssessor
   readonly outbox: Outbox
+  /** Created after the outbox; the executor reaches it through a closure, so its construction order does not matter. */
+  private progressNotifier?: ProgressNotifier
+  /** The pre-execute command policy and its approval ledger, shared by the executor and the main Session's tools. */
+  readonly commandGate: CommandGate
   readonly engine: Engine
   readonly passes: Passes
   readonly ready: Promise<void>
@@ -211,9 +218,14 @@ export class Runtime extends Service implements SourceHost {
       const policyChanged: EngineForSettings['policyChanged'] = (from, to, effects) => { this.engine.policyChanged(from, to, effects) }
       this.settings = new Settings({ store, sources, engine: { policyChanged }, health: board, context: ctx, lifetime: this.lifetime, sessions,
         sourceHost: this, setup, requestPass: () => { this.passes.request() }, declarative: this.declarative })
+      const audit = new CommandAudit(commandAuditFile(this.machine.stateDir))
+      const approvals = new Approvals({ file: approvalsFile(this.machine.stateDir), audit })
+      this.commandGate = new CommandGate({ settings: () => store.settings(), audit, approvals })
       this.executor = new DshExecutor({ context: ctx, get engine() { return runtime.engine }, store, effects, health: board.claim('worker'), machine,
         lifetime: this.lifetime, sessions, closing: () => this.closing(), paused: () => this.paused(), environment, sourceLink: link,
-        repliedTo: trigger => repliedTo({ store, sources }, trigger) })
+        repliedTo: trigger => repliedTo({ store, sources }, trigger),
+        progress: (ticketId, line) => { this.progressNotifier?.update(ticketId, line) },
+        audit, commandGate: this.commandGate })
       this.assessor = new MasterAssessor({ get engine() { return runtime.engine }, commands, get deployment() { return setup.deployment }, effects,
         settings: () => store.settings(), paused: () => this.paused(), threadContext: trigger => sources.threadContext(trigger),
         deliver: async (id, text, thread) => {
@@ -223,6 +235,7 @@ export class Runtime extends Service implements SourceHost {
         },
         candidateCard: candidate => candidateCard(links, candidate) })
       const outbox = this.outbox = new Outbox({ store, effects, sources, commands, paused: () => this.paused() })
+      this.progressNotifier = new ProgressNotifier({ store, outbox })
       const { assessor, executor } = this
       const policy = () => settingsPolicy(store.settings(), sources)
       const engine = this.engine = new Engine({ repo: store, scope: sources, policy, assessor, executor,
@@ -257,7 +270,7 @@ export class Runtime extends Service implements SourceHost {
         configured: () => setup.configured(),
         get setupProblem() { return setup.problem }, problemFor: instance => setup.problemFor(instance),
         get feishuProblem() { return setup.feishuProblem }, receive: trigger => passes.receive(trigger) }
-      this.toolHost = { context: ctx, engine, store, prompts, sessions, settings: this.settings, assessor, resources,
+      this.toolHost = { context: ctx, engine, store, prompts, sessions, settings: this.settings, assessor, resources, commandGate: this.commandGate,
         get github() { return runtime.context({ kind: 'github', health: ['github'] }) },
         requestPass: () => { passes.request() }, sendReplies: () => outbox.sent(),
         quietly: run => { this.quiet++; try { return run() } finally { this.quiet-- } } }

@@ -308,6 +308,7 @@ Some generic modules still refer directly to GitHub or Feishu:
 | `src/deployment.ts` | The plugin `Config` and `Machine`; `resolveDeployment` and `resolveFeishuBot` read the repository and the accounts from the Source settings, each CLI run as Executor shells run it; `SETUP_FIELDS` lists the Source fields setup reads. The code names no person, account or organization |
 | `src/setup.ts` | Setup problems: `SetupError`, with a code, the place that fixes it and the English text the log, the main Session and the panel share |
 | `src/policy.ts` | The Policy: the settings schemas by block, the Policy version, the gate and Mandate revalidation |
+| `src/command-policy.ts` | The parameter-level command policy: argv-prefix rules with the `allow`/`prompt`/`forbid` decision, `evaluateCommand`, and `splitCommandLine`. It is always evaluated; `enforce` decides whether a decision is applied at `tools/pre-execute` |
 | `src/admission.ts` | The admission table's values, each cell's options and defaults, shared with the panel |
 | `src/limits.ts` | The limits of the values a person sets, which the settings schemas check and the panel's fields offer |
 | `src/kv.ts` | `KV`: every family of `kv` records with its key, its value's type and its owner, and the `Key` and `Family` types the Store and `SourceContext.state` take |
@@ -331,6 +332,9 @@ Some generic modules still refer directly to GitHub or Feishu:
 | `src/app/setup.ts` | Setup, and `setupChanged`, whether a save changes a field setup reads |
 | `src/app/passes.ts` | Passes, the pass scheduler |
 | `src/app/outbox.ts` | The Outbox: the Engine's `Outbox` port, the receipts and the `reply` effects that send them |
+| `src/app/progress.ts` | Progress comments: the marker a progress `notice` carries, the body one GitHub comment shows, and `ProgressNotifier`, which sends a line only for a Ticket with a GitHub Channel |
+| `src/app/command-audit.ts` | `CommandAudit`: the append-only JSONL record of command-policy decisions under the state directory, rotated at a size cap |
+| `src/app/command-gate.ts` | The pre-execute command gate and its approval ledger: `Approvals` (`stateDir/approvals.jsonl`, TTL, timeout-as-deny), and `CommandGate`, which denies `forbid` and holds `prompt` for a person's approval under `enforce` |
 | `src/app/notices.ts` | The main Session's notices and relays: `eventNotice`, `reportRelay`, `resultRelay` and `followupRelay` |
 | `src/app/store.ts` | The Store, and `Receipt`, a message of the outbox |
 | `src/app/store-read.ts` | `storeReads`: the Store's read queries for the views, the tools and the Sources' polls, which never write |
@@ -437,6 +441,9 @@ Some generic modules still refer directly to GitHub or Feishu:
 | `tests/core-engine.spec.ts` | Domain rules on in-memory repositories: receiving, Eval, fan-out, resume and stop, interrupted Assignments, the pause, Policy changes, reports and outcomes, attaching, replies, failed deliveries and dismissed problems |
 | `tests/stage.spec.ts` | The Ticket stages, row by row |
 | `tests/policy.spec.ts` | Source scope, the gate, the admission table, Mandate revalidation, the Policy version, settings migrations and assessment outcomes |
+| `tests/command-policy.spec.ts` | The parameter-level command policy: argv-prefix matching, the four decisions, the record-only default, the settings default, and the executor recording a worker's shell call without enforcing it |
+| `tests/command-gate.spec.ts` | The pre-execute gate under `enforce`: allow/prompt/forbid, the approval ledger on disk, TTL expiry as a denial, one-use approvals, and the main Session's approve/deny tools |
+| `tests/progress.spec.ts` | Progress comment helpers: the marker round trip, the body, and the GitHub-only notifier |
 | `tests/admission-plain.spec.ts` | The plain-language layer over the admission table: the groups a cell falls into, the round trip of a choice, and which questions a scope can be asked at all |
 | `tests/registry.spec.ts` | `SourceRegistry`: instances, validation, Policy parts, Channels and Thread context |
 | `tests/sources.spec.ts` | The Feishu and GitHub Sources on a `SourceContext`: translation, polls and read positions, the pull request rules, health |
@@ -486,7 +493,7 @@ Some generic modules still refer directly to GitHub or Feishu:
 | `tests/model-surface.spec.ts` | Everything models read: tools, prompts, skills and inputs, checked against the tool schemas, the execution environment and the glossary, within a size budget per role |
 | `tests/deployment.spec.ts`, `tests/environment.spec.ts`, `tests/index.spec.ts` | The plugin configuration and setup, the agent's process environment, the plugin entry |
 | `tests/windows-port.spec.ts` | The Windows port of the agent environment: batch shims and the marker they carry, the commands they block, and the agent account's `GH_CONFIG_DIR` |
-| `tests/github-channel.spec.ts` | The GitHub outbound channel: delivered receipts short-circuit the marker sweep, the idempotent POST carries its marker, and a deleted target reads as gone |
+| `tests/github-channel.spec.ts` | The GitHub outbound channel: delivered receipts short-circuit the marker sweep, the idempotent POST carries its marker, a deleted target reads as gone, and a progress comment is posted once and then patched with its lines |
 | `tests/red-line.spec.ts` | The product red line as regressions: the main Session's allow list carries no write/web/subagent tool, the router preset is file-locked at the DSH layer and free of web/todo/subagent rows, and the worker preset keeps the full work surface |
 | `tests/guard-installer.spec.ts` | The logon starter `scripts/install-guard-startup.cmd` emits: VBScript quote pairing survives parsing, and the emitting lines stay out of parenthesized blocks |
 | `tests/service-script.spec.ts` | `scripts/dsh-superagent` against fake `ps`, `tmux` and `dsh` |
