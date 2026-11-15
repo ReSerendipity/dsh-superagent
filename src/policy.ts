@@ -3,6 +3,7 @@
  * Who may originate work is configured per Source in that Source's own identities; the Policy never maps a person across Sources.
  */
 import { LIMITS } from './limits.ts'
+import { CommandPolicySchema, DEFAULT_COMMAND_POLICY } from './command-policy.ts'
 import { z } from 'zod'
 import { ADMISSION_DEFAULTS, type Admission, type AdmissionCell, type AdmissionRow } from './admission.ts'
 import { key, type AssessmentOutcome, type Mandate, type Policy, type PolicyEffect, type SourceScope, type Strength, type Thread, type Ticket,
@@ -95,13 +96,15 @@ export const EvalConfigSchema = z.object({
 }).strict()
 const CommandNameSchema = z.string().regex(/^[A-Za-z0-9._-]+$/).refine(name => name !== '.' && name !== '..', 'Not a command name')
   .refine(name => !WORKER_COMMANDS.includes(name), `${WORKER_COMMANDS.join(', ')} cannot be blocked`)
-/** Executor settings: worker model, concurrency, ticket directory root (empty defaults to `<stateDir>/work`), `prepare` command, and blocked commands. */
+/** Executor settings: worker model, concurrency, ticket directory root (empty defaults to `<stateDir>/work`), `prepare` command, blocked commands, and the parameter-level command policy. */
 export const ExecutorConfigSchema = z.object({
   model: RoleModelSchema.nullable().default(null),
   maxWorkers: z.number().int().min(LIMITS.maxWorkers.min).max(LIMITS.maxWorkers.max).default(3),
   directory: z.string().trim().refine(path => path === '' || ABSOLUTE_PATH.test(path), 'An absolute path, or empty for <stateDir>/work').default(''),
   prepare: z.string().max(LIMITS.prepareCommand).default(''),
   blockedCommands: z.array(CommandNameSchema).default([]),
+  // Record-only by default: rules are evaluated and audited; nothing is blocked until `enforce` is turned on.
+  commandPolicy: CommandPolicySchema.default(DEFAULT_COMMAND_POLICY),
   // The external control loop (article §6) and Router sharding (article §2.1) are runtime policy a person tunes here;
   // the machine config keeps only startup wiring (state directory, declarative settings path).
   watchdogMinutes: z.number().int().min(0).max(1440).default(30),

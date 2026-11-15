@@ -41,6 +41,7 @@ import { eventNotice, followupNotice } from './notices.ts'
 import { pullEndNotices } from '../sources/github-pull.ts'
 import { HealthBoard } from '../infra/health.ts'
 import { Outbox } from './outbox.ts'
+import { ProgressNotifier } from './progress.ts'
 import { Passes } from './passes.ts'
 import { Setup } from './setup.ts'
 import { until } from '../executor/background.ts'
@@ -100,6 +101,8 @@ export class Runtime extends Service implements SourceHost {
   readonly executor: DshExecutor
   readonly assessor: MasterAssessor
   readonly outbox: Outbox
+  /** Created after the outbox; the executor reaches it through a closure, so its construction order does not matter. */
+  private progressNotifier?: ProgressNotifier
   readonly engine: Engine
   readonly passes: Passes
   readonly ready: Promise<void>
@@ -213,7 +216,8 @@ export class Runtime extends Service implements SourceHost {
         sourceHost: this, setup, requestPass: () => { this.passes.request() }, declarative: this.declarative })
       this.executor = new DshExecutor({ context: ctx, get engine() { return runtime.engine }, store, effects, health: board.claim('worker'), machine,
         lifetime: this.lifetime, sessions, closing: () => this.closing(), paused: () => this.paused(), environment, sourceLink: link,
-        repliedTo: trigger => repliedTo({ store, sources }, trigger) })
+        repliedTo: trigger => repliedTo({ store, sources }, trigger),
+        progress: (ticketId, line) => { this.progressNotifier?.update(ticketId, line) } })
       this.assessor = new MasterAssessor({ get engine() { return runtime.engine }, commands, get deployment() { return setup.deployment }, effects,
         settings: () => store.settings(), paused: () => this.paused(), threadContext: trigger => sources.threadContext(trigger),
         deliver: async (id, text, thread) => {
@@ -223,6 +227,7 @@ export class Runtime extends Service implements SourceHost {
         },
         candidateCard: candidate => candidateCard(links, candidate) })
       const outbox = this.outbox = new Outbox({ store, effects, sources, commands, paused: () => this.paused() })
+      this.progressNotifier = new ProgressNotifier({ store, outbox })
       const { assessor, executor } = this
       const policy = () => settingsPolicy(store.settings(), sources)
       const engine = this.engine = new Engine({ repo: store, scope: sources, policy, assessor, executor,

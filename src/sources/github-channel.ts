@@ -6,6 +6,7 @@ import { sameName } from '../infra/text.ts'
 import type { SourceContext } from './host.ts'
 import type { ChannelLink, ChannelLinks, DeliveredMessage } from './kind.ts'
 import { githubAddress, githubPage } from './github-trigger.ts'
+import { PROGRESS_PREFIX, progressBody, progressLine, progressTicket } from '../app/progress.ts'
 
 const CommentSchema = z.looseObject({
   id: z.number(), body: z.string().nullish(), in_reply_to_id: z.number().nullish(), user: z.looseObject({ login: z.string() }).nullish(),
@@ -14,6 +15,49 @@ const CommentSchema = z.looseObject({
 const gone = (error: unknown): boolean => error instanceof CliError
   && (error.code === 410 || (error.code === 403 && /locked/i.test(error.message)))
 const missing = (error: unknown): boolean => error instanceof CliError && (error.code === 404 || error.code === 410)
+/** Progress comment ids found or created by this process, keyed by repository, thread, and ticket, so a hot ticket does not rescan its pages per line. */
+const progressComments = new Map<string, number>()
+const PROGRESS_CACHE_LIMIT = 500
+/**
+ * Updates a ticket's single progress comment: the body is recomposed from the progress messages already delivered to the
+ * thread plus this one, and the comment is found by its marker (cached id first, a page scan after a restart) and patched.
+ * A lost comment is posted again rather than swallowing the line.
+ */
+async function sendProgress(host: Pick<SourceContext, 'commands'>, message: OutboundMessage, ticketId: string,
+  delivered?: readonly DeliveredMessage[]): Promise<'sent' | 'gone'> {
+  const { commands } = host
+  const number = Number(message.channel.address.number)
+  if (!number) throw new Error('Missing GitHub reply target')
+  const cacheKey = `${commands.deployment.repository}|${message.channel.thread}|${ticketId}`
+  const lines = [...(delivered ?? [])
+    .filter(item => item.ticketId === ticketId && progressTicket(item.text) === ticketId)
+    .map(item => progressLine(item.text)), progressLine(message.text)].filter(Boolean)
+  const body = progressBody(ticketId, lines)
+  const known = progressComments.get(cacheKey)
+  if (known !== undefined) {
+    try {
+      await commands.api(z.unknown(), `issues/comments/${known}`, '--method', 'PATCH', '-f', `body=${body}`)
+      return 'sent'
+    } catch (error) {
+      progressComments.delete(cacheKey)
+      if (gone(error)) return 'gone'
+      // A comment deleted since it was cached is found again below, or posted anew when it is really gone.
+      if (!missing(error)) throw error
+    }
+  }
+  const marker = `${PROGRESS_PREFIX}${ticketId} -->`
+  const found = (await commands.pages(CommentSchema, `issues/${number}/comments?per_page=100`))
+    .find(comment => sameName(comment.user?.login ?? '', commands.deployment.github.login) && (comment.body ?? '').includes(marker))
+  if (found) {
+    progressComments.set(cacheKey, found.id)
+    await commands.api(z.unknown(), `issues/comments/${found.id}`, '--method', 'PATCH', '-f', `body=${body}`)
+    return 'sent'
+  }
+  const created = await commands.api(CommentSchema, `issues/${number}/comments`, '--method', 'POST', '-f', `body=${body}`)
+  if (progressComments.size >= PROGRESS_CACHE_LIMIT) progressComments.delete(progressComments.keys().next().value as string)
+  progressComments.set(cacheKey, created.id)
+  return 'sent'
+}
 /** Posts a comment or review-thread reply with an embedded HTML marker so retries do not create duplicate comments. */
 export async function sendGithub(host: Pick<SourceContext, 'commands'>, message: OutboundMessage, delivered?: readonly DeliveredMessage[]): Promise<'sent' | 'gone'> {
   const { commands } = host
@@ -25,6 +69,9 @@ export async function sendGithub(host: Pick<SourceContext, 'commands'>, message:
   // instead of a full pagination sweep per delivery.
   if (delivered?.some(item => item.id === message.id)) return 'sent'
   try {
+    // A progress message always updates the ticket's one top-level comment, never a review thread: those replies cannot be edited.
+    const progress = progressTicket(message.text)
+    if (progress !== undefined) return await sendProgress(host, message, progress, delivered)
     // Retained trigger URLs also route replies queued before thread-aware delivery.
     const address = githubAddress(message.channel.address.url ?? '', repository)
     let rootId: number | undefined

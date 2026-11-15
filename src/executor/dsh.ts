@@ -17,6 +17,8 @@ import { executionRoot, type Variable } from '../app/execution-environment.ts'
 import type { Sessions } from '../app/sessions.ts'
 import { WorktreeNameSchema } from '../app/assessment.ts'
 import { resultRelay } from '../app/notices.ts'
+import { CommandAudit, commandAuditFile } from '../app/command-audit.ts'
+import { evaluateCommand, splitCommandLine } from '../command-policy.ts'
 import type { HealthEntry } from '../infra/health.ts'
 import { cancelled, collectJob, killJobs, runningJobs, stopBackground, stopSubagents, until, untilQuiet } from './background.ts'
 import { initLocalWorkspace, usesLocalWorkspace } from './local-workspace.ts'
@@ -83,6 +85,8 @@ export interface ExecutorHost {
   sourceLink(trigger: Trigger, signal?: AbortSignal): Promise<{ source_url?: string; source_url_read?: string }>
   /** Stored Trigger of the message `trigger` replies to, when it replies to one. */
   repliedTo(trigger: Trigger): Trigger | undefined
+  /** Records one progress line for a ticket's GitHub progress comment; a ticket with no GitHub channel sends nothing. */
+  progress(ticketId: string, line: string): void
 }
 /** Looks up a ticket's origin trigger in Store. */
 export const sourceTrigger = (host: { store: Pick<Store, 'triggers'> }, ticket: Ticket): Trigger | undefined =>
@@ -228,8 +232,11 @@ export class DshExecutor implements Executor {
   private readonly personal = new Map<string, string>()
   /** The timers of workers that go on after a passing failure, which dispose clears. */
   private readonly timers = new Set<ReturnType<typeof setTimeout>>()
+  /** Append-only record of the shell commands workers ran and what the command policy decided for each. */
+  private readonly audit: CommandAudit
   /** Registers the `launch` and `delivery` effect handlers; both are held (concurrency limit 0) while processing is paused. */
   constructor(private readonly host: ExecutorHost) {
+    this.audit = new CommandAudit(commandAuditFile(host.machine.stateDir))
     this.slots = new WorkerSlots(() => host.store.tickets.open().filter(ticket => this.running(ticket)).map(ticket => ticket.id),
       () => host.store.settings().executor.maxWorkers)
     // Each launch reserves a worker slot so launches run concurrently while slots are free.
@@ -436,6 +443,7 @@ export class DshExecutor implements Executor {
       const updated = this.host.engine.report(ticketId, { state: 'failed', summary })
       this.relay(resultRelay(updated, 'failed', summary))
     })
+    this.host.progress(ticketId, 'Failed')
   }
   private relay({ id, text }: { id: string; text: string }): void { this.host.sessions.relay(id, text) }
   private async launch(ticket: Ticket, assignment: Assignment): Promise<void> {
@@ -490,6 +498,7 @@ export class DshExecutor implements Executor {
       () => { if (!current()) throw new Error('Launch authorization changed before worker delivery') },
       () => { this.host.engine.assignmentStarted(ticket.id, assignment.id) })
     this.host.engine.assignmentStarted(ticket.id, assignment.id)
+    this.host.progress(ticket.id, 'Started')
   }
   /** Returns the stored ticket for `agent` when it is a worker session, or undefined otherwise. */
   private ticketOf(agent: Agent): Ticket | undefined {
@@ -517,7 +526,12 @@ export class DshExecutor implements Executor {
     // history: a step that claimed it may be cancelled or fail before, which drops it.
     this.disposers.push(ctx.on('session/event', (session, event) => {
       const ticketId = ticketOfSession(session.id)
-      if (event.type !== 'user/message' || ticketId === undefined || event.data.source.kind !== 'dsh-superagent' || this.host.closing()) return
+      if (ticketId === undefined || this.host.closing()) return
+      // A shell command a worker ran is judged against the command policy after the fact. Record-only: the command's
+      // behaviour never depends on this listener, and a record that cannot be written is dropped rather than failing
+      // the worker or the command it describes.
+      if (event.type === 'tool/call') { this.auditCommand(ticketId, event.data.name, event.data.arguments); return }
+      if (event.type !== 'user/message' || event.data.source.kind !== 'dsh-superagent') return
       const message = event.data
       void this.background(Promise.resolve().then(() => {
         const read = this.host.store.tickets.get(ticketId)?.inputs.filter(input => input.kind === 'trigger' && !input.readAt
@@ -532,6 +546,27 @@ export class DshExecutor implements Executor {
       if (this.retries(assignment.id, error)) { this.resumeAfter(ticket.id, assignment.id, error); return }
       void this.background(Promise.resolve().then(() => { this.failed(ticket.id, String(error)) }))
     }))
+  }
+  /**
+   * Records one worker shell command against the configured command policy. Record-only: nothing is decided here that
+   * the command can observe, so `enforced` is always `allow` until the policy itself enforces.
+   */
+  private auditCommand(ticketId: string, tool: string, raw: string): void {
+    if (tool !== 'bash' && tool !== 'pwsh') return
+    let command: string | undefined
+    try {
+      const call = JSON.parse(raw) as { command?: unknown }
+      if (typeof call.command === 'string') command = call.command
+    } catch { return }
+    if (!command) return
+    const argv = splitCommandLine(command)
+    if (!argv.length) return
+    const evaluation = evaluateCommand(this.host.store.settings().executor.commandPolicy, argv)
+    void this.audit.append({
+      at: now(), ticket: ticketId, tool, command: command.length > 2000 ? `${command.slice(0, 1999)}…` : command,
+      argv: evaluation.argv.slice(0, 12), decision: evaluation.decision, enforced: evaluation.enforced,
+      ...evaluation.matched ? { rule: evaluation.matched.id, ...evaluation.matched.reason ? { reason: evaluation.matched.reason } : {} } : {},
+    }).catch(() => {})
   }
   /** Unsubscribes from host agent events and clears any pending transient-retry timers. */
   dispose(): void {
@@ -645,6 +680,9 @@ export class DshExecutor implements Executor {
     const report = runningAssignment(before)?.report, person = this.personal.get(ticket.id)
     // The worker read what reached it before a turn that ended: one it handed off with, or one whose background work ended.
     if (handedOff(before) && !(report && person && person > report.at)) {
+      const phase = runningAssignment(before)?.report?.state === 'ready' ? 'Ready for review'
+        : before.attention ? 'Waiting for an answer' : 'Waiting for a person'
+      this.host.progress(ticket.id, phase)
       this.host.engine.turnEnded(ticket.id, idle.id)
       this.handOff(ticket.id, agent)
       return
