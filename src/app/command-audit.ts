@@ -23,6 +23,13 @@ export interface CommandAuditEntry {
   enforced: CommandDecision
   rule?: string
   reason?: string
+  /** `command` for one judged attempt, `approval` for one approval transition. */
+  kind?: 'command' | 'approval'
+  /** The approval a `prompt` attempt or an approval transition belongs to. */
+  approvalId?: string
+  /** Who resolved or used the approval: `main-session`, `worker`, or `timeout`. */
+  by?: string
+  note?: string
 }
 
 /** The audit file of one instance, beside the other state files. */

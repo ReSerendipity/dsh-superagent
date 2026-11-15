@@ -13,6 +13,7 @@ import type { Sessions } from '../sessions.ts'
 import type { Settings } from '../settings.ts'
 import type { Store } from '../store.ts'
 import { AcknowledgementSchema, readTool, tool, type Tool } from './tool.ts'
+import type { ApprovalRecord, CommandGate } from '../command-gate.ts'
 
 const RoutingNoteSchema = z.string().trim()
   .refine(text => wordCount(text) <= NOTE_WORDS, `Routing note must not exceed ${NOTE_WORDS} words (Chinese uses word segmentation). Shorten it; do not split it across deliveries.`)
@@ -26,6 +27,8 @@ export interface MainToolsHost {
   readonly settings: Pick<Settings, 'view' | 'block' | 'save' | 'pause' | 'sync'>
   readonly assessor: Pick<MasterAssessor, 'context' | 'read' | 'decide'>
   readonly resources: ResourceHost
+  /** The command policy's approval ledger: a worker's `prompt` command waits here for a person's decision. */
+  readonly commandGate: Pick<CommandGate, 'approve' | 'deny'>
   /** Schedules a pass to carry out work queued by an Engine command (such as an Eval or ticket resume). */
   requestPass(): void
   sendReplies(): Promise<void>
@@ -306,5 +309,22 @@ export function mainTools(host: MainToolsHost, agent: Agent): Tool[] {
         return saved
       },
     }),
+    tool({
+      name: 'orchestrator_command_approve',
+      description: 'Approve a pending worker command; it may run once before the approval expires.',
+      schema: z.object({ approval_id: z.string().min(1) }).strict(),
+      execute: async args => approvalSummary(await host.commandGate.approve(args.approval_id, 'main-session')),
+    }),
+    tool({
+      name: 'orchestrator_command_deny',
+      description: 'Deny a pending worker command.',
+      schema: z.object({ approval_id: z.string().min(1) }).strict(),
+      execute: async args => approvalSummary(await host.commandGate.deny(args.approval_id, 'main-session')),
+    }),
   ]
+}
+/** The record of one resolved approval as the main Session reads it back. */
+function approvalSummary(approval: ApprovalRecord) {
+  return { approval_id: approval.id, state: approval.state, ticket: approval.ticket, command: approval.command,
+    expires_at: approval.expiresAt, ...approval.by ? { by: approval.by } : {} }
 }

@@ -42,7 +42,9 @@ interface Skill { name: string; description: string; content: string }
 // all for a rule set. That discipline held only in a profile's own prompt revisions, so a fresh
 // install silently lost it; shipping it in prompts/team/* costs 1_572 characters per request for both roles, and these
 // caps moved to 61_000 and 42_500 to pay for it. The guard still applies to anything added after this.
-const BUDGET: Record<Role, number> = { orchestrator: 61_000, worker: 42_500 }
+// The command-policy approval tools add their definitions to the orchestrator's surface; measured at 61_130 with both,
+// so the cap moved to 61_150 (150 characters, 0.25%) rather than making the tools' descriptions unreadable.
+const BUDGET: Record<Role, number> = { orchestrator: 61_150, worker: 42_500 }
 const PROMPTS = 'prompts/, skills/', TOOLS = 'src/app/tools/', SESSIONS = 'src/app/sessions.ts'
 const NOTICES = 'src/app/notices.ts', LINKS = 'src/app/links.ts', ASSESSMENT = 'src/app/assessment.ts'
 const EXECUTOR = 'src/executor/dsh.ts', ERRORS = 'src/core/errors.ts'

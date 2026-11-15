@@ -308,7 +308,7 @@ Some generic modules still refer directly to GitHub or Feishu:
 | `src/deployment.ts` | The plugin `Config` and `Machine`; `resolveDeployment` and `resolveFeishuBot` read the repository and the accounts from the Source settings, each CLI run as Executor shells run it; `SETUP_FIELDS` lists the Source fields setup reads. The code names no person, account or organization |
 | `src/setup.ts` | Setup problems: `SetupError`, with a code, the place that fixes it and the English text the log, the main Session and the panel share |
 | `src/policy.ts` | The Policy: the settings schemas by block, the Policy version, the gate and Mandate revalidation |
-| `src/command-policy.ts` | The parameter-level command policy: argv-prefix rules with the `allow`/`prompt`/`forbid` decision, `evaluateCommand`, and `splitCommandLine`. Record-only until its `enforce` is turned on |
+| `src/command-policy.ts` | The parameter-level command policy: argv-prefix rules with the `allow`/`prompt`/`forbid` decision, `evaluateCommand`, and `splitCommandLine`. It is always evaluated; `enforce` decides whether a decision is applied at `tools/pre-execute` |
 | `src/admission.ts` | The admission table's values, each cell's options and defaults, shared with the panel |
 | `src/limits.ts` | The limits of the values a person sets, which the settings schemas check and the panel's fields offer |
 | `src/kv.ts` | `KV`: every family of `kv` records with its key, its value's type and its owner, and the `Key` and `Family` types the Store and `SourceContext.state` take |
@@ -334,6 +334,7 @@ Some generic modules still refer directly to GitHub or Feishu:
 | `src/app/outbox.ts` | The Outbox: the Engine's `Outbox` port, the receipts and the `reply` effects that send them |
 | `src/app/progress.ts` | Progress comments: the marker a progress `notice` carries, the body one GitHub comment shows, and `ProgressNotifier`, which sends a line only for a Ticket with a GitHub Channel |
 | `src/app/command-audit.ts` | `CommandAudit`: the append-only JSONL record of command-policy decisions under the state directory, rotated at a size cap |
+| `src/app/command-gate.ts` | The pre-execute command gate and its approval ledger: `Approvals` (`stateDir/approvals.jsonl`, TTL, timeout-as-deny), and `CommandGate`, which denies `forbid` and holds `prompt` for a person's approval under `enforce` |
 | `src/app/notices.ts` | The main Session's notices and relays: `eventNotice`, `reportRelay`, `resultRelay` and `followupRelay` |
 | `src/app/store.ts` | The Store, and `Receipt`, a message of the outbox |
 | `src/app/store-read.ts` | `storeReads`: the Store's read queries for the views, the tools and the Sources' polls, which never write |
@@ -441,6 +442,7 @@ Some generic modules still refer directly to GitHub or Feishu:
 | `tests/stage.spec.ts` | The Ticket stages, row by row |
 | `tests/policy.spec.ts` | Source scope, the gate, the admission table, Mandate revalidation, the Policy version, settings migrations and assessment outcomes |
 | `tests/command-policy.spec.ts` | The parameter-level command policy: argv-prefix matching, the four decisions, the record-only default, the settings default, and the executor recording a worker's shell call without enforcing it |
+| `tests/command-gate.spec.ts` | The pre-execute gate under `enforce`: allow/prompt/forbid, the approval ledger on disk, TTL expiry as a denial, one-use approvals, and the main Session's approve/deny tools |
 | `tests/progress.spec.ts` | Progress comment helpers: the marker round trip, the body, and the GitHub-only notifier |
 | `tests/admission-plain.spec.ts` | The plain-language layer over the admission table: the groups a cell falls into, the round trip of a choice, and which questions a scope can be asked at all |
 | `tests/registry.spec.ts` | `SourceRegistry`: instances, validation, Policy parts, Channels and Thread context |

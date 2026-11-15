@@ -124,17 +124,18 @@ describe('DshExecutor record-only audit', () => {
   it('records a worker shell call against the policy, and leaves the decision unenforced', async () => {
     const ctx = new Context()
     const stateDir = join(dir, 'state')
+    const audit = new CommandAudit(commandAuditFile(stateDir))
     const host = {
       context: ctx, engine: {}, effects: { handle: () => {} }, health: {}, machine: { stateDir, mode: 'local' },
       store: { tickets: { get: () => undefined }, settings: () => SettingsSchema.parse({}), atomic: (work: () => void) => work() },
       lifetime: new AbortController().signal, sessions: {}, closing: () => false, paused: () => false,
       environment: () => [], sourceLink: async () => ({}), repliedTo: () => undefined, progress: () => {},
+      audit, commandGate: { guard: async () => ({ kind: 'allow' }) },
     }
     const executor = new DshExecutor(host as never)
     executor.install()
     ctx.emit('session/event', { id: 'worker-tk1' } as never, { type: 'tool/call',
       data: { turn: 0, step: 0, callId: 'c1', name: 'pwsh', arguments: JSON.stringify({ command: 'git push --force origin main' }) } } as never)
-    const audit = new CommandAudit(commandAuditFile(stateDir))
     await until(async () => (await audit.recent()).length === 1)
     expect((await audit.recent())[0]).toMatchObject({ ticket: 'tk1', tool: 'pwsh', decision: 'forbid', enforced: 'allow', rule: 'force-push' })
     executor.dispose()

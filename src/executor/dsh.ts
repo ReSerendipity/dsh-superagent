@@ -1,5 +1,6 @@
 /** DSH executor: manages one persistent worker session and workspace directory per ticket. */
 import type { Context } from '@deepseek-ai/cordis'
+import type { PreToolDecision, ToolExecution } from '@deepseek-ai/dsh-tools'
 import type { SessionId } from '@deepseek-ai/dsh-session'
 import type { Agent } from '@deepseek-ai/dsh-agent'
 import { mkdir, rmdir, stat } from 'node:fs/promises'
@@ -17,7 +18,8 @@ import { executionRoot, type Variable } from '../app/execution-environment.ts'
 import type { Sessions } from '../app/sessions.ts'
 import { WorktreeNameSchema } from '../app/assessment.ts'
 import { resultRelay } from '../app/notices.ts'
-import { CommandAudit, commandAuditFile } from '../app/command-audit.ts'
+import { CommandAudit } from '../app/command-audit.ts'
+import type { CommandGate } from '../app/command-gate.ts'
 import { evaluateCommand, splitCommandLine } from '../command-policy.ts'
 import type { HealthEntry } from '../infra/health.ts'
 import { cancelled, collectJob, killJobs, runningJobs, stopBackground, stopSubagents, until, untilQuiet } from './background.ts'
@@ -87,6 +89,10 @@ export interface ExecutorHost {
   repliedTo(trigger: Trigger): Trigger | undefined
   /** Records one progress line for a ticket's GitHub progress comment; a ticket with no GitHub channel sends nothing. */
   progress(ticketId: string, line: string): void
+  /** The instance's command audit, shared with the gate so both write one file. */
+  readonly audit: CommandAudit
+  /** Judges a worker's shell call before it dispatches (`tools/pre-execute`), enforcing the command policy. */
+  readonly commandGate: Pick<CommandGate, 'guard'>
 }
 /** Looks up a ticket's origin trigger in Store. */
 export const sourceTrigger = (host: { store: Pick<Store, 'triggers'> }, ticket: Ticket): Trigger | undefined =>
@@ -236,7 +242,7 @@ export class DshExecutor implements Executor {
   private readonly audit: CommandAudit
   /** Registers the `launch` and `delivery` effect handlers; both are held (concurrency limit 0) while processing is paused. */
   constructor(private readonly host: ExecutorHost) {
-    this.audit = new CommandAudit(commandAuditFile(host.machine.stateDir))
+    this.audit = host.audit
     this.slots = new WorkerSlots(() => host.store.tickets.open().filter(ticket => this.running(ticket)).map(ticket => ticket.id),
       () => host.store.settings().executor.maxWorkers)
     // Each launch reserves a worker slot so launches run concurrently while slots are free.
@@ -522,14 +528,17 @@ export class DshExecutor implements Executor {
       const ticketId = ticketOfSession(agent.id)
       if (ticketId !== undefined && message.source.kind === 'user') this.personal.set(ticketId, now())
     }))
+    // A worker's shell call is judged before it dispatches, so an enforcing policy can deny it rather than record it
+    // after the fact. A record-only policy returns allow without touching disk.
+    this.disposers.push(ctx.on('tools/pre-execute', (exec, next) => this.gated(exec, next)))
     // The Inputs a message of dsh-superagent's carries, which its worker reads once the Session took the message into its
     // history: a step that claimed it may be cancelled or fail before, which drops it.
     this.disposers.push(ctx.on('session/event', (session, event) => {
       const ticketId = ticketOfSession(session.id)
       if (ticketId === undefined || this.host.closing()) return
-      // A shell command a worker ran is judged against the command policy after the fact. Record-only: the command's
-      // behaviour never depends on this listener, and a record that cannot be written is dropped rather than failing
-      // the worker or the command it describes.
+      // Record-only build: every shell call a worker ran is written here, after the fact. An enforcing policy is judged
+      // before dispatch instead (`gated`), where the real outcome is known; a second after-the-fact record would claim
+      // the command ran when it was denied, so it is skipped.
       if (event.type === 'tool/call') { this.auditCommand(ticketId, event.data.name, event.data.arguments); return }
       if (event.type !== 'user/message' || event.data.source.kind !== 'dsh-superagent') return
       const message = event.data
@@ -548,8 +557,22 @@ export class DshExecutor implements Executor {
     }))
   }
   /**
-   * Records one worker shell command against the configured command policy. Record-only: nothing is decided here that
-   * the command can observe, so `enforced` is always `allow` until the policy itself enforces.
+   * Applies the command gate to a call before dispatch. Only a worker session's shell call is judged; every other call
+   * passes to the next handler. With enforcement on, a gate that cannot decide denies the call rather than running it.
+   */
+  private async gated(exec: ToolExecution, next: () => Promise<PreToolDecision>): Promise<PreToolDecision> {
+    const ticketId = exec.agent ? ticketOfSession(exec.agent.id) : undefined
+    if (ticketId === undefined) return next()
+    try {
+      const decision = await this.host.commandGate.guard(ticketId, exec.name, exec.arguments)
+      return decision.kind === 'deny' ? { kind: 'deny', reason: decision.reason } : next()
+    } catch (error) {
+      return { kind: 'deny', reason: `The command policy could not judge this command (${String(error)}); it was not run.` }
+    }
+  }
+  /**
+   * Records one worker shell command against the configured command policy after it ran, in a record-only build.
+   * When the policy enforces, the gate already recorded the attempt before dispatch and this is a no-op.
    */
   private auditCommand(ticketId: string, tool: string, raw: string): void {
     if (tool !== 'bash' && tool !== 'pwsh') return
@@ -559,9 +582,11 @@ export class DshExecutor implements Executor {
       if (typeof call.command === 'string') command = call.command
     } catch { return }
     if (!command) return
+    const policy = this.host.store.settings().executor.commandPolicy
+    if (policy.enforce) return
     const argv = splitCommandLine(command)
     if (!argv.length) return
-    const evaluation = evaluateCommand(this.host.store.settings().executor.commandPolicy, argv)
+    const evaluation = evaluateCommand(policy, argv)
     void this.audit.append({
       at: now(), ticket: ticketId, tool, command: command.length > 2000 ? `${command.slice(0, 1999)}…` : command,
       argv: evaluation.argv.slice(0, 12), decision: evaluation.decision, enforced: evaluation.enforced,

@@ -266,6 +266,7 @@
         "commandPolicy": {
           "enforce": false,
           "default": "allow",
+          "approvalTtlMinutes": 10,
           "rules": [
             {
               "id": "force-push",
@@ -363,6 +364,7 @@
           "default": {
             "enforce": false,
             "default": "allow",
+            "approvalTtlMinutes": 10,
             "rules": [
               {
                 "id": "force-push",
@@ -452,6 +454,12 @@
                 ],
                 "additionalProperties": false
               }
+            },
+            "approvalTtlMinutes": {
+              "default": 10,
+              "type": "integer",
+              "minimum": 1,
+              "maximum": 1440
             }
           },
           "additionalProperties": false

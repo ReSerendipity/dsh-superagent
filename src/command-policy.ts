@@ -1,9 +1,10 @@
 /**
  * Parameter-level command policy: argv-prefix rules with a four-state decision (`allow`, `prompt`, `forbid`).
  *
- * This build only *evaluates*: `enforce` is false by default, so every decision is recorded and nothing is blocked.
- * Worker deliveries (`gh`, `git`, `lark-cli`) stay on their existing shims until an enforcing build has been proven
- * against the command lines workers really produce, which `stateDir/command-audit.jsonl` collects first.
+ * The policy is always evaluated; whether a decision is enforced depends on `enforce`. A record-only policy (the default)
+ * writes judgments to `stateDir/command-audit.jsonl` and lets every command run; an enforcing one denies `forbid` at
+ * DSH's `tools/pre-execute` waterfall and turns `prompt` into an approval recorded in `stateDir/approvals.jsonl`.
+ * Worker deliveries (`gh`, `git`, `lark-cli`) are untouched in either mode unless a rule names them.
  */
 import { z } from 'zod'
 
@@ -27,6 +28,8 @@ export const CommandPolicySchema = z.object({
   /** The decision for a command no rule matches. */
   default: CommandDecisionSchema.default('allow'),
   rules: z.array(CommandRuleSchema).max(200).default([]),
+  /** How long a `prompt` approval stays valid; a pending approval past it is denied by timeout. */
+  approvalTtlMinutes: z.number().int().min(1).max(1440).default(10),
 }).strict()
 export type CommandPolicy = z.infer<typeof CommandPolicySchema>
 
@@ -38,6 +41,7 @@ export type CommandPolicy = z.infer<typeof CommandPolicySchema>
 export const DEFAULT_COMMAND_POLICY: CommandPolicy = {
   enforce: false,
   default: 'allow',
+  approvalTtlMinutes: 10,
   rules: [
     { id: 'force-push', match: ['git', 'push', '--force'], decision: 'forbid',
       reason: 'A force-push rewrites published history; a ticket branch must move forward.' },
