@@ -46,16 +46,22 @@ jobs:
 
       - run: pnpm install --frozen-lockfile
 
-      - name: Check that the tag matches package.json
+      # version.json is the repository's single version fact; package.json mirrors it.
+      - name: Check that the tag matches package.json and version.json
         id: version
         run: |
           tag="${GITHUB_REF_NAME}"
-          version="$(node -p "require('./package.json').version")"
-          if [ "$tag" != "v$version" ]; then
-            echo "::error::tag $tag does not match package version $version"
+          package_version="$(node -p "require('./package.json').version")"
+          file_version="$(node -p "require('./version.json').version")"
+          if [ "$package_version" != "$file_version" ]; then
+            echo "::error::package.json version $package_version does not match version.json $file_version"
             exit 1
           fi
-          echo "version=$version" >> "$GITHUB_OUTPUT"
+          if [ "$tag" != "v$package_version" ]; then
+            echo "::error::tag $tag does not match version $package_version (package.json and version.json)"
+            exit 1
+          fi
+          echo "version=$package_version" >> "$GITHUB_OUTPUT"
 
       - name: Skip when this version already exists on npm
         id: exists

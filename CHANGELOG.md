@@ -1,5 +1,21 @@
 # DSH-Superagent Changelog
 
+## [0.2.9] — 2026-11-16
+
+参数级命令策略与审批闸门（PR #39）。
+
+### Added
+
+- **参数级命令策略（默认 record-only）**：新增 `commandPolicy` 规则求值与 `command-audit` 审计，按结构化 argv 判定；`enforce=false` 时只记录不拦截。
+- **GitHub 单条进度评论**：每个 ticket 只保留一条进度评论并原地 PATCH，结果仍走既有回复链。
+- **enforce 前置拦截与审批队列**：用 DSH `tools/pre-execute` 的结构化 argv 做前置判定，`forbid` 直接拒绝、`prompt` 落审批；`approvals.jsonl` 带 TTL、默认超时拒绝，主会话提供 `approve` / `deny` 工具；默认 `enforce=false` 保持 record-only。
+
+### Notes
+
+- 全量 1349 passed / 49 skipped，`tsc --noEmit` 通过。
+- 真实实例上的 `tools/pre-execute` 派发与 `gh`/`git` 交付链仍需现场验证（PR #39 test plan 未勾选项）。
+- 发布工程：新增 `version.json` 作为仓库统一版本事实源，`publish.yml` 同时校验它与 `package.json`，两者都必须与 tag 一致。
+
 ## [0.2.8] — 2026-11-13
 
 深度审查修复批次（2026-11-12/13 全仓审查，报告见 `local/review-2026-11-12.md`）：6 条 P1、20 余条 P2 与 P3 卫生项全部处理，测试基线 1307 passed / 49 skipped。
