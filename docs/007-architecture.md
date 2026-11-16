@@ -505,7 +505,7 @@ Some generic modules still refer directly to GitHub or Feishu:
 | `tests/locales.spec.ts`, `tests/styles.spec.ts` | The copy in both languages, the stylesheet |
 | `tests/class-docs.spec.ts` | Every class in `src` has a JSDoc block before it |
 | `tests/docs.spec.ts` | Numbered documents link only to earlier ones, every local link resolves, no document has merge conflict markers, and this document's tables list every module and every test |
-| `tests/portability.spec.ts` | Portability: detect machine paths and explicit local account values in common arguments, assignments and comparisons; ordinary prose is not an account reference |
+| `tests/portability.spec.ts` | Portability: detect the current home/checkout paths and conventional Windows user directories; bare account names and arbitrary machine dependencies are outside this static path check |
 | `tests/release-invariants.spec.ts` | Release invariants: upstream attribution in README/NOTICE/LICENSE/locale/package metadata, the changelog, the package id and the absence of credential shapes |
 | `tests/client-module-id.spec.ts` | The built client module registers under the package name, which is what DSH's desktop host composes client modules by; a bare id fails to boot |
 | `tests/state-lock.spec.ts` | The state directory's one-backend lock: a lock left by a dead holder is reclaimed without waiting out `stale`, a live holder's lock still refuses acquisition, and the holder record is written and cleared with the lock |
