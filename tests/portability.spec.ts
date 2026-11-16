@@ -19,11 +19,13 @@ const BINARY = /\.(png|ico|jpg|jpeg|webp|zip|zst|zstd|exe|dll|pak|dat|bin|pdf)$/
 const USER = userInfo().username
 const HOME = homedir()
 const escape = (value: string): string => value.replace(/[.*+?^${}()|[\]\\]/g, '\\$&')
+export const windowsUserPathPattern = (user: string): RegExp =>
+  new RegExp(`[a-z]:[\\\\/]{1,2}Users[\\\\/]{1,2}${escape(user)}(?=[\\\\/]|$)`, 'i')
 // A bare account name can be an ordinary word in prose on any machine. Detect it in machine paths instead.
 /** Paths that identify the machine this checkout runs on. */
 export const FORBIDDEN: { name: string; pattern: RegExp }[] = [
   { name: 'developer home directory', pattern: new RegExp(escape(HOME), 'i') },
-  { name: 'windows user path', pattern: new RegExp(`C:[\\\\/]{1,2}Users[\\\\/]{1,2}${escape(USER)}\\b`, 'i') },
+  { name: 'windows user path', pattern: windowsUserPathPattern(USER) },
   { name: 'repository checkout path', pattern: new RegExp(escape(ROOT), 'i') },
 ]
 
@@ -103,4 +105,13 @@ it('allows ordinary prose even when a word matches the current account name', ()
 
 it('still detects a planted checkout path', () => {
   expect(scanText(`checkout: ${ROOT}`).map(finding => finding.name)).toContain('repository checkout path')
+})
+
+it.each(['alice.smith', '研发用户', 'user name', 'dev[1]+'])('detects Windows user paths for %s on either drive and with escaped separators', user => {
+  const patterns = [{ name: 'windows user path', pattern: windowsUserPathPattern(user) }]
+  for (const drive of ['C', 'D']) for (const separator of ['/', '\\', '\\\\']) {
+    expect(scanText(`${drive}:${separator}Users${separator}${user}${separator}work`, patterns)).toHaveLength(1)
+    expect(scanText(`${drive}:${separator}Users${separator}${user}`, patterns)).toHaveLength(1)
+    expect(scanText(`${drive}:${separator}Users${separator}${user}-other${separator}work`, patterns)).toEqual([])
+  }
 })
