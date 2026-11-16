@@ -60,7 +60,7 @@ import type { ResourceHost } from './resources.ts'
 import { mainTools, type MainToolsHost } from './tools/main.ts'
 import { executorTools, type ExecutorToolsHost } from './tools/executor.ts'
 import { CHAT_ROUTER_PROMPT, type ChatRouterHost } from '../chat-router/host.ts'
-import { briefOf } from '../chat-router/config.ts'
+import { briefOf, rosterOf, teamRole } from '../chat-router/config.ts'
 import { chatRouterTools, type DispatchedTask } from '../chat-router/tools.ts'
 import { submitChatTicket } from '../chat-router/submit.ts'
 import { ChatReplyWatcher } from '../chat-router/channel.ts'
@@ -201,9 +201,10 @@ export class Runtime extends Service implements SourceHost {
       }
       const chatRouter: ChatRouterHost = {
         settings: () => store.settings().chatRouter,
-        prompt: () => CHAT_ROUTER_PROMPT,
+        // The roster is read on every model request, so a panel save changes the next turn without a restart.
+        prompt: () => CHAT_ROUTER_PROMPT + rosterOf(store.settings().chatRouter),
         tools: agent => chatRouterTools({
-          submit: async (title, request, context, name) => this.dispatchChatTask(agent.id, title, request, context, name),
+          submit: async (title, request, context, name, role) => this.dispatchChatTask(agent.id, title, request, context, name, role),
           status: async () => ({ tickets: store.tickets.list().slice(0, 20).map(ticketCard) }),
           answer: async (ticketId, text) => { this.engine.note(ticketId, text); return { noted: true } },
         }),
@@ -322,9 +323,19 @@ export class Runtime extends Service implements SourceHost {
   /**
    * Hand a chief-of-staff task straight to the Engine: an explicit Trigger accepted at once. Dispatch therefore never
    * depends on the Router Session (which may be unavailable) and the worker still gets its own Session.
+   *
+   * A named team role is validated before anything is created: an unknown id throws, so the tool reports a failed task
+   * instead of quietly dispatching to a default worker. The role travels on the Trigger's meta — never on the Ticket —
+   * which keeps `src/core/**` byte-identical to upstream while the worker Session still reads it.
    */
-  private dispatchChatTask(sessionId: string, title: string, request: string, context?: string, name?: string): DispatchedTask {
+  private dispatchChatTask(sessionId: string, title: string, request: string, context?: string, name?: string, role?: string): DispatchedTask {
     const at = new Date().toISOString()
+    const settings = this.store.settings().chatRouter
+    const profile = role === undefined ? undefined : teamRole(settings, role)
+    if (role !== undefined && profile === undefined) {
+      const known = settings.team.roles.map(item => item.id).join(', ')
+      throw new Error(`Unknown team role "${role}"; this deployment configures: ${known || 'no roles'}. Dispatch without a role or use a listed id.`)
+    }
     const text = context?.trim()
       ? `${request.trim()}\n\n## Context from the dispatching conversation\n${context.trim()}`
       : request.trim()
@@ -340,7 +351,8 @@ export class Runtime extends Service implements SourceHost {
       addressed: 'direct',
       at,
       text,
-      meta: { title, chatSession: sessionId, dispatchedBy: 'chat-router' },
+      meta: { title, chatSession: sessionId, dispatchedBy: 'chat-router',
+        ...(profile ? { role: profile.id, roleName: profile.name } : {}) },
     }
     const result = this.engine.receive(trigger)
     if (result !== 'stored') return { triggerId: trigger.id, result }

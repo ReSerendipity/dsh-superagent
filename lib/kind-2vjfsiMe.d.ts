@@ -171,6 +171,22 @@ declare const SettingsSchema: ZodObject<{
       }>>;
       onProgress: ZodDefault<ZodBoolean>;
     }, $strip>>;
+    team: ZodDefault<ZodObject<{
+      roles: ZodDefault<ZodArray<ZodObject<{
+        id: ZodString;
+        name: ZodString;
+        instruction: ZodString;
+        model: ZodDefault<ZodNullable<ZodType<{
+          provider: string;
+          model: string;
+          reasoningEffort?: string | undefined;
+        }, unknown, $ZodTypeInternals<{
+          provider: string;
+          model: string;
+          reasoningEffort?: string | undefined;
+        }, unknown>>>>;
+      }, $strict>>>;
+    }, $strict>>;
   }, $strict>>;
 }, $strict>;
 type Settings = output<typeof SettingsSchema>;
@@ -286,6 +302,18 @@ declare class SourceRegistry implements SourceScope {
         mode: "none" | "brief";
         onProgress: boolean;
       };
+      team: {
+        roles: {
+          id: string;
+          name: string;
+          instruction: string;
+          model: {
+            provider: string;
+            model: string;
+            reasoningEffort?: string | undefined;
+          } | null;
+        }[];
+      };
     };
   }): (SourceInstance & {
     installed: boolean;
@@ -367,6 +395,18 @@ declare class SourceRegistry implements SourceScope {
       reply: {
         mode: "none" | "brief";
         onProgress: boolean;
+      };
+      team: {
+        roles: {
+          id: string;
+          name: string;
+          instruction: string;
+          model: {
+            provider: string;
+            model: string;
+            reasoningEffort?: string | undefined;
+          } | null;
+        }[];
       };
     };
   }): SourceInstance<C> | undefined;
@@ -462,6 +502,18 @@ declare class SourceRegistry implements SourceScope {
         mode: "none" | "brief";
         onProgress: boolean;
       };
+      team: {
+        roles: {
+          id: string;
+          name: string;
+          instruction: string;
+          model: {
+            provider: string;
+            model: string;
+            reasoningEffort?: string | undefined;
+          } | null;
+        }[];
+      };
     };
   }): {
     admission: Record<string, AdmissionRow>;
@@ -551,6 +603,18 @@ declare class SourceRegistry implements SourceScope {
         mode: "none" | "brief";
         onProgress: boolean;
       };
+      team: {
+        roles: {
+          id: string;
+          name: string;
+          instruction: string;
+          model: {
+            provider: string;
+            model: string;
+            reasoningEffort?: string | undefined;
+          } | null;
+        }[];
+      };
     };
   }): boolean;
   /** Environment variable declarations for every installed kind, whether enabled or disabled. */
@@ -635,6 +699,18 @@ declare class SourceRegistry implements SourceScope {
       reply: {
         mode: "none" | "brief";
         onProgress: boolean;
+      };
+      team: {
+        roles: {
+          id: string;
+          name: string;
+          instruction: string;
+          model: {
+            provider: string;
+            model: string;
+            reasoningEffort?: string | undefined;
+          } | null;
+        }[];
       };
     };
   }): {
@@ -734,6 +810,18 @@ declare class SourceRegistry implements SourceScope {
         mode: "none" | "brief";
         onProgress: boolean;
       };
+      team: {
+        roles: {
+          id: string;
+          name: string;
+          instruction: string;
+          model: {
+            provider: string;
+            model: string;
+            reasoningEffort?: string | undefined;
+          } | null;
+        }[];
+      };
     };
   }): TriggerContext | undefined;
   scope(input: {
@@ -816,6 +904,18 @@ declare class SourceRegistry implements SourceScope {
       reply: {
         mode: "none" | "brief";
         onProgress: boolean;
+      };
+      team: {
+        roles: {
+          id: string;
+          name: string;
+          instruction: string;
+          model: {
+            provider: string;
+            model: string;
+            reasoningEffort?: string | undefined;
+          } | null;
+        }[];
       };
     };
   }): ScopeResult;

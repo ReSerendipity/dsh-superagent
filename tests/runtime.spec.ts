@@ -1821,3 +1821,62 @@ it('writes a panel-dispatched ticket into the inbox Source, and refuses while no
   expect(readdirSync(inbox)).toContain(file)
   expect(readFileSync(join(inbox, file), 'utf8')).toContain('只改颜色，不动布局')
 })
+
+// A team role chosen at dispatch travels to the worker Session: its model seeds that Session and its instruction joins
+// the worker's system prompt, while an unknown id is refused before any Trigger exists.
+it('carries a dispatched team role into the worker Session, and refuses an unknown role', async () => {
+  const inbox = mkdtempSync(join(tmpdir(), 'team-role-inbox-'))
+  runtime.sources.register(inboxKind)
+  const settings = runtime.store.settings()
+  await runtime.settings.save('chatRouter', { ...settings.chatRouter, enabled: true, team: { roles: [
+    { id: 'reviewer', name: 'Reviewer', instruction: 'Review the change and name every unverified gap.',
+      model: { provider: 'team-fake', model: 'team-review' } }] } }, runtime.store.blockRevision('chatRouter'), 'panel')
+  await runtime.settings.save('source:inbox', { kind: 'inbox', enabled: true,
+    config: { inboxDir: inbox, actor: 'local', pollSeconds: 10 } }, runtime.store.blockRevision('source:inbox'), 'panel')
+  // Admit the inbox Source's local actor, the same policy a person would save for a working inbox Source.
+  const policy = runtime.store.settings().policy
+  await runtime.settings.save('policy', { ...policy, sources: { ...policy.sources,
+    inbox: { allowed: [{ id: 'local', name: 'Local' }] } } }, runtime.store.blockRevision('policy'), 'panel')
+  // An ordinary main chat becomes the chief of staff and learns the roster from its own prompt.
+  await runtime.sessions.ensure('session-chief', join(directory, 'chat'), 'Chat', 'orchestrator')
+  const chief = (sections.get('session-chief')!.text as (context: object) => string)({})
+  expect(chief).toContain('reviewer (Reviewer)')
+  expect(chief).toContain('Review the change and name every unverified gap.')
+
+  // An unknown role fails that task only, before anything is stored: no silent fallback to a default worker.
+  const refused = await runTool('session-chief', 'chat_dispatch', { tasks: [{ title: 'Ghost', request: 'Do it', role: 'ghost' }] })
+  expect(refused).toMatchObject({ results: [{ status: 'failed' }] })
+  expect(String((refused.results as { error: string }[])[0]!.error)).toContain('Unknown team role')
+  expect(runtime.store.tickets.list()).toHaveLength(0)
+
+  const dispatched = await runTool('session-chief', 'chat_dispatch', { tasks: [{ title: 'Review the diff',
+    request: 'Review the change in this repository.', role: 'reviewer' }] })
+  expect(dispatched).toMatchObject({ results: [{ status: 'created', role: 'reviewer' }] })
+  const ticketId = String((dispatched.results as { ticket_id: string }[])[0]!.ticket_id)
+  const ticket = runtime.store.tickets.get(ticketId)!
+  const trigger = runtime.store.triggers.get(ticket.origin.triggerId)!
+  expect(trigger.meta).toMatchObject({ role: 'reviewer', roleName: 'Reviewer' })
+  const worker = `worker-${ticketId}`
+  // The fixture records the Session's appended events, which is where the seeded model selection shows up.
+  const events = (agents.get(worker) as unknown as { session: { snapshotEvents: () => { type: string; data: unknown }[] } })
+    .session.snapshotEvents()
+  expect(events).toContainEqual({ type: 'model/selection', data: { provider: 'team-fake', model: 'team-review' } })
+  expect((sections.get(worker)!.text as (context: object) => string)({})).toContain('## Team role: Reviewer')
+  expect((sections.get(worker)!.text as (context: object) => string)({})).toContain('Review the change and name every unverified gap.')
+
+  // A role without a model must keep the executor's model, the same fallback an anonymous worker had: this is the
+  // one seam where a missing value could silently drop the Session to the host default instead of the configured one.
+  await runtime.settings.save('executor', { ...runtime.store.settings().executor,
+    model: { provider: 'exec-fake', model: 'exec-model' } }, runtime.store.blockRevision('executor'), 'panel')
+  await runtime.settings.save('chatRouter', { ...runtime.store.settings().chatRouter, team: { roles: [
+    ...runtime.store.settings().chatRouter.team.roles,
+    { id: 'writer', name: 'Writer', instruction: 'Draft the words a person will read.', model: null }] } },
+  runtime.store.blockRevision('chatRouter'), 'panel')
+  const written = await runTool('session-chief', 'chat_dispatch', { tasks: [{ title: 'Write the note', request: 'Write it.', role: 'writer' }] })
+  expect(written).toMatchObject({ results: [{ status: 'created', role: 'writer' }] })
+  const writerTicket = String((written.results as { ticket_id: string }[])[0]!.ticket_id)
+  const writerEvents = (agents.get(`worker-${writerTicket}`) as unknown as { session: { snapshotEvents: () => { type: string; data: unknown }[] } })
+    .session.snapshotEvents()
+  expect(writerEvents).toContainEqual({ type: 'model/selection', data: { provider: 'exec-fake', model: 'exec-model' } })
+  expect((sections.get(`worker-${writerTicket}`)!.text as (context: object) => string)({})).toContain('## Team role: Writer')
+})

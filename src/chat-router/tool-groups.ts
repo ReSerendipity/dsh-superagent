@@ -5,6 +5,9 @@ export interface ChatToolGroup {
   tools: readonly string[]
 }
 
+/** How many named team roles a deployment may configure; the panel and the settings schema share this one bound. */
+export const MAX_TEAM_ROLES = 8
+
 /** Offered by the panel when `preset: custom` is selected; dispatch tools are always kept and never listed here. */
 export const CUSTOM_TOOL_GROUPS: readonly ChatToolGroup[] = [
   { id: 'read', label: { zh: '只读', en: 'Read only' }, tools: ['read', 'read_image', 'glob', 'grep', 'orchestrator_read'] },

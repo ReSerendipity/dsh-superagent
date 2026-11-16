@@ -258,7 +258,7 @@ describe('settings migration', () => {
       executor: { model: null, maxWorkers: 5, directory: '', prepare: '', blockedCommands: [], commandPolicy: DEFAULT_COMMAND_POLICY,
         watchdogMinutes: 30, watchdogStallMinutes: 45, watchdogGuidance: '', routerShards: 1 },
       chatRouter: { enabled: false, scope: 'allNewChats', tools: { preset: 'standard', allow: [] }, forceDispatch: true,
-        worker: { preset: 'standard', maxParallel: 3 }, reply: { mode: 'brief', onProgress: false } },
+        worker: { preset: 'standard', maxParallel: 3 }, reply: { mode: 'brief', onProgress: false }, team: { roles: [] } },
     })
     expect(migrateSettings(migrated)).toEqual(migrated)
   })

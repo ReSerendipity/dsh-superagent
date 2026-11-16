@@ -4,7 +4,8 @@ import { dirname, join } from 'node:path'
 import { describe, expect, it } from 'vitest'
 import { fileURLToPath } from 'node:url'
 import { CHAT_ROUTER_PROMPT } from '../src/chat-router/host.ts'
-import { CHAT_TOOLS, ChatRouterSettingsSchema, DEFAULT_CHAT_ROUTER_SETTINGS, allowedChatTools, briefOf } from '../src/chat-router/config.ts'
+import { CHAT_TOOLS, ChatRouterSettingsSchema, DEFAULT_CHAT_ROUTER_SETTINGS, allowedChatTools, briefOf, roleOfMeta,
+  rosterOf, teamRole } from '../src/chat-router/config.ts'
 import { chatThreadKey, isChatRouterSession } from '../src/chat-router/match.ts'
 import { chatSessionFrom, submitChatTicket } from '../src/chat-router/submit.ts'
 import { ChatReplyWatcher } from '../src/chat-router/channel.ts'
@@ -51,6 +52,51 @@ describe('chatRouter settings', () => {
     expect(brief.length).toBeLessThan(200)
     expect(brief).toContain('truncated')
     expect(brief).not.toContain('line 99')
+  })
+})
+
+describe('chatRouter team roles', () => {
+  const reviewer = { id: 'reviewer', name: 'Reviewer', instruction: 'Review the change and name every unverified gap.',
+    model: { provider: 'fake', model: 'review-model' } }
+
+  it('is empty by default, so an existing deployment dispatches exactly as before', () => {
+    expect(DEFAULT_CHAT_ROUTER_SETTINGS.team.roles).toEqual([])
+    expect(rosterOf(DEFAULT_CHAT_ROUTER_SETTINGS)).toBe('')
+  })
+
+  it('keeps a role\'s id, name, instruction and model, with the model optional', () => {
+    const settings = ChatRouterSettingsSchema.parse({ team: { roles: [reviewer,
+      { id: 'writer', name: 'Writer', instruction: 'Write the docs.', model: null }] } })
+    expect(settings.team.roles).toHaveLength(2)
+    expect(settings.team.roles[1]!.model).toBeNull()
+    expect(settings.team.roles[0]!.model).toEqual({ provider: 'fake', model: 'review-model' })
+  })
+
+  it('rejects duplicate ids, non-kebab ids, an oversized roster and unknown keys', () => {
+    expect(() => ChatRouterSettingsSchema.parse({ team: { roles: [reviewer, reviewer] } })).toThrow(/Duplicate/)
+    expect(() => ChatRouterSettingsSchema.parse({ team: { roles: [{ ...reviewer, id: 'Reviewer' }] } })).toThrow()
+    expect(() => ChatRouterSettingsSchema.parse({ team: { roles: [{ ...reviewer, id: 'reviewer-1' },
+      { ...reviewer, id: 'reviewer-2' }, { ...reviewer, id: 'reviewer-3' }, { ...reviewer, id: 'reviewer-4' },
+      { ...reviewer, id: 'reviewer-5' }, { ...reviewer, id: 'reviewer-6' }, { ...reviewer, id: 'reviewer-7' },
+      { ...reviewer, id: 'reviewer-8' }, { ...reviewer, id: 'reviewer-9' }] } })).toThrow()
+    expect(() => ChatRouterSettingsSchema.parse({ team: { roles: [reviewer], surprise: true } })).toThrow()
+  })
+
+  it('announces the roster to the chief of staff, bounded per role, and resolves ids and meta', () => {
+    const settings = ChatRouterSettingsSchema.parse({ team: { roles: [reviewer,
+      { id: 'writer', name: 'Writer', instruction: `Write the docs. ${'Long detail. '.repeat(40)}`, model: null }] } })
+    const roster = rosterOf(settings)
+    expect(roster).toContain('reviewer (Reviewer)')
+    expect(roster).toContain('writer (Writer)')
+    expect(roster).not.toContain('Long detail. '.repeat(40))
+    expect(teamRole(settings, 'reviewer')).toMatchObject(reviewer)
+    expect(teamRole(settings, 'ghost')).toBeUndefined()
+    expect(teamRole(settings, undefined)).toBeUndefined()
+    expect(roleOfMeta(settings, { role: 'writer' })).toMatchObject({ name: 'Writer' })
+    // A role removed from settings stops resolving, which is how a retired role stops applying to new dispatches.
+    expect(roleOfMeta(settings, { role: 'retired' })).toBeUndefined()
+    expect(roleOfMeta(settings, {})).toBeUndefined()
+    expect(roleOfMeta(settings, undefined)).toBeUndefined()
   })
 })
 

@@ -7,7 +7,7 @@ import type { SessionId } from '@deepseek-ai/dsh-session'
 import { dirname } from 'node:path'
 import { z } from 'zod'
 import { key, liveTicket, type Ticket } from '../core/index.ts'
-import { mandateInstructions, ticketOfSession } from '../executor/dsh.ts'
+import { mandateInstructions, sourceTrigger, ticketOfSession } from '../executor/dsh.ts'
 import type { HealthEntry } from '../infra/health.ts'
 import { AgentDelivery, messageId } from './delivery.ts'
 import type { Effects } from './effects.ts'
@@ -19,7 +19,7 @@ import { SKILL_PREFIX, type PromptVersion, type Prompts } from './prompts.ts'
 import type { Store } from './store.ts'
 import { KV } from '../kv.ts'
 import type { RegisterTool, Tool } from './tools/tool.ts'
-import { allowedChatTools, CHAT_TOOLS } from '../chat-router/config.ts'
+import { allowedChatTools, CHAT_TOOLS, roleOfMeta, type TeamRole } from '../chat-router/config.ts'
 import { isChatRouterSession } from '../chat-router/match.ts'
 import type { ChatRouterHost } from '../chat-router/host.ts'
 
@@ -27,7 +27,7 @@ import type { ChatRouterHost } from '../chat-router/host.ts'
 export interface SessionsHost {
   /** DSH Cordis context: sessions, agents, persistence, and their events. */
   readonly context: Context
-  readonly store: Pick<Store, 'tickets' | 'settings' | 'get' | 'set' | 'keys'>
+  readonly store: Pick<Store, 'tickets' | 'settings' | 'get' | 'set' | 'keys' | 'triggers'>
   readonly prompts: Pick<Prompts, 'current' | 'version' | 'compose' | 'skills'>
   readonly effects: Pick<Effects, 'enqueue' | 'handle' | 'idle' | 'pending'>
   /** The `models` health entry, which reports managed sessions waiting on a model-budget retry. */
@@ -157,11 +157,26 @@ export class Sessions {
     }
     if ('error' in result) throw result.error
     const settings = this.host.store.settings()
-    await initializeRoleModel(ctx, result.agent, role === 'orchestrator' ? settings.eval.model : settings.executor.model)
+    // A ticket dispatched to a named team role seeds that role's model; without one (or without a model) the worker
+    // keeps the executor's model, exactly as before team roles existed.
+    const profile = role === 'worker' ? this.teamRoleOf(id) : undefined
+    await initializeRoleModel(ctx, result.agent, role === 'orchestrator' ? settings.eval.model : profile?.model ?? settings.executor.model)
     await this.decorate(result.agent)
     ctx.permissionPresets.set(result.agent.session, 'danger-full-access')
     await ctx.sessionController.rename({ sessionId: id as SessionId, title })
     return result.agent
+  }
+  /**
+   * The team role a worker's ticket was dispatched to, read through the Trigger's meta. Roles deliberately live there
+   * instead of on the Ticket, so `src/core/**` keeps matching upstream byte for byte.
+   */
+  private teamRoleOf(sessionId: string): TeamRole | undefined {
+    const ticketId = ticketOfSession(sessionId)
+    return this.roleOf(ticketId === undefined ? undefined : this.host.store.tickets.get(ticketId))
+  }
+  private roleOf(ticket: Ticket | undefined): TeamRole | undefined {
+    if (!ticket) return undefined
+    return roleOfMeta(this.host.store.settings().chatRouter, sourceTrigger(this.host, ticket)?.meta)
   }
   /** Returns whether `sessionId` already holds the message delivered under `requestId`, or `false` if the session does not exist. */
   async holds(sessionId: string, requestId: string): Promise<boolean> {
@@ -263,7 +278,11 @@ export class Sessions {
       const version = this.promptFor(agent, context.signal !== undefined)
       const current = ticket && host.store.tickets.get(ticket.id)
       const composed = host.prompts.compose(version.config, master ? 'orchestrator' : 'worker', current ? host.environment(current) : undefined)
-      return `[dsh-superagent prompt revision ${version.revision}]\n${composed}\n${current ? mandateInstructions(current.mandate) : ''}`
+      // The role's standing instruction is part of who the worker is, so it belongs in the prompt, not in the task
+      // text: the person's request stays verbatim and the role survives follow-up messages on the same ticket.
+      const role = master ? undefined : this.roleOf(current)
+      const section = role ? `\n\n## Team role: ${role.name}\n${role.instruction}` : ''
+      return `[dsh-superagent prompt revision ${version.revision}]\n${composed}${section}\n${current ? mandateInstructions(current.mandate) : ''}`
     }, ...(master ? { complete: true } : {}) }))
     // A recreated skill scope (e.g. after the skills service restarts) starts empty, so reset `binding.skills` before rebinding.
     const skillScope = agent.ctx.inject(['skills'], scope => {
