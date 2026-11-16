@@ -3,7 +3,7 @@ setlocal EnableExtensions
 rem DSH-Superagent guard installer (run by double-click, or from a terminal).
 rem Writes a hidden-window VBS starter into THIS user's Startup folder so the guard loop
 rem (start the backend at logon + one watchdog tick every 15 minutes) runs on every sign-in.
-rem No admin, no Task Scheduler (this environment refuses it), no registry machine keys.
+rem No elevation required, no Task Scheduler (this environment refuses it), no registry machine keys.
 rem Uninstall: delete the VBS from the Startup folder, or drop a "disabled" file in
 rem   %APPDATA%\Superagent\watchdog  (the running loop exits at its next tick).
 rem Optional: CLI unattended path only. The in-app plugin path does not need this; the app starts its own host.
