@@ -91,18 +91,18 @@ DSH 的右侧栏标签由两个座位组成，缺一不可：
 
 | 位置 | 职责 |
 |---|---|
-| `src/chat-router/config.ts` | schema、三档预设、`allowedChatTools()`、`briefOf()` |
+| `src/chat-router/config.ts` | schema、三档预设、`allowedChatTools()`、`briefOf()`、`rosterOf()` / `teamRole()` / `roleOfMeta()` |
 | `src/chat-router/tool-groups.ts` | 面板自定义矩阵的工具分组（无 zod，供客户端复用） |
 | `src/chat-router/match.ts` | 普通会话判据；不绑定固定 session id |
-| `src/chat-router/tools.ts` | `chat_dispatch` / `chat_status` / `chat_answer`；`TaskSchema` 含可选 `name` |
+| `src/chat-router/tools.ts` | `chat_dispatch` / `chat_status` / `chat_answer`；`TaskSchema` 含可选 `name` 与 `role` |
 | `src/chat-router/host.ts` | Runtime 与 `Sessions` 之间的接缝、总管提示词 |
-| `src/app/runtime.ts` | `dispatchChatTask()`（直接建单）、`reportToChat()`（工单结束回投）、`chatTickets` 映射 |
-| `src/app/views/tickets.ts` | `chatRouterTasks()`：工单列表 + `chat_session` + `worker_session` + `dispatched` + `report_state` |
+| `src/app/runtime.ts` | `dispatchChatTask()`（直接建单、角色校验与 `meta.role`）、`reportToChat()`（工单结束回投）、`chatTickets` 映射 |
+| `src/app/views/tickets.ts` | `chatRouterTasks()`：工单列表 + `chat_session` + `worker_session` + `dispatched` + `report_state` + `role` / `role_name` |
 | `src/app/http.ts` / `api.ts` | 只读路由 `GET chatRouter/tasks` |
-| `src/app/sessions.ts` | `decorateChatRouter()`：注入提示词段、注册工具、`tools.restrict` + `tools.guard` |
-| `src/client/tasks-pane.tsx` | 右栏面板（自带 `<style>`，不依赖面板 CSS） |
+| `src/app/sessions.ts` | `decorateChatRouter()`：注入提示词段、注册工具、`tools.restrict` + `tools.guard`；`ensure()` 按角色播种模型、提示词追加角色段 |
+| `src/client/tasks-pane.tsx` | 右栏面板（自带 `<style>`，不依赖面板 CSS），含角色徽标 |
 | `src/client/index.tsx` | 标签类型 + 正文注册、`sidebar.panellist` 图标 |
-| `src/client/chat-router.tsx` / `route.ts` / `settings.tsx` / `locales.ts` | 面板分组、控件、中英文案 |
+| `src/client/chat-router.tsx` / `route.ts` / `settings.tsx` / `locales.ts` | 面板分组、控件（含团队角色编辑）、中英文案 |
 | `prompts/chat-router.md` / `tests/chat-router.spec.ts` | 提示词资产 / 契约测试 |
 
 **强制派发是硬约束**：白名单之外工具不可见；`forceDispatch` 再加一层 guard，任何越界调用被拒并提示改用 `chat_dispatch`。提示词只是软约束。注意 `tools.restrict` 只约束从 preset 继承的工具，本地注册的三个派发工具不受影响（与上游 `MASTER_TOOLS` 同一机制）。
@@ -144,3 +144,16 @@ DSH 的右侧栏标签由两个座位组成，缺一不可：
 ## 10. 与上游的关系
 
 本功能是纯增量：不改 `src/core/**`（与上游逐字节相同），不改既有 Router/Worker 语义，默认关闭。若上游将来实现同名的「主对话工具治理」，按 `docs/WINDOWS-DELTA.md` 的差量清单删除本模块并切回上游。
+
+## 11. 团队角色（team roles）
+
+总管可以给派单指定一个**具名角色**。角色表默认为空，此时派单行为与引入该功能前逐字节一致。
+
+- **配置**：`chatRouter.team.roles[]`，每项 `{ id, name, instruction, model }`。`id` 为小写 kebab-case；`instruction` ≤2000 字；`model` 可空，空则沿用 `executor.model`。最多 8 个角色，`id` 不得重复。
+- **总管侧**：提示词末尾追加角色名单（`id (name): 指令前 120 字`）。完整指令不进提示词，避免把名单写成第二份系统提示。
+- **派单**：`chat_dispatch` 的每条任务可带 `role`。未知 `id` 让**该条任务**失败并列出可用角色，不静默回落到默认 worker；同批其他任务照常派发。
+- **落盘**：角色写在 Trigger 的 `meta.role` / `meta.roleName`，**不新增 Ticket 字段**——`src/core/**` 因此保持与上游逐字节一致。
+- **执行**：worker 会话创建时按角色 `model` 播种（空则 `executor.model`）；系统提示词追加 `## Team role: <name>` 与该角色指令。同一工单的后续消息沿用该角色，因为角色是「这个 worker 是谁」，不是「这一条消息」。
+- **面板**：设置 → 总管模式 → 团队角色可增删改，保存走既有 revision 乐观并发；右栏任务卡片显示角色徽标，搜索也匹配角色名。
+- **已知边界**：编辑中的非法草稿（空 id、重复 id、空指令）会在保存时报 schema 错误，不会写坏配置；角色表保存后，总管名单与 worker 提示词段从**下一次请求**起生效，模型只在会话创建时播种、不随角色表回溯；已运行工单的派发记录（`meta.role`）不变。
+- **与竞品的对应**：`dsh-agent-teams` 的 `profiles.ts` 成员档案、`dsh-agent-team` 的 Member 配置、`dsh-team-control` 的 role/model 双预设。本批只取「角色档案 + 按角色播种」这一最小切片；任务 DAG、持久信箱、独立验收、共享工作区列为 P1，裁定见 `_reports/2026-11-16-agent-teams/20-p0-scope.md`。

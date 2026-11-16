@@ -55,10 +55,16 @@ export function chatRouterTasks(host: ViewHost) {
   const items = store.tickets.list().slice(0, 20).map(ticket => {
     const meta = store.triggers.get(ticket.origin.triggerId)?.meta
     const chatSession = meta?.chatSession
+    const role = meta?.role
+    const roleName = meta?.roleName
     return { ...ticketCard(ticket),
       chat_session: typeof chatSession === 'string' ? chatSession : '',
       worker_session: workerSessionId(ticket.id),
       dispatched: meta?.dispatchedBy === 'chat-router',
+      // The team role a chief of staff dispatched to, so a person can tell a reviewer ticket from a writer ticket at
+      // a glance. Both fields are null on ordinary dispatches, which keeps the card exactly as it was.
+      role: typeof role === 'string' ? role : null,
+      role_name: typeof roleName === 'string' ? roleName : null,
       // What the worker's latest assignment reports: progress / waiting / ready / blocked / failed / dropped.
       report_state: ticket.assignments.at(-1)?.report?.state ?? null }
   }).sort((a, b) => Number(b.dispatched) - Number(a.dispatched))

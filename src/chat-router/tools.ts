@@ -14,8 +14,9 @@ export interface ChatRouterToolsHost {
   /**
    * Hands one task to the Engine as an explicit Trigger and accepts it at once. It does not go through the Router
    * Session, so dispatch keeps working when that Session is unavailable; the worker still gets its own Session.
+   * An unknown `role` throws instead of quietly dispatching to a default worker.
    */
-  submit(title: string, request: string, context?: string, name?: string): Promise<DispatchedTask>
+  submit(title: string, request: string, context?: string, name?: string, role?: string): Promise<DispatchedTask>
   /** Read-only view of the shared ticket store, for the chat that dispatched the work. */
   status(): Promise<unknown>
   /** Passes a person's answer back to the worker that asked. */
@@ -29,6 +30,9 @@ const TaskSchema = z.object({
   // A ticket's execution needs a kebab-case worktree name; without one, ticket creation throws before any worker runs.
   name: z.string().trim().max(32).regex(/^[a-z]+(?:-[a-z0-9]+){0,3}$/, 'Use 1–4 short English words in lowercase kebab-case, at most 32 characters').optional()
     .describe('Short English kebab-case name for the ticket worktree, e.g. create-hello-file. Translate the title into 1–4 lowercase English words; omit it and one is generated.'),
+  // The roster names the ids; without one the worker is the same default worker as before team roles existed.
+  role: z.string().trim().min(1).max(32).optional()
+    .describe('Optional team role id from the roster in this conversation\'s prompt, e.g. reviewer. Omit it when no role fits.'),
 }).strict()
 
 export function chatRouterTools(host: ChatRouterToolsHost): Tool[] {
@@ -41,11 +45,11 @@ export function chatRouterTools(host: ChatRouterToolsHost): Tool[] {
         const results = []
         for (const task of tasks) {
           try {
-            const dispatched = await host.submit(task.title, task.request, task.context, task.name)
+            const dispatched = await host.submit(task.title, task.request, task.context, task.name, task.role)
             // Report what actually happened: a ticket id, or the reason nothing was created. Never call a stored
             // Trigger "queued" — that reads as a live ticket when no ticket exists.
             results.push(dispatched.ticketId
-              ? { title: task.title, ticket_id: dispatched.ticketId, status: 'created' }
+              ? { title: task.title, ticket_id: dispatched.ticketId, status: 'created', ...(task.role !== undefined ? { role: task.role } : {}) }
               : { title: task.title, status: dispatched.result, reason: dispatched.result === 'duplicate'
                 ? 'This exact task was already dispatched; look it up with chat_status.' : 'The Engine filtered this Trigger; no ticket was created.' })
           } catch (error) {

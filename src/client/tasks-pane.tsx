@@ -39,6 +39,8 @@ const CSS = `
 .dsh-task-badge[data-state="working"] { color: #1a5fd0; background: color-mix(in srgb, #1a5fd0 10%, transparent); }
 .dsh-task-badge[data-state="stopped"] { color: #b42318; background: color-mix(in srgb, #b42318 10%, transparent); }
 .dsh-task-badge[data-state="person"] { color: #a15c00; background: color-mix(in srgb, #a15c00 10%, transparent); }
+.dsh-task-role { font-size: 10px; padding: 1px 7px; border-radius: 999px; white-space: nowrap; opacity: .72;
+  border: 1px dashed color-mix(in srgb, currentColor 38%, transparent); }
 .dsh-task-preview { font-size: 12px; line-height: 1.5; opacity: .62; display: -webkit-box; -webkit-line-clamp: 2;
   -webkit-box-orient: vertical; overflow: hidden; }
 .dsh-task-preview[data-expanded="true"] { display: block; -webkit-line-clamp: unset; overflow: visible; white-space: pre-wrap; }
@@ -64,7 +66,7 @@ const CSS = `
 const LIVE = new Set(['working', 'person', 'idle'])
 type Filter = 'all' | 'live' | 'done'
 type Item = { ticket_id: string; title: string; state: string; preview?: string; ended?: { at: string }
-  worker_session: string; chat_session: string; report_state?: string | null }
+  worker_session: string; chat_session: string; report_state?: string | null; role?: string | null; role_name?: string | null }
 
 function EmptyIcon() {
   return <svg width="28" height="28" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="1.4" strokeLinecap="round" strokeLinejoin="round" aria-hidden>
@@ -91,7 +93,7 @@ export function TasksPane({ t, call, openSession }: {
   }, [menu])
   const all = (data?.items ?? []) as Item[]
   const needle = query.trim().toLowerCase()
-  const items = needle ? all.filter(item => `${item.title} ${item.preview ?? ''}`.toLowerCase().includes(needle)) : all
+  const items = needle ? all.filter(item => `${item.title} ${item.preview ?? ''} ${item.role_name ?? ''}`.toLowerCase().includes(needle)) : all
   const live = items.filter(item => LIVE.has(item.state))
   const done = items.filter(item => !LIVE.has(item.state))
   const toggle = (id: string) => setExpanded(previous => {
@@ -118,6 +120,7 @@ export function TasksPane({ t, call, openSession }: {
         onKeyDown={event => { if (event.key === 'Enter' || event.key === ' ') { event.preventDefault(); toggle(item.ticket_id) } }}>
         {item.title}
       </span>
+      {item.role_name && <span className="dsh-task-role" title={t('chatRouterRoleBadge')}>{item.role_name}</span>}
       <span className="dsh-task-badge" data-state={item.state}>{item.state}</span>
     </div>
     {item.preview && <span className="dsh-task-preview" data-expanded={expanded.has(item.ticket_id)}>{item.preview}</span>}

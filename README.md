@@ -8,6 +8,7 @@
 > **DSH-Superagent 是 DeepSeek Harness 的一个非官方插件**：把 GitHub 仓库（issue / PR / 评论 / CI）、本地收件目录或飞书群聊里的事件，变成一条条可执行的工单——每条工单在上下文隔离的 DSH 会话里完成，再把结果回贴到原处。
 >
 > **非官方产品**：上游代码与设计由 DeepSeek Harness Team 以 MIT 授权，本仓新增部分同样以 MIT 发布；归属与分工见 [NOTICE](NOTICE)。
+> 治理规范：[ReSerendipity/.github/governance](https://github.com/ReSerendipity/.github/tree/main/governance)
 
 ## 安装
 
@@ -84,7 +85,7 @@ tarball、本地目录、独立 profile 与常驻服务见 [WINDOWS-SETUP.md](do
 | **判断** | 程序层准入（谁能触发、什么算请求）+ 语义层评估（含糊的消息交给模型，必要时来问你） |
 | **执行** | 每个工单一个**上下文隔离**的 DSH 会话，在独立目录里干活；完成后回贴评论或开 Pull Request |
 | **运营** | 面板实时看触发/评估/执行/健康；一行运行判读对应 CLI 退出码；Watchdog 与 Router 分片按需开启 |
-| **总管模式（可选）** | 设置 → 总管模式：新建主对话只保留派发/只读工具，任务**强制**派给独立会话的执行器，避免上下文混在一个窗口里；右侧栏「总管任务」标签实时列出派出的工单（搜索、筛选、右键停止/重试、跳回发起派发的主对话），工单结束自动回投简报。默认关闭，详见 [`docs/027`](docs/027-chat-router.md) |
+| **总管模式（可选）** | 设置 → 总管模式：新建主对话只保留派发/只读工具，任务**强制**派给独立会话的执行器，避免上下文混在一个窗口里；右侧栏「总管任务」标签实时列出派出的工单（搜索、筛选、右键停止/重试、跳回发起派发的主对话），工单结束自动回投简报。可再配置**团队角色**：派单时指定具名角色，角色指令进入该 worker 的系统提示词、角色模型播种该会话，右栏卡片带角色徽标。默认关闭，详见 [`docs/027`](docs/027-chat-router.md) |
 | **边界** | 插件运行期不依赖 WSL/tmux/Python；执行器按设计有完整 OS 权限——这是操作者信任模型，不是沙箱 |
 
 ![概览页：运行判读「正常」，过去 24 小时到达 6 / 接单 6，执行器 2/2](https://gcore.jsdelivr.net/gh/ReSerendipity/dsh-superagent@main/docs/assets/readme-overview-20261108.png)

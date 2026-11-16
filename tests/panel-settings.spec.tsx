@@ -62,6 +62,32 @@ it('saves the Eval block on the Policy settings and the Executor with its execut
     'settings/executor'])
 })
 
+it('edits the team roles a chief-of-staff chat may dispatch to, and saves them against the chatRouter block', async () => {
+  await mount()
+  await click(zh['tab.execution'])
+  await click(find(zh['tab.settings'], '.dt-status-head button'))
+  await click(find(zh['settingsGroup.chatRouter'], '.dt-settings-link'))
+  await click(zh['chatRouterRoleAdd'])
+  await type(field<HTMLInputElement>(zh['chatRouterRoleId']), 'reviewer')
+  await type(field<HTMLInputElement>(zh['chatRouterRoleName']), '评审')
+  await type(field<HTMLTextAreaElement>(zh['chatRouterRoleInstruction']), '检查改动，列出未验证项。')
+  await type(field<HTMLInputElement>(zh['chatRouterRoleModelProvider']), 'worker-provider')
+  await type(field<HTMLInputElement>(zh['chatRouterRoleModelName']), 'worker-model')
+  await click(zh.save)
+  expect(server.settings.chatRouter.team.roles).toEqual([{ id: 'reviewer', name: '评审',
+    instruction: '检查改动，列出未验证项。', model: { provider: 'worker-provider', model: 'worker-model' } }])
+  expect(server.requests.filter(request => request.method === 'PUT').map(request => request.path)).toContain('settings/chatRouter')
+  // Adding a second role and removing the first must leave exactly the second in the saved block, not a merged row.
+  await click(zh['chatRouterRoleAdd'])
+  await type(all(`input[aria-label="${zh['chatRouterRoleId']}"]`)[1] as HTMLInputElement, 'writer')
+  await type(all(`input[aria-label="${zh['chatRouterRoleName']}"]`)[1] as HTMLInputElement, '写作')
+  await type(all(`textarea[aria-label="${zh['chatRouterRoleInstruction']}"]`)[1] as HTMLTextAreaElement, '起草文案。')
+  const removes = all('button').filter(button => button.textContent === zh['chatRouterRoleRemove'])
+  await click(removes[0] as HTMLButtonElement)
+  await click(zh.save)
+  expect(server.settings.chatRouter.team.roles).toEqual([{ id: 'writer', name: '写作', instruction: '起草文案。', model: null }])
+})
+
 it('loads configuration history on demand with localized changes, Source field labels and notified Tickets', async () => {
   server.history = { current: 3, policyVersion: 'abcdef1234567890', items: [{ revision: 3, savedAt: '2026-09-22T00:00:00Z',
     source: 'sync', policyVersion: 'abcdef1234567890', policyChanged: true, notified: [{ id: 't1', title: '修复回归' }], block: 'policy',
