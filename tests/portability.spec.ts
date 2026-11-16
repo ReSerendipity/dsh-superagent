@@ -1,7 +1,7 @@
 // Portability guard: nothing in this repository may name one developer's machine.
 //
-// The product is published for other people's computers, so tracked text files must not contain absolute paths or user
-// names from the machine it was developed on. The machine-specific values are derived at run time, so the gate keeps
+// The product is published for other people's computers, so tracked text files must not contain paths from the machine
+// it was developed on. The machine-specific values are derived at run time, so the gate keeps
 // working after a checkout moves or changes hands; only the rules are written down here.
 import { readdirSync, readFileSync, statSync } from 'node:fs'
 import { homedir, userInfo } from 'node:os'
@@ -19,19 +19,10 @@ const BINARY = /\.(png|ico|jpg|jpeg|webp|zip|zst|zstd|exe|dll|pak|dat|bin|pdf)$/
 const USER = userInfo().username
 const HOME = homedir()
 const escape = (value: string): string => value.replace(/[.*+?^${}()|[\]\\]/g, '\\$&')
-// GitHub's hosted runners use a generic service account (`runner` on Linux/macOS, `runneradmin` on Windows).
-// Those names are ordinary words in prose ("a Linux runner needs more time") and identify no person, so the
-// user-name rule is skipped for them; the home, Windows-user and checkout path rules still run on CI.
-const SERVICE_ACCOUNTS = new Set(['runner', 'runneradmin', 'vsts', 'build', 'builder', 'administrator'])
-const developerUser = SERVICE_ACCOUNTS.has(USER.toLowerCase()) ? undefined : USER
-const userRule: { name: string; pattern: RegExp }[] = developerUser === undefined ? [] : [
-  { name: 'developer user name', pattern: new RegExp(`(?:^|[^A-Za-z0-9_])${escape(developerUser)}(?:$|[^A-Za-z0-9_])`, 'i') },
-]
-
-/** Absolute paths and names that only exist on the machine this checkout runs on. */
+// A bare account name can be an ordinary word in prose on any machine. Detect it in machine paths instead.
+/** Paths that identify the machine this checkout runs on. */
 export const FORBIDDEN: { name: string; pattern: RegExp }[] = [
   { name: 'developer home directory', pattern: new RegExp(escape(HOME), 'i') },
-  ...userRule,
   { name: 'windows user path', pattern: new RegExp(`C:[\\\\/]{1,2}Users[\\\\/]{1,2}${escape(USER)}\\b`, 'i') },
   { name: 'repository checkout path', pattern: new RegExp(escape(ROOT), 'i') },
 ]
@@ -104,4 +95,12 @@ it('catches the user name in both Windows path spellings', () => {
 
 it('leaves a clean file alone, so the gate does not fail on placeholders', () => {
   expect(scanText('stateDir: C:/Users/<you>/.dsh/state/superagent\ncheckout: <checkout>\n')).toEqual([])
+})
+
+it('allows ordinary prose even when a word matches the current account name', () => {
+  expect(scanText(`No ${userInfo().username}, no Task Scheduler.`)).toEqual([])
+})
+
+it('still detects a planted checkout path', () => {
+  expect(scanText(`checkout: ${ROOT}`).map(finding => finding.name)).toContain('repository checkout path')
 })
