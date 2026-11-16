@@ -25,16 +25,21 @@ const escape = (value: string): string => value.replace(/[.*+?^${}()|[\]\\]/g, '
 const SERVICE_ACCOUNTS = new Set(['runner', 'runneradmin', 'vsts', 'build', 'builder', 'administrator'])
 const developerUser = SERVICE_ACCOUNTS.has(USER.toLowerCase()) ? undefined : USER
 const userRule: { name: string; pattern: RegExp }[] = developerUser === undefined ? [] : [
-  { name: 'developer user name', pattern: new RegExp(`(?:^|[^A-Za-z0-9_])${escape(developerUser)}(?:$|[^A-Za-z0-9_])`, 'i') },
+  { name: 'developer user name', pattern: new RegExp(`(?<prefix>^|[^A-Za-z0-9_])(?<account>${escape(developerUser)})(?:$|[^A-Za-z0-9_])`, 'i') },
 ]
 
-/** Absolute paths and names that only exist on the machine this checkout runs on. */
-export const FORBIDDEN: { name: string; pattern: RegExp }[] = [
+const pathRules = [
   { name: 'developer home directory', pattern: new RegExp(escape(HOME), 'i') },
-  ...userRule,
   { name: 'windows user path', pattern: new RegExp(`C:[\\\\/]{1,2}Users[\\\\/]{1,2}${escape(USER)}\\b`, 'i') },
   { name: 'repository checkout path', pattern: new RegExp(escape(ROOT), 'i') },
 ]
+
+/** Absolute paths and names that only exist on the machine this checkout runs on. */
+export const FORBIDDEN = [...pathRules, ...userRule]
+
+// Recognize common account arguments and config values. Ambiguous matches still fail the check.
+const ACCOUNT_VALUE = /(?:\b(?:user(?:name)?|login|account)["']?[ \t]*[:=][ \t]*|(?:^|[ \t])--(?:user(?:name)?|login|account)(?:[ \t]+|=))["']?(?:[\w.-]+\\)?$/i
+const AMBIGUOUS_ACCOUNT = 'ambiguous developer user name (clarify prose or use an account placeholder)'
 
 export interface Finding {
   name: string
@@ -43,13 +48,22 @@ export interface Finding {
 
 /** Every forbidden rule that matches `text`, with the 1-based line of each match. */
 export function scanText(text: string, patterns: { name: string; pattern: RegExp }[] = FORBIDDEN): Finding[] {
-  const found: Finding[] = []
-  for (const { name, pattern } of patterns) {
+  const matches = patterns.flatMap(({ name, pattern }) => {
     const flags = pattern.flags.includes('g') ? pattern.flags : pattern.flags + 'g'
-    const global = new RegExp(pattern.source, flags)
-    for (const match of text.matchAll(global)) found.push({ name, line: text.slice(0, match.index).split('\n').length })
-  }
-  return found
+    return Array.from(text.matchAll(new RegExp(pattern.source, flags)), match => ({ name, pattern, match }))
+  })
+  const paths = matches.filter(({ pattern }) => pathRules.some(rule => rule.pattern === pattern)).map(({ match }) => match)
+  return matches.map(({ name, match }) => {
+    const { prefix, account } = match.groups ?? {}
+    if (prefix !== undefined && account !== undefined) {
+      const start = match.index + prefix.length
+      const before = text.slice(text.lastIndexOf('\n', start - 1) + 1, start)
+      const end = start + account.length
+      const inPath = paths.some(path => path.index <= start && end <= path.index + path[0].length)
+      if (!inPath && !ACCOUNT_VALUE.test(before)) name = AMBIGUOUS_ACCOUNT
+    }
+    return { name, line: text.slice(0, match.index + (prefix?.length ?? 0)).split('\n').length }
+  })
 }
 
 /** A file is text when it is not a known binary and either has a text extension or no extension at all. */
