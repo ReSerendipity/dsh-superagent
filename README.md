@@ -192,7 +192,7 @@ It is built on the [deepseek-ai/dsh-superagent-prototype](https://github.com/dee
 
 **仓库里有没有绑定开发机的地方？** 没有。所有路径运行时推导，文档只用 `<install>`、`%LOCALAPPDATA%`、`<checkout>`
 这类占位符；`tests/portability.spec.ts` 会扫描仓库内的文本文件（含 `lib/` 构建产物、`.css` 与无扩展名文件），
-用户名与 home 目录在运行时从 `os.userInfo()` / `os.homedir()` 推导，出现开发机的绝对路径或用户名就让测试失败。
+用户名与 home 目录在运行时从 `os.userInfo()` / `os.homedir()` 推导，检测本机路径及常见账号参数、赋值和比较中的固定账号值。普通文字不会仅因与当前用户名同名而失败；自定义字段或动态拼接的账号仍需代码评审。
 
 **安装时报 `UNABLE_TO_VERIFY_LEAF_SIGNATURE`？** 这台机器或网络边界有 TLS 中间盒（公司代理、杀毒软件的 HTTPS 扫描），git 不认它的根证书。这与插件无关，克隆任何 GitHub 仓库都一样。把代理根证书导入系统信任区，或 `git config --global http.sslCAInfo <ca-bundle.pem>` 指向它的 CA 包；Node 侧需要时设 `NODE_EXTRA_CA_CERTS`。不要用 `http.sslVerify false` 绕过。详见 [`WINDOWS-DELTA.md`](docs/WINDOWS-DELTA.md) §8.5。
 

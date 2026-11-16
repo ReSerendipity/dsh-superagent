@@ -52,7 +52,7 @@ dsh-superagent 是 **一个 GitHub 仓库的常驻编码智能体**，作为 Dee
 
 ```
 ┌──────────────────────────────────────────────────────────────┐
-│ Superagent 桌面应用（Electron，便携，无需提升权限）          │
+│ Superagent 桌面应用（Electron，便携，无 admin）              │
 │  %LOCALAPPDATA%\Programs\Superagent\Superagent.exe          │
 │  · 自己的窗口 + 图标，双击即用                               │
 │  · 负责拉起后端、清理子进程、显示启动失败页                  │

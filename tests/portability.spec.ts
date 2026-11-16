@@ -1,7 +1,7 @@
 // Portability guard: nothing in this repository may name one developer's machine.
 //
-// The product is published for other people's computers, so tracked text files must not contain absolute paths or user
-// names from the machine it was developed on. The machine-specific values are derived at run time, so the gate keeps
+// The product is published for other people's computers, so tracked text files must not hard-code local paths or
+// account values. The machine-specific values are derived at run time, so the gate keeps
 // working after a checkout moves or changes hands; only the rules are written down here.
 import { readdirSync, readFileSync, statSync } from 'node:fs'
 import { homedir, userInfo } from 'node:os'
@@ -19,27 +19,19 @@ const BINARY = /\.(png|ico|jpg|jpeg|webp|zip|zst|zstd|exe|dll|pak|dat|bin|pdf)$/
 const USER = userInfo().username
 const HOME = homedir()
 const escape = (value: string): string => value.replace(/[.*+?^${}()|[\]\\]/g, '\\$&')
-// GitHub's hosted runners use a generic service account (`runner` on Linux/macOS, `runneradmin` on Windows).
-// Those names are ordinary words in prose ("a Linux runner needs more time") and identify no person, so the
-// user-name rule is skipped for them; the home, Windows-user and checkout path rules still run on CI.
-const SERVICE_ACCOUNTS = new Set(['runner', 'runneradmin', 'vsts', 'build', 'builder', 'administrator'])
-const developerUser = SERVICE_ACCOUNTS.has(USER.toLowerCase()) ? undefined : USER
-const userRule: { name: string; pattern: RegExp }[] = developerUser === undefined ? [] : [
-  { name: 'developer user name', pattern: new RegExp(`(?<prefix>^|[^A-Za-z0-9_])(?<account>${escape(developerUser)})(?:$|[^A-Za-z0-9_])`, 'i') },
-]
+// A matching word alone does not establish an account dependency. Match complete account values in common
+// assignments, comparisons and command arguments instead; apply the same rule to every operating-system account.
+const account = String.raw`(?:[\w.-]+\\)?${escape(USER)}`
+const accountValue = String.raw`(?:"${account}"|'${account}'|${account}(?=$|[\s,;)}\]]))`
+const accountPrefix = String.raw`(?:\b(?:user(?:name)?|login|account)["']?[ \t]*(?::|={1,3}|!==?)[ \t]*|(?:^|[ \t])--(?:user(?:name)?|login|account)(?:[ \t]+|=))`
 
-const pathRules = [
+/** Machine paths and explicit account values, rather than coincidentally identical prose. */
+export const FORBIDDEN: { name: string; pattern: RegExp }[] = [
   { name: 'developer home directory', pattern: new RegExp(escape(HOME), 'i') },
+  { name: 'developer user name', pattern: new RegExp(accountPrefix + accountValue, 'im') },
   { name: 'windows user path', pattern: new RegExp(`C:[\\\\/]{1,2}Users[\\\\/]{1,2}${escape(USER)}\\b`, 'i') },
   { name: 'repository checkout path', pattern: new RegExp(escape(ROOT), 'i') },
 ]
-
-/** Absolute paths and names that only exist on the machine this checkout runs on. */
-export const FORBIDDEN = [...pathRules, ...userRule]
-
-// Recognize common account arguments and config values. Ambiguous matches still fail the check.
-const ACCOUNT_VALUE = /(?:\b(?:user(?:name)?|login|account)["']?[ \t]*[:=][ \t]*|(?:^|[ \t])--(?:user(?:name)?|login|account)(?:[ \t]+|=))["']?(?:[\w.-]+\\)?$/i
-const AMBIGUOUS_ACCOUNT = 'ambiguous developer user name (clarify prose or use an account placeholder)'
 
 export interface Finding {
   name: string
@@ -48,22 +40,13 @@ export interface Finding {
 
 /** Every forbidden rule that matches `text`, with the 1-based line of each match. */
 export function scanText(text: string, patterns: { name: string; pattern: RegExp }[] = FORBIDDEN): Finding[] {
-  const matches = patterns.flatMap(({ name, pattern }) => {
+  const found: Finding[] = []
+  for (const { name, pattern } of patterns) {
     const flags = pattern.flags.includes('g') ? pattern.flags : pattern.flags + 'g'
-    return Array.from(text.matchAll(new RegExp(pattern.source, flags)), match => ({ name, pattern, match }))
-  })
-  const paths = matches.filter(({ pattern }) => pathRules.some(rule => rule.pattern === pattern)).map(({ match }) => match)
-  return matches.map(({ name, match }) => {
-    const { prefix, account } = match.groups ?? {}
-    if (prefix !== undefined && account !== undefined) {
-      const start = match.index + prefix.length
-      const before = text.slice(text.lastIndexOf('\n', start - 1) + 1, start)
-      const end = start + account.length
-      const inPath = paths.some(path => path.index <= start && end <= path.index + path[0].length)
-      if (!inPath && !ACCOUNT_VALUE.test(before)) name = AMBIGUOUS_ACCOUNT
-    }
-    return { name, line: text.slice(0, match.index + (prefix?.length ?? 0)).split('\n').length }
-  })
+    const global = new RegExp(pattern.source, flags)
+    for (const match of text.matchAll(global)) found.push({ name, line: text.slice(0, match.index).split('\n').length })
+  }
+  return found
 }
 
 /** A file is text when it is not a known binary and either has a text extension or no extension at all. */
