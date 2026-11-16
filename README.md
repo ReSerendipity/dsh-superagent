@@ -8,6 +8,7 @@
 > **DSH-Superagent 是 DeepSeek Harness 的一个非官方插件**：把 GitHub 仓库（issue / PR / 评论 / CI）、本地收件目录或飞书群聊里的事件，变成一条条可执行的工单——每条工单在上下文隔离的 DSH 会话里完成，再把结果回贴到原处。
 >
 > **非官方产品**：上游代码与设计由 DeepSeek Harness Team 以 MIT 授权，本仓新增部分同样以 MIT 发布；归属与分工见 [NOTICE](NOTICE)。
+> 治理规范：[ReSerendipity/.github/governance](https://github.com/ReSerendipity/.github/tree/main/governance)
 
 ## 安装
 
