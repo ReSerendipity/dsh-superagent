@@ -32,11 +32,12 @@ export function AboutPage() {
 
     <Section title={t('aboutPagesTitle')}>
       <ul className="dt-list">
-        <Step index={1} title={t('tab.source')} body={t('aboutPageSource')} />
-        <Step index={2} title={t('tab.trigger')} body={t('aboutPageTrigger')} />
-        <Step index={3} title={t('tab.eval')} body={t('aboutPageEval')} />
-        <Step index={4} title={t('tab.execution')} body={t('aboutPageExecution')} />
-        <Step index={5} title={t('tab.settings')} body={t('aboutPageSettings')} />
+        <Step index={1} title={t('tab.team')} body={t('aboutPageTeam')} />
+        <Step index={2} title={t('tab.source')} body={t('aboutPageSource')} />
+        <Step index={3} title={t('tab.trigger')} body={t('aboutPageTrigger')} />
+        <Step index={4} title={t('tab.eval')} body={t('aboutPageEval')} />
+        <Step index={5} title={t('tab.execution')} body={t('aboutPageExecution')} />
+        <Step index={6} title={t('tab.settings')} body={t('aboutPageSettings')} />
       </ul>
     </Section>
 

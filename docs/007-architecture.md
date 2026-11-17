@@ -366,6 +366,7 @@ Some generic modules still refer directly to GitHub or Feishu:
 | `src/app/views/text.ts` | The two forms of a view's text: `preview`, plain text on one line, and `markdown` without HTML; `plain` and `readable` |
 | `src/app/views/records.ts` | The rows the views share: Triggers, Tickets, Threads, Decisions and Channel links, and `ownersOf`, the owners of follow-ups as one request reads them |
 | `src/app/views/tickets.ts` | The Ticket lists by stage, a Ticket's page, the Mandate basis facts and the Executor's load |
+| `src/app/views/team.ts` | The team board: each configured role with the chief-of-staff tickets dispatched under it, the unassigned dispatches, and the counts a role card shows |
 | `src/app/views/threads.ts` | The Thread lists, a Thread's timeline, the search and the Decision list |
 | `src/app/views/sources.ts` | The Source status: each Source instance's state, its last day's counts, and what it filtered and dropped in that day |
 | `src/app/views/settings.ts` | The settings page's view: each block with its revision, each Source's settings with its kind's form, and the execution environment |
@@ -433,6 +434,7 @@ Some generic modules still refer directly to GitHub or Feishu:
 | `src/chat-router/channel.ts` | A bounded brief from an archived reply back to the chat that dispatched it |
 | `src/client/chat-router.tsx` | The panel settings group for the presets and dispatch switches |
 | `src/client/tasks-pane.tsx` | The right-pane tab listing the tickets a chief-of-staff chat dispatched, each opening its worker Session |
+| `src/client/team.tsx` | The main-panel team board: role cards, ticket rows, metrics, search and status filters, and the empty roster's guide |
 
 ## Tests
 
@@ -484,6 +486,7 @@ Some generic modules still refer directly to GitHub or Feishu:
 | `tests/http.spec.ts` | The same-origin and loopback checks, the status of each kind of failure, the body limit, path parameters and queries |
 | `tests/settings.spec.ts` | Settings saves that race a model or account check, a Policy sync that a save outran, and the refusals of the pause, a sync and a block |
 | `tests/views.spec.ts` | What the management views derive from the Store, such as the Thread a dropped message belongs to |
+| `tests/team.spec.ts` | The team board's grouping by role, its live/done/unassigned counts, the eight-ticket cap per card, and the dispatches a deleted role hides |
 | `tests/timeline.spec.ts` | A Thread's pages and a Trigger's neighbours by time and then id, with every received Trigger's time in one form |
 | `tests/migration.spec.ts` | The schema 11 migration: every stored record in its current shape, and the refusal of older schemas |
 | `tests/store.spec.ts` | Repositories and their working sets, in SQLite as in memory, the kv area, with every key of `KV` spelled only in `src/kv.ts` and the migration, settings history and queries |
@@ -499,6 +502,8 @@ Some generic modules still refer directly to GitHub or Feishu:
 | `tests/service-script.spec.ts` | `scripts/dsh-superagent` against fake `ps`, `tmux` and `dsh` |
 | `tests/client.spec.tsx`, `tests/navigation.spec.ts`, `tests/controls.spec.tsx` | The client plugin's registration and polling, Session navigation and route memory, the local controls, and the panel's imports, which have no cycle |
 | `tests/panel-overview.spec.tsx`, `panel-source.spec.tsx`, `panel-trigger.spec.tsx`, `panel-eval.spec.tsx`, `panel-execution.spec.tsx` | Each page of the panel, against a fake management API answered by route |
+| `tests/panel-team.spec.tsx` | The team page: role cards and their localized states, status and search filters, the unassigned lane, and the empty-roster guide |
+| `tests/panel-tasks.spec.tsx` | The right-pane task list: localized ticket and report states, relative times with full-time titles, and the role filter |
 | `tests/panel-settings.spec.tsx`, `panel-prompts.spec.tsx`, `panel-deployment.spec.tsx`, `panel-panel.spec.tsx` | The settings groups, drafts and history, the prompts, the Deployment page, and the panel's search, glossary and route memory |
 | `tests/panel-about.spec.tsx` | The guide page: it names every page and the first steps, links both repositories, and the overview introduces the panel with a link to it |
 | `tests/draft.spec.ts`, `tests/prompt-config.spec.ts`, `tests/markdown.spec.ts`, `tests/marks.spec.ts` | Draft states, merges and the save bar's line; the prompt configuration by section and the line diff; the Markdown subset and its links; the mark of every state the views classify |

@@ -1,7 +1,7 @@
 /** The right-pane tab: the tickets a chief-of-staff chat dispatched, as searchable cards with per-task actions. */
 import { useEffect, useState } from 'react'
 import { usePoll, type Call } from './api.ts'
-import { errorText, type T } from './text.ts'
+import { errorText, fullTime, reportStateLabel, ticketStateLabel, ticketTone, when, type T } from './text.ts'
 
 /**
  * The pane brings its own stylesheet: the panel's `client.css` is injected inside its own React tree, which this
@@ -17,11 +17,14 @@ const CSS = `
   border: 1px solid color-mix(in srgb, currentColor 18%, transparent); background: transparent; color: inherit; }
 .dsh-tasks-refresh:hover { border-color: currentColor; }
 .dsh-tasks-hint { font-size: 11px; opacity: .55; margin: 3px 0 4px; line-height: 1.5; }
-.dsh-tasks-filters { display: flex; gap: 6px; margin: 8px 0 2px; }
+.dsh-tasks-filters { display: flex; gap: 6px; margin: 8px 0 2px; flex-wrap: wrap; }
 .dsh-tasks-filter { font: inherit; font-size: 11px; padding: 2px 9px; border-radius: 999px; cursor: pointer; color: inherit;
   border: 1px solid color-mix(in srgb, currentColor 16%, transparent); background: transparent; }
 .dsh-tasks-filter[data-active="true"] { background: color-mix(in srgb, currentColor 12%, transparent);
   border-color: color-mix(in srgb, currentColor 40%, transparent); }
+.dsh-tasks-filter:focus-visible { outline: 2px solid currentColor; outline-offset: 1px; }
+.dsh-tasks-roles { display: flex; gap: 6px; margin: 4px 0 2px; flex-wrap: wrap; align-items: center; }
+.dsh-tasks-roles-label { font-size: 10px; opacity: .42; letter-spacing: .3px; text-transform: uppercase; }
 .dsh-tasks-search { margin: 8px 0 2px; }
 .dsh-tasks-search input { width: 100%; box-sizing: border-box; font: inherit; font-size: 12px; padding: 5px 9px;
   border-radius: 7px; border: 1px solid color-mix(in srgb, currentColor 18%, transparent); background: transparent;
@@ -34,11 +37,13 @@ const CSS = `
 .dsh-task-top { display: flex; gap: 8px; align-items: flex-start; }
 .dsh-task-name { flex: 1; font-size: 13px; line-height: 1.45; word-break: break-word; cursor: pointer; }
 .dsh-task-name:hover { text-decoration: underline; }
-.dsh-task-badge { font-size: 10px; padding: 1px 7px; border-radius: 999px; white-space: nowrap; border: 1px solid currentColor; }
-.dsh-task-badge[data-state="completed"] { color: #1a7f45; background: color-mix(in srgb, #1a7f45 10%, transparent); }
-.dsh-task-badge[data-state="working"] { color: #1a5fd0; background: color-mix(in srgb, #1a5fd0 10%, transparent); }
-.dsh-task-badge[data-state="stopped"] { color: #b42318; background: color-mix(in srgb, #b42318 10%, transparent); }
-.dsh-task-badge[data-state="person"] { color: #a15c00; background: color-mix(in srgb, #a15c00 10%, transparent); }
+.dsh-task-badge { font-size: 10px; padding: 1px 7px; border-radius: 999px; white-space: nowrap;
+  border: 1px solid color-mix(in srgb, currentColor 22%, transparent); color: var(--dsw-alias-label-secondary, currentColor); }
+.dsh-task-badge[data-tone="live"] { color: var(--dsw-alias-state-success-primary, #1a7f45); border-color: color-mix(in srgb, currentColor 45%, transparent); }
+.dsh-task-badge[data-tone="done"] { color: var(--dsw-alias-state-success-primary, #1a7f45); opacity: .75; }
+.dsh-task-badge[data-tone="person"] { color: var(--dsw-alias-state-warn-primary, #a15c00); border-color: color-mix(in srgb, currentColor 45%, transparent); }
+.dsh-task-badge[data-tone="error"] { color: var(--dsw-alias-state-error-primary, #b42318); border-color: color-mix(in srgb, currentColor 45%, transparent); }
+.dsh-task-badge[data-tone="muted"], .dsh-task-badge[data-tone="idle"] { opacity: .6; }
 .dsh-task-role { font-size: 10px; padding: 1px 7px; border-radius: 999px; white-space: nowrap; opacity: .72;
   border: 1px dashed color-mix(in srgb, currentColor 38%, transparent); }
 .dsh-task-preview { font-size: 12px; line-height: 1.5; opacity: .62; display: -webkit-box; -webkit-line-clamp: 2;
@@ -52,8 +57,13 @@ const CSS = `
 .dsh-task-open { font-size: 12px; padding: 2px 9px; border-radius: 6px; cursor: pointer; font: inherit; color: inherit;
   border: 1px solid color-mix(in srgb, currentColor 22%, transparent); background: transparent; }
 .dsh-task-open:hover { border-color: currentColor; }
-.dsh-tasks-empty { margin-top: 20px; text-align: center; font-size: 12px; opacity: .55; line-height: 1.7; }
+.dsh-tasks-empty { margin-top: 20px; text-align: center; font-size: 12px; opacity: .6; line-height: 1.7; }
 .dsh-tasks-empty svg { opacity: .35; margin-bottom: 8px; }
+.dsh-tasks-empty-guide { display: block; margin-top: 4px; font-size: 11px; opacity: .8; }
+.dsh-tasks-error { margin: 8px 0 0; padding: 7px 9px; border-radius: 7px; font-size: 11px; line-height: 1.5;
+  color: var(--dsw-alias-state-error-primary, #b42318);
+  background: color-mix(in srgb, var(--dsw-alias-state-error-primary, #b42318) 9%, transparent);
+  border: 1px solid color-mix(in srgb, var(--dsw-alias-state-error-primary, #b42318) 30%, transparent); }
 .dsh-task-menu { position: fixed; z-index: 9999; background: Canvas; color: CanvasText; min-width: 132px; padding: 4px;
   border-radius: 8px; border: 1px solid color-mix(in srgb, CanvasText 20%, transparent);
   box-shadow: 0 8px 24px rgba(0, 0, 0, .18); display: flex; flex-direction: column; }
@@ -63,10 +73,11 @@ const CSS = `
 `
 
 /** Stages in which a ticket still has work ahead: anything else is history. */
-const LIVE = new Set(['working', 'person', 'idle'])
+const liveState = (state: string) => state === 'working' || state === 'working/queued' || state === 'idle' || state.startsWith('person/')
 type Filter = 'all' | 'live' | 'done'
-type Item = { ticket_id: string; title: string; state: string; preview?: string; ended?: { at: string }
-  worker_session: string; chat_session: string; report_state?: string | null; role?: string | null; role_name?: string | null }
+type Item = { ticket_id: string; title: string; state: string; preview?: string; ended?: { at: string }; updated_at?: string
+  worker_session: string; chat_session: string; report_state?: string | null; role?: string | null; role_name?: string | null
+  dispatched?: boolean }
 
 function EmptyIcon() {
   return <svg width="28" height="28" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="1.4" strokeLinecap="round" strokeLinejoin="round" aria-hidden>
@@ -80,10 +91,12 @@ export function TasksPane({ t, call, openSession }: {
   const { data, error, reload } = usePoll(() => call('GET chatRouter/tasks'), [])
   const [query, setQuery] = useState('')
   const [filter, setFilter] = useState<Filter>('all')
+  const [role, setRole] = useState('all')
   const [expanded, setExpanded] = useState<ReadonlySet<string>>(new Set())
   const [menu, setMenu] = useState<{ x: number; y: number; item: Item } | null>(null)
   const [updatedAt, setUpdatedAt] = useState('')
   const [failure, setFailure] = useState<string | null>(null)
+  useEffect(() => { if (data) setUpdatedAt(new Date().toLocaleTimeString()) }, [data])
   useEffect(() => {
     if (!menu) return
     const close = () => setMenu(null)
@@ -92,10 +105,14 @@ export function TasksPane({ t, call, openSession }: {
     return () => { window.removeEventListener('click', close); window.removeEventListener('scroll', close, true) }
   }, [menu])
   const all = (data?.items ?? []) as Item[]
+  // Roles come from the cards themselves, so a role removed from settings still filters its own history.
+  const roles = [...new Map(all.flatMap(item => item.role && item.role_name ? [[item.role, item.role_name] as const] : [])).entries()]
+  const hasUnassigned = all.some(item => item.dispatched && !item.role)
   const needle = query.trim().toLowerCase()
-  const items = needle ? all.filter(item => `${item.title} ${item.preview ?? ''} ${item.role_name ?? ''}`.toLowerCase().includes(needle)) : all
-  const live = items.filter(item => LIVE.has(item.state))
-  const done = items.filter(item => !LIVE.has(item.state))
+  const searched = needle ? all.filter(item => `${item.title} ${item.preview ?? ''} ${item.role_name ?? ''}`.toLowerCase().includes(needle)) : all
+  const items = role === 'all' ? searched : role === 'unassigned' ? searched.filter(item => item.dispatched && !item.role) : searched.filter(item => item.role === role)
+  const live = items.filter(item => liveState(item.state))
+  const done = items.filter(item => !liveState(item.state))
   const toggle = (id: string) => setExpanded(previous => {
     const next = new Set(previous)
     if (next.has(id)) next.delete(id); else next.add(id)
@@ -112,32 +129,38 @@ export function TasksPane({ t, call, openSession }: {
       setFailure(error instanceof Error ? error.message : String(error))
     }
   }
-  const card = (item: Item) => <article key={item.ticket_id} className="dsh-task"
-    onContextMenu={event => { event.preventDefault(); setMenu({ x: event.clientX, y: event.clientY, item }) }}>
-    <div className="dsh-task-top">
-      <span className="dsh-task-name" role="button" tabIndex={0} title={t('chatRouterExpand')}
-        onClick={() => toggle(item.ticket_id)}
-        onKeyDown={event => { if (event.key === 'Enter' || event.key === ' ') { event.preventDefault(); toggle(item.ticket_id) } }}>
-        {item.title}
-      </span>
-      {item.role_name && <span className="dsh-task-role" title={t('chatRouterRoleBadge')}>{item.role_name}</span>}
-      <span className="dsh-task-badge" data-state={item.state}>{item.state}</span>
-    </div>
-    {item.preview && <span className="dsh-task-preview" data-expanded={expanded.has(item.ticket_id)}>{item.preview}</span>}
-    <div className="dsh-task-foot">
-      {item.ended?.at && <span className="dsh-task-time">{new Date(item.ended.at).toLocaleString()}</span>}
-      {item.report_state && <span className="dsh-task-note">{item.report_state}</span>}
-      {item.chat_session && <button type="button" className="dsh-task-note dsh-task-link"
-        onClick={() => { void openSession(item.chat_session).catch(error => setFailure(errorText(error))) }}>{t('chatRouterFrom')} {item.chat_session.slice(-8)}</button>}
-      <button type="button" className="dsh-task-open" onClick={() => { void openSession(item.worker_session).catch(error => setFailure(errorText(error))) }}>{t('openWorkerSession')}</button>
-    </div>
-  </article>
+  const card = (item: Item) => {
+    const stateLabel = ticketStateLabel(item.state)
+    const tone = ticketTone(item.state)
+    const at = item.ended?.at ?? item.updated_at
+    const report = item.report_state ? reportStateLabel(item.report_state) : undefined
+    return <article key={item.ticket_id} className="dsh-task" aria-label={item.title}
+      onContextMenu={event => { event.preventDefault(); setMenu({ x: event.clientX, y: event.clientY, item }) }}>
+      <div className="dsh-task-top">
+        <span className="dsh-task-name" role="button" tabIndex={0} title={t('chatRouterExpand')}
+          onClick={() => toggle(item.ticket_id)}
+          onKeyDown={event => { if (event.key === 'Enter' || event.key === ' ') { event.preventDefault(); toggle(item.ticket_id) } }}>
+          {item.title}
+        </span>
+        {item.role_name && <span className="dsh-task-role" title={t('chatRouterRoleBadge')}>{item.role_name}</span>}
+        <span className="dsh-task-badge" data-tone={tone}>{stateLabel ? t(stateLabel) : item.state}</span>
+      </div>
+      {item.preview && <span className="dsh-task-preview" data-expanded={expanded.has(item.ticket_id)}>{item.preview}</span>}
+      <div className="dsh-task-foot">
+        {at && <time className="dsh-task-time" dateTime={at} title={fullTime(at, t('lang'))}>{when(at, t('lang'))}</time>}
+        {item.report_state && <span className="dsh-task-note">{report ? t(report) : item.report_state}</span>}
+        {item.chat_session && <button type="button" className="dsh-task-note dsh-task-link"
+          onClick={() => { void openSession(item.chat_session).catch(error => setFailure(errorText(error))) }}>{t('chatRouterFrom')} {item.chat_session.slice(-8)}</button>}
+        <button type="button" className="dsh-task-open" onClick={() => { void openSession(item.worker_session).catch(error => setFailure(errorText(error))) }}>{t('openWorkerSession')}</button>
+      </div>
+    </article>
+  }
   return <>
     <style>{CSS}</style>
-    <div className="dsh-tasks">
+    <div className="dsh-tasks" role="region" aria-label={t('chatRouterTasks')}>
       <div className="dsh-tasks-head">
         <h2 className="dsh-tasks-title">{t('chatRouterTasks')}</h2>
-        {all.length > 0 && <span className="dsh-tasks-count">{live.length} / {all.length}</span>}
+        {items.length > 0 && <span className="dsh-tasks-count" aria-live="polite">{t('chatRouterCount', { live: live.length, total: items.length })}</span>}
         <button type="button" className="dsh-tasks-refresh" title={t('chatRouterRefresh')} aria-label={t('chatRouterRefresh')}
           onClick={refresh}>⟳</button>
       </div>
@@ -145,14 +168,24 @@ export function TasksPane({ t, call, openSession }: {
       {all.length > 0 && <>
         <div className="dsh-tasks-filters">{([['all', 'chatRouterFilterAll'], ['live', 'chatRouterFilterLive'], ['done', 'chatRouterFilterDone']] as const).map(([value, label]) =>
           <button key={value} type="button" className="dsh-tasks-filter" data-active={filter === value}
-            onClick={() => setFilter(value)}>{t(label)}</button>)}</div>
+            aria-pressed={filter === value} onClick={() => setFilter(value)}>{t(label)}</button>)}</div>
+        {(roles.length > 0 || hasUnassigned) && <div className="dsh-tasks-roles" role="group" aria-label={t('chatRouterAllRoles')}>
+          {([['all', t('chatRouterAllRoles')]] as const).map(([value, label]) => <button key={value} type="button"
+            className="dsh-tasks-filter" data-active={role === value} aria-pressed={role === value}
+            onClick={() => setRole(value)}>{label}</button>)}
+          {roles.map(([id, name]) => <button key={id} type="button" className="dsh-tasks-filter" data-active={role === id}
+            aria-pressed={role === id} onClick={() => setRole(id)}>{name}</button>)}
+          {hasUnassigned && <button type="button" className="dsh-tasks-filter" data-active={role === 'unassigned'}
+            aria-pressed={role === 'unassigned'} onClick={() => setRole('unassigned')}>{t('chatRouterUnassigned')}</button>}
+        </div>}
         <div className="dsh-tasks-search">
           <input value={query} onChange={event => setQuery(event.target.value)} placeholder={t('chatRouterSearch')} aria-label={t('chatRouterSearch')} />
         </div>
       </>}
-      {(error || failure) && <p className="dsh-tasks-hint" style={{ color: 'crimson' }}>{failure ?? error?.message}</p>}
+      {(error || failure) && <p className="dsh-tasks-error" role="alert">{failure ?? error?.message}</p>}
       {all.length === 0
-        ? <div className="dsh-tasks-empty"><EmptyIcon /><div>{t('chatRouterTasksEmpty')}</div></div>
+        ? <div className="dsh-tasks-empty"><EmptyIcon /><div>{t('chatRouterTasksEmpty')}
+          <span className="dsh-tasks-empty-guide">{t('chatRouterEmptyGuide')}</span></div></div>
         : items.length === 0
           ? <div className="dsh-tasks-empty"><div>{t('chatRouterNoMatch')}</div></div>
           : <>

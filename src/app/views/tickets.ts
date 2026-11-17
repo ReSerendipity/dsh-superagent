@@ -65,6 +65,8 @@ export function chatRouterTasks(host: ViewHost) {
       // a glance. Both fields are null on ordinary dispatches, which keeps the card exactly as it was.
       role: typeof role === 'string' ? role : null,
       role_name: typeof roleName === 'string' ? roleName : null,
+      // When the ticket last moved, so the pane's relative time does not have to fall back to the panel's clock.
+      updated_at: ticket.updatedAt,
       // What the worker's latest assignment reports: progress / waiting / ready / blocked / failed / dropped.
       report_state: ticket.assignments.at(-1)?.report?.state ?? null }
   }).sort((a, b) => Number(b.dispatched) - Number(a.dispatched))
