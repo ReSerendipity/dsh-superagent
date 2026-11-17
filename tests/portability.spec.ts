@@ -1,7 +1,7 @@
-// Portability guard: nothing in this repository may name one developer's machine.
+// Portability guard: tracked text must not hard-code paths to the development machine.
 //
-// The product is published for other people's computers, so tracked text files must not contain absolute paths or user
-// names from the machine it was developed on. The machine-specific values are derived at run time, so the gate keeps
+// The product is published for other people's computers. Bare account names can also be ordinary words;
+// detect concrete machine paths instead. Their values are derived at run time, so the gate keeps
 // working after a checkout moves or changes hands; only the rules are written down here.
 import { readdirSync, readFileSync, statSync } from 'node:fs'
 import { homedir, userInfo } from 'node:os'
@@ -19,21 +19,15 @@ const BINARY = /\.(png|ico|jpg|jpeg|webp|zip|zst|zstd|exe|dll|pak|dat|bin|pdf)$/
 const USER = userInfo().username
 const HOME = homedir()
 const escape = (value: string): string => value.replace(/[.*+?^${}()|[\]\\]/g, '\\$&')
-// GitHub's hosted runners use a generic service account (`runner` on Linux/macOS, `runneradmin` on Windows).
-// Those names are ordinary words in prose ("a Linux runner needs more time") and identify no person, so the
-// user-name rule is skipped for them; the home, Windows-user and checkout path rules still run on CI.
-const SERVICE_ACCOUNTS = new Set(['runner', 'runneradmin', 'vsts', 'build', 'builder', 'administrator'])
-const developerUser = SERVICE_ACCOUNTS.has(USER.toLowerCase()) ? undefined : USER
-const userRule: { name: string; pattern: RegExp }[] = developerUser === undefined ? [] : [
-  { name: 'developer user name', pattern: new RegExp(`(?:^|[^A-Za-z0-9_])${escape(developerUser)}(?:$|[^A-Za-z0-9_])`, 'i') },
-]
+// Accept native, forward-slash and text-escaped separators, but not a different directory with the same prefix.
+const pathEnd = String.raw`(?=$|[\\/\s"'\x60<>()\[\]{},;])`
+const pathSource = (value: string): string => value.split(/[\\/]+/).map(escape).join(String.raw`[\\/]+`)
 
-/** Absolute paths and names that only exist on the machine this checkout runs on. */
+/** Current home/checkout directories and the current account's conventional Windows user directory. */
 export const FORBIDDEN: { name: string; pattern: RegExp }[] = [
-  { name: 'developer home directory', pattern: new RegExp(escape(HOME), 'i') },
-  ...userRule,
-  { name: 'windows user path', pattern: new RegExp(`C:[\\\\/]{1,2}Users[\\\\/]{1,2}${escape(USER)}\\b`, 'i') },
-  { name: 'repository checkout path', pattern: new RegExp(escape(ROOT), 'i') },
+  { name: 'developer home directory', pattern: new RegExp(pathSource(HOME) + pathEnd, 'i') },
+  { name: 'windows user path', pattern: new RegExp(String.raw`[a-z]:[\\/]+Users[\\/]+${escape(USER)}${pathEnd}`, 'i') },
+  { name: 'repository checkout path', pattern: new RegExp(pathSource(ROOT) + pathEnd, 'i') },
 ]
 
 export interface Finding {
@@ -91,7 +85,7 @@ it('never names the development machine, so another computer can use the reposit
 })
 
 it('catches a planted home directory, so the scanner is not passing by blindness', () => {
-  const planted = `notes: ${homedir()}${join('APP', 'repository')}`
+  const planted = `notes: ${join(homedir(), 'APP', 'repository')}`
   expect(scanText(planted).map(finding => finding.name)).toContain('developer home directory')
 })
 
