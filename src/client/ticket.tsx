@@ -6,7 +6,8 @@ import { decisionMark, reportDot, ticketMark } from './marks.ts'
 import { usePanel } from './provider.tsx'
 import { settingsRoute } from './route.ts'
 import { Earlier, ThreadLine, automatedRuns } from './rows.tsx'
-import { actorName, localized, readableMarkers, reasonLabel, valueLabel, when } from './text.ts'
+import { actorName, clockTime, fullTime, localized, readableMarkers, reasonLabel, valueLabel, when, type T } from './text.ts'
+import { ticketTimeline, type TimelineEntry, type TimelineFilter } from './timeline.ts'
 import { ActionLink, ConfirmButton, ExternalLink, Hint, KeyValues, LabelValue, LoadState, MarkdownLite, PageHead, Section, SessionButton,
   StageMark, When } from './widgets.tsx'
 
@@ -105,6 +106,81 @@ function MandateDetails({ ticket, actor }: { ticket: TicketPageView; actor: stri
   </Section>
 }
 
+const TIMELINE_PAGE = 8
+const TIMELINE_FILTERS = [['all', 'timelineAll'], ['message', 'timelineMessages'], ['event', 'timelineEvents'],
+  ['report', 'timelineReports']] as const
+const timelineTitle = (t: T, entry: TimelineEntry): string => {
+  switch (entry.kind) {
+    case 'decision': return t('timelineDecision', { outcome: valueLabel(t, 'decision', entry.outcome) })
+    case 'created': return t('timelineCreated')
+    case 'trigger': return t('timelineFromActor', { actor: actorName(t, entry.actor) })
+    case 'text': return t('timelineMainNote')
+    case 'note': return t('timelineContextNote')
+    case 'policy': return t('timelinePolicy')
+    case 'reopen': return t('timelineReopen')
+    case 'resume': return t('timelineResume')
+    case 'assigned': return t('timelineAssigned', { number: entry.number })
+    case 'started': return t('timelineStarted', { number: entry.number })
+    case 'assignmentEnded': return t('timelineAssignmentEnded', { number: entry.number })
+    case 'report': return t('timelineReport', { state: valueLabel(t, 'report', entry.state) })
+    case 'ended': return t('timelineEnded', { outcome: valueLabel(t, 'outcome', entry.outcome) })
+  }
+}
+const timelineDetail = (t: T, entry: TimelineEntry): string => {
+  if (entry.kind === 'policy') return `${entry.from?.slice(0, 8) ?? ''} → ${entry.to?.slice(0, 8) ?? ''}`
+  if (entry.kind === 'assignmentEnded' || entry.kind === 'ended') return reasonLabel(t, entry.reason)
+  return entry.text ?? ''
+}
+/** One chrono view over the ticket's existing aggregates: messages, system events and reports, newest first. */
+function Timeline({ ticket }: { ticket: TicketPageView }) {
+  const { t, navigate } = usePanel()
+  const [filter, setFilter] = useState<TimelineFilter>('all')
+  const [limit, setLimit] = useState(TIMELINE_PAGE)
+  const [expanded, setExpanded] = useState<ReadonlySet<string>>(new Set())
+  const entries = ticketTimeline(ticket)
+  const filtered = filter === 'all' ? entries : entries.filter(entry => entry.group === filter)
+  const shown = filtered.slice(0, limit)
+  const toggle = (id: string) => setExpanded(previous => {
+    const next = new Set(previous)
+    if (next.has(id)) next.delete(id); else next.add(id)
+    return next
+  })
+  return <Section title={t('ticketTimeline')} count={filtered.length} icon="history"
+    action={<div className="dt-ticket-timeline-filters" role="group" aria-label={t('timelineFilter')}>
+      {TIMELINE_FILTERS.map(([value, label]) => <button key={value} type="button"
+        className={`dt-pill${filter === value ? ' dt-pill-active' : ''}`} aria-pressed={filter === value}
+        onClick={() => { setFilter(value); setLimit(TIMELINE_PAGE) }}>{t(label)}</button>)}
+    </div>}>
+    {shown.length === 0 ? <Hint>{t('timelineEmpty')}</Hint> : <ol className="dt-ticket-timeline">
+      {shown.map(entry => {
+        const detail = timelineDetail(t, entry)
+        const long = detail.length > 160
+        const open = expanded.has(entry.id)
+        return <li key={entry.id} className="dt-ticket-timeline-item" data-tone={entry.tone} data-kind={entry.kind}>
+          <time className="dt-ticket-timeline-time" dateTime={entry.at} title={fullTime(entry.at, t('lang'))}>
+            {clockTime(entry.at, t('lang'))}</time>
+          <span className="dt-ticket-timeline-rail"><span className="dt-ticket-timeline-dot" /></span>
+          <div className="dt-ticket-timeline-body">
+            <div className="dt-ticket-timeline-head">
+              <span className="dt-ticket-timeline-kind">{t(entry.group === 'message' ? 'timelineMessages'
+                : entry.group === 'report' ? 'timelineReports' : 'timelineEvents')}</span>
+              <span className="dt-ticket-timeline-title">{timelineTitle(t, entry)}</span>
+              {entry.undelivered && <span className="dt-tag" data-tone="warning">{t('inputUndelivered')}</span>}
+            </div>
+            {detail && <div className={`dt-ticket-timeline-text${long && !open ? ' dt-clamp-4' : ''}`}><MarkdownLite text={detail} /></div>}
+            {long && <button type="button" className="dt-ticket-timeline-toggle" onClick={() => toggle(entry.id)}>
+              {t(open ? 'timelineCollapseText' : 'timelineExpand')}</button>}
+            {entry.link && <button type="button" className="dt-ticket-timeline-toggle" onClick={() => navigate({ page: 'trigger',
+              id: entry.link!.thread, query: { trigger: entry.link!.trigger } })}>{t('timelineOpenSource')}</button>}
+          </div>
+        </li>
+      })}
+    </ol>}
+    {filtered.length > shown.length && <button type="button" className="dt-ticket-timeline-toggle"
+      onClick={() => setLimit(limit + TIMELINE_PAGE)}>{t('timelineShowEarlier', { count: filtered.length - shown.length })}</button>}
+  </Section>
+}
+
 export function TicketPage({ id }: { id: string }) {
   const { t, call } = usePanel()
   const { data, error, reload } = usePoll(() => call('GET tickets/:id', { id }), [id])
@@ -153,6 +229,7 @@ export function TicketPage({ id }: { id: string }) {
     {data.deliveryError && <p className="dt-banner dt-danger dt-mono">
       <span className="dt-banner-label">{t('deliveryFailedPrefix')}</span>{data.deliveryError}
     </p>}
+    <Timeline ticket={data} />
     <MandateDetails ticket={data} actor={actor} />
     {undelivered.length > 0 && <Section title={t('undeliveredInputs')} count={undelivered.length}>
       <Hint>{data.deliveryError ? t('inputRetryHint') : data.paused ? t('inputPausedHint') : t('inputWaitingHint')}</Hint>
