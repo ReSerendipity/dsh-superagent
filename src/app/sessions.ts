@@ -18,7 +18,7 @@ import { bundledSkills } from './skill-files.ts'
 import { SKILL_PREFIX, type PromptVersion, type Prompts } from './prompts.ts'
 import type { Store } from './store.ts'
 import { KV } from '../kv.ts'
-import type { RegisterTool, Tool } from './tools/tool.ts'
+import { objectOutput, type RegisterTool, type Tool } from './tools/tool.ts'
 import { allowedChatTools, CHAT_TOOLS, roleOfMeta, type TeamRole } from '../chat-router/config.ts'
 import { isChatRouterSession } from '../chat-router/match.ts'
 import type { ChatRouterHost } from '../chat-router/host.ts'
@@ -236,7 +236,7 @@ export class Sessions {
           const image = value && typeof value === 'object' && 'image' in value ? (value as { image: never }).image : undefined
           return image ? [text, { type: 'image' as const, attachment: image }] : [text]
         } },
-        execute: (args, execution) => execute(schema.parse(args), execution.signal) }))
+        execute: async (args, execution) => objectOutput(await execute(schema.parse(args), execution.signal)) }))
     }
   }
   /** Returns `sessionId`'s active model-budget retry state (`{ model_retry }`) for status listings, or `{}` when not waiting on one. */

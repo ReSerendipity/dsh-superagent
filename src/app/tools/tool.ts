@@ -10,6 +10,14 @@ export interface Tool<S extends z.ZodType = z.ZodType> {
   execute: (args: z.infer<S>, signal: AbortSignal) => Promise<unknown>
 }
 export type RegisterTool = <S extends z.ZodType>(name: string, description: string, schema: S, execute: Tool<S>['execute']) => void
+/**
+ * Tools declare an object output schema, so a primitive, an array or `undefined` must not escape as itself.
+ * Objects pass through unchanged (including `image`); everything else is wrapped as `{ result }`, with `null`
+ * for an absent value so the shape survives JSON.
+ */
+export function objectOutput(value: unknown): Record<string, unknown> {
+  return value !== null && typeof value === 'object' && !Array.isArray(value) ? value as Record<string, unknown> : { result: value ?? null }
+}
 export const tool = <S extends z.ZodType>(definition: Tool<S>): Tool => definition as unknown as Tool
 
 /** Human-facing acknowledgement text, constrained to `IM_WORDS` regardless of which channel it is posted to. */
