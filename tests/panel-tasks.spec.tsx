@@ -33,14 +33,20 @@ async function mount() {
 
 it('shows localized states, relative times with a full-time title, and localized report states', async () => {
   await mount()
+  // Waiting on a person comes first, then live work, then history.
   expect([...document.querySelectorAll('.dsh-task-badge')].map(badge => badge.textContent))
-    .toEqual([zh['stage.working'], zh['stage.failed'], zh['outcome.completed']])
+    .toEqual([zh['stage.failed'], zh['stage.working'], zh['outcome.completed']])
+  expect([...document.querySelectorAll('.dsh-tasks-group')].map(group => group.textContent))
+    .toEqual([`${zh.chatRouterWaiting} · 1`, `${zh.chatRouterActive} · 1`, `${zh.chatRouterDone} · 1`])
+  expect(document.querySelector('.dsh-task[data-waiting="true"]')?.getAttribute('aria-label')).toBe('临时排查')
+  expect(document.querySelector('.dsh-task[data-blocked="true"]')?.getAttribute('aria-label')).toBe('临时排查')
   // No raw English state or report word survives in the cards.
   expect(document.querySelector('.dsh-task-badge')?.textContent).not.toBe('working')
   expect([...document.querySelectorAll('.dsh-task-note:not(.dsh-task-link)')].map(note => note.textContent))
-    .toEqual([zh['report.progress'], zh['report.failed'], zh['report.ready']])
+    .toEqual([zh['report.failed'], zh['report.progress'], zh['report.ready']])
   const time = document.querySelector('.dsh-task-time')!
-  expect(time.getAttribute('datetime')).toBe('2026-09-22T10:00:00Z')
+  expect([...document.querySelectorAll('.dsh-task-time')].map(item => item.getAttribute('datetime')))
+    .toEqual(['2026-09-22T08:00:00Z', '2026-09-22T10:00:00Z', '2026-09-22T09:00:00Z'])
   expect(time.getAttribute('title')).toContain('2026')
 })
 
@@ -71,6 +77,6 @@ it('counts the attention buckets and links each count to an equally long list', 
   expect(chip(1).getAttribute('aria-pressed')).toBe('true')
   await act(async () => { chip(2).click() })
   await flush()
-  expect([...document.querySelectorAll('.dsh-task-name')].map(name => name.textContent)).toEqual(['评审 README', '临时排查'])
+  expect([...document.querySelectorAll('.dsh-task-name')].map(name => name.textContent)).toEqual(['临时排查', '评审 README'])
   expect(chip(2).getAttribute('aria-pressed')).toBe('true')
 })
