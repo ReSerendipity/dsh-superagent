@@ -61,6 +61,17 @@ export function fullTime(value: string | undefined, lang: string): string {
   const date = new Date(value ?? '')
   return Number.isNaN(date.getTime()) ? '' : date.toLocaleString(timeLocale(lang))
 }
+/** A timeline timestamp: clock time for today, month/day plus clock time for anything older. */
+export function clockTime(value: string | undefined, lang: string): string {
+  if (!value) return ''
+  const date = new Date(value)
+  if (Number.isNaN(date.getTime())) return value
+  const now = new Date()
+  const today = date.getFullYear() === now.getFullYear() && date.getMonth() === now.getMonth() && date.getDate() === now.getDate()
+  return date.toLocaleString(timeLocale(lang), today
+    ? { hour: '2-digit', minute: '2-digit' }
+    : { month: 'short', day: 'numeric', hour: '2-digit', minute: '2-digit' })
+}
 /** Every ticket-card state maps onto the panel's existing stage and outcome labels, so no second vocabulary drifts. */
 const TICKET_STATE_LABELS = {
   'person/delivery': 'stage.delivery', 'person/answer': 'stage.answer', 'person/review': 'stage.review',

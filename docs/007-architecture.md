@@ -405,7 +405,8 @@ Some generic modules still refer directly to GitHub or Feishu:
 | `src/client/overview.tsx` | The overview |
 | `src/client/about.tsx` | The guide page: what this panel is, what each page does, the first steps, usage notes, and links to the upstream and build repositories |
 | `src/client/source.tsx`, `trigger.tsx`, `eval.tsx`, `execution.tsx` | One file per stage: its status, and its settings where it has some |
-| `src/client/thread.tsx`, `ticket.tsx` | The record pages: a Thread with its timeline, and a Ticket with its authorization, Inputs and Assignments |
+| `src/client/thread.tsx`, `ticket.tsx` | The record pages: a Thread with its timeline, and a Ticket with its authorization, Inputs, Assignments and one chrono view over all of them |
+| `src/client/timeline.ts` | The Ticket timeline: messages, system events and reports built from existing aggregates, newest first, without a second server shape |
 | `src/client/settings.tsx` | The Settings tab: the group navigation and the group on screen |
 | `src/client/settings-kit.tsx` | The building blocks of settings blocks: the settings the stage groups share, `useBlockDraft`, the fields, among them a Source kind's, and the history of saves |
 | `src/client/policy-editor.tsx` | One Source's Policy as a person reads it: who may hand work over, which messages open work by themselves and which are only recorded, beside the cell-by-cell admission table the same answers are written into |
@@ -504,6 +505,7 @@ Some generic modules still refer directly to GitHub or Feishu:
 | `tests/panel-overview.spec.tsx`, `panel-source.spec.tsx`, `panel-trigger.spec.tsx`, `panel-eval.spec.tsx`, `panel-execution.spec.tsx` | Each page of the panel, against a fake management API answered by route |
 | `tests/panel-team.spec.tsx` | The team page: role cards and their localized states, status and search filters, the unassigned lane, and the empty-roster guide |
 | `tests/panel-tasks.spec.tsx` | The right-pane task list: localized ticket and report states, relative times with full-time titles, and the role filter |
+| `tests/panel-timeline.spec.tsx` | The Ticket timeline: entry order and grouping, localized titles and filters, and the earlier-page control |
 | `tests/panel-settings.spec.tsx`, `panel-prompts.spec.tsx`, `panel-deployment.spec.tsx`, `panel-panel.spec.tsx` | The settings groups, drafts and history, the prompts, the Deployment page, and the panel's search, glossary and route memory |
 | `tests/panel-about.spec.tsx` | The guide page: it names every page and the first steps, links both repositories, and the overview introduces the panel with a link to it |
 | `tests/draft.spec.ts`, `tests/prompt-config.spec.ts`, `tests/markdown.spec.ts`, `tests/marks.spec.ts` | Draft states, merges and the save bar's line; the prompt configuration by section and the line diff; the Markdown subset and its links; the mark of every state the views classify |
