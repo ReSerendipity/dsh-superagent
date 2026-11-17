@@ -4,6 +4,7 @@ import type { ThreadFact } from '../core/index.ts'
 import { validItems, type Commands, type Tally } from '../infra/commands.ts'
 import { CommentSchema, IssueSchema, isHumanLogin, reviewPlace, type GithubComment } from './github-trigger.ts'
 import type { ContextMessage, ThreadContext } from './kind.ts'
+import { selectReviewThread } from './github-review-thread.ts'
 
 const CheckSchema = z.looseObject({ name: z.string(), status: z.string(), conclusion: z.string().nullable() })
 const StatusSchema = z.looseObject({ context: z.string(), state: z.string() })
@@ -84,9 +85,7 @@ const DescriptionSchema = IssueSchema.extend({
 })
 async function reviewThread(commands: Commands, number: number, comment: number, tally?: Tally): Promise<GithubComment[]> {
   const comments = await commands.pages(CommentSchema, `pulls/${number}/comments?per_page=100`, tally)
-  const root = comments.find(item => item.id === comment)?.in_reply_to_id ?? comment
-  return comments.filter(item => item.id === root || item.in_reply_to_id === root)
-    .sort((a, b) => (a.created_at ?? '').localeCompare(b.created_at ?? ''))
+  return selectReviewThread(comments, comment)
 }
 function threadMessages(thread: GithubComment[], id: (comment: GithubComment) => string): ContextMessage[] {
   const [first] = thread
