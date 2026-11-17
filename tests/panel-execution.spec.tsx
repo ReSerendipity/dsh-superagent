@@ -58,6 +58,10 @@ it('shows a Ticket with its stage, its Mandate details with the Trigger and Deci
   expect(all('.dt-section-title').map(title => title.querySelector('.dt-section-name')?.textContent)).toEqual(['工单时间线', '授权详情', '未送达的输入', '订阅的线程'])
   expect(document.querySelector('.dt-status-line .dt-stage')?.textContent).toBe(zh.executingLabel)
   expect(document.querySelector('.dt-status-line .dt-stage .dt-spinner')).not.toBeNull()
+  // Actions stay reachable in a bar that remains at the top while the long timeline scrolls.
+  expect(document.querySelector('.dt-ticket-bar .dt-ticket-bar-label')?.textContent).toBe(zh.executingLabel)
+  expect(all('.dt-ticket-bar button, .dt-ticket-bar a').map(item => item.textContent))
+    .toEqual(expect.arrayContaining([zh.openSession, zh.stop]))
   // A Thread this Ticket follows reads as subscribed on its page, though no other Ticket follows it.
   expect(all('.dt-list .dt-ticket .dt-stage').map(stage => stage.textContent)).toContain(zh.threadSubscribed)
   expect(all('.dt-list .dt-ticket .dt-stage').map(stage => stage.textContent)).not.toContain(zh.threadUnsubscribed)
@@ -93,6 +97,7 @@ it('links a question to its Channel, folds consecutive automated messages among 
   await click(all('.dt-open').find(button => button.textContent === '修复回归')!)
   expect(all('.dt-banner a').map(link => [link.textContent, link.getAttribute('href')])).toEqual([['去飞书回答',
     'https://applink.feishu.cn/client/chat/open?openChatId=oc_1']])
+  expect(all('.dt-ticket-bar a').map(link => link.textContent)).toEqual(['去飞书回答'])
   await click('已送达的输入 · 2')
   expect(all('.dt-disclosure-body .dt-row-title').map(title => title.textContent)).toEqual(['自动通知：CI of PR #42 at abc1234: 10 checks, 1 failed, 0 running.'])
   await click('同一发送者之前还有 1 条自动消息')
