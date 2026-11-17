@@ -158,6 +158,10 @@ div.dt-preview-head { color: var(--dsw-alias-label-secondary); }
 .dt-details { display: flex; flex-direction: column; gap: 2px; border-top: 0.5px solid var(--dsw-alias-border-l2); padding-top: 8px; }
 .dt-danger-zone { display: flex; align-items: center; justify-content: space-between; gap: 12px; flex-wrap: wrap; padding-top: 16px; border-top: 0.5px solid var(--dsw-alias-border-l2); }
 .dt-danger-zone .dt-btn { color: var(--dsw-alias-state-error-primary); }
+.dt-ticket-bar { position: sticky; top: 0; z-index: 2; display: flex; align-items: center; justify-content: space-between; gap: 12px; flex-wrap: wrap; padding: 10px 0; margin-bottom: -24px; background: var(--dsw-alias-bg-base, var(--dsw-alias-bg-layer-1)); border-bottom: 0.5px solid var(--dsw-alias-border-l2); }
+.dt-ticket-bar-label { font-size: 12px; line-height: 18px; color: var(--dsw-alias-label-caption); }
+.dt-ticket-bar-actions { display: flex; align-items: center; gap: 8px; flex-wrap: wrap; margin-left: auto; }
+.dt-ticket-bar-stop .dt-btn { color: var(--dsw-alias-state-error-primary); }
 .dt-md { display: flex; flex-direction: column; gap: 6px; font-size: 13px; line-height: 20px; overflow-wrap: anywhere; }
 .dt-md p, .dt-md ul, .dt-md ol { margin: 0; }
 .dt-md ul, .dt-md ol { padding-left: 20px; display: flex; flex-direction: column; gap: 2px; }

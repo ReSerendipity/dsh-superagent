@@ -405,7 +405,7 @@ Some generic modules still refer directly to GitHub or Feishu:
 | `src/client/overview.tsx` | The overview |
 | `src/client/about.tsx` | The guide page: what this panel is, what each page does, the first steps, usage notes, and links to the upstream and build repositories |
 | `src/client/source.tsx`, `trigger.tsx`, `eval.tsx`, `execution.tsx` | One file per stage: its status, and its settings where it has some |
-| `src/client/thread.tsx`, `ticket.tsx` | The record pages: a Thread with its timeline, and a Ticket with its authorization, Inputs, Assignments and one chrono view over all of them |
+| `src/client/thread.tsx`, `ticket.tsx` | The record pages: a Thread with its timeline, and a Ticket with its authorization, Inputs, Assignments, one chrono view over all of them, and its actions in a bar that stays at the top |
 | `src/client/timeline.ts` | The Ticket timeline: messages, system events and reports built from existing aggregates, newest first, without a second server shape |
 | `src/client/settings.tsx` | The Settings tab: the group navigation and the group on screen |
 | `src/client/settings-kit.tsx` | The building blocks of settings blocks: the settings the stage groups share, `useBlockDraft`, the fields, among them a Source kind's, and the history of saves |

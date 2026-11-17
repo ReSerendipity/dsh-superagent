@@ -201,14 +201,24 @@ export function TicketPage({ id }: { id: string }) {
     return reason ? t('endedAt', { time, outcome, reason }) : t('endedAtShort', { time, outcome })
   })()
   const channel = data.channels[0]
+  const hasBar = Boolean((channel && data.attention) || data.sessionId || data.actions.retry || data.actions.stop)
   return <>
     <PageHead title={data.title}>
       {opening?.url && <ActionLink href={opening.url}>{t('openThread', { source: valueLabel(t, 'source', opening.source) })}</ActionLink>}
-      {data.actions.retry && <ConfirmButton variant="outline" icon="refresh" label={t('retry')} title={t('retryTitle')}
-        message={t('retryConfirm', { title: data.title })}
-        onConfirm={() => after(call('POST tickets/:id/retry', { id }))} />}
-      {data.sessionId && <SessionButton variant="outline" sessionId={data.sessionId} />}
     </PageHead>
+    {hasBar && <div className="dt-ticket-bar" role="group" aria-label={t('term.ticket')}>
+      <span className="dt-ticket-bar-label">{status.label}</span>
+      <div className="dt-ticket-bar-actions">
+        {channel && data.attention && <ActionLink href={channel.url} icon="message">{t('answerIn', { source: valueLabel(t, 'source',
+          channel.source) })}</ActionLink>}
+        {data.sessionId && <SessionButton variant="outline" sessionId={data.sessionId} />}
+        {data.actions.retry && <ConfirmButton variant="outline" icon="refresh" label={t('retry')} title={t('retryTitle')}
+          message={t('retryConfirm', { title: data.title })} onConfirm={() => after(call('POST tickets/:id/retry', { id }))} />}
+        {data.actions.stop && <span className="dt-ticket-bar-stop" title={t('stopHint')}><ConfirmButton variant="outline"
+          label={t('stop')} title={t('stopConfirmTitle')} message={t('stopConfirm', { title: data.title })}
+          onConfirm={() => after(call('POST tickets/:id/stop', { id }))} /></span>}
+      </div>
+    </div>}
     {error && <LoadState error={error} loading={false} />}
     <div className="dt-row-meta dt-status-line">
       <StageMark state={status.dot} icon={status.icon} label={status.label} />
@@ -266,10 +276,5 @@ export function TicketPage({ id }: { id: string }) {
             className="dt-mono dt-clamp">{data.mandate.scope}</span>] as [string, ReactNode]] : []]} />
       </Details>
     </div>
-    {data.actions.stop && <div className="dt-danger-zone">
-      <span className="dt-hint">{t('stopHint')}</span>
-      <ConfirmButton variant="outline" label={t('stop')} title={t('stopConfirmTitle')} message={t('stopConfirm', { title: data.title })}
-        onConfirm={() => after(call('POST tickets/:id/stop', { id }))} />
-    </div>}
   </>
 }
