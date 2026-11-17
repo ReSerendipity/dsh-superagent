@@ -10,7 +10,7 @@ usePanel()
 it('explains what the panel is for and what each page does', async () => {
   await openGuide()
   expect(tab(zh['tab.about']).getAttribute('aria-selected')).toBe('true')
-  expect(all('[role="tab"]').map(item => item.textContent)).toEqual(['介绍', '概览', '来源', '触发', '评估', '执行', '设置'])
+  expect(all('[role="tab"]').map(item => item.textContent)).toEqual(['介绍', '概览', '团队', '来源', '触发', '评估', '执行', '设置'])
   const titles = all('.dt-section-title').map(item => item.textContent)
   expect(titles).toEqual([zh.aboutWhatTitle, zh.aboutPagesTitle, zh.aboutStartTitle, zh.aboutNotesTitle, zh.aboutTitle])
   // The five panel pages are named in the guide, and the first steps are there too.

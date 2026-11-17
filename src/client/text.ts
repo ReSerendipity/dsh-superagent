@@ -61,3 +61,35 @@ export function fullTime(value: string | undefined, lang: string): string {
   const date = new Date(value ?? '')
   return Number.isNaN(date.getTime()) ? '' : date.toLocaleString(timeLocale(lang))
 }
+/** Every ticket-card state maps onto the panel's existing stage and outcome labels, so no second vocabulary drifts. */
+const TICKET_STATE_LABELS = {
+  'person/delivery': 'stage.delivery', 'person/answer': 'stage.answer', 'person/review': 'stage.review',
+  'person/blocked': 'stage.blocked', 'person/failed': 'stage.failed', 'working': 'stage.working',
+  'working/queued': 'stage.queued', 'idle': 'stage.idle', 'completed': 'outcome.completed',
+  'merged': 'outcome.merged', 'closed': 'outcome.closed', 'dropped': 'outcome.dropped', 'stopped': 'outcome.stopped'
+} as const
+export type TicketStateLabel = typeof TICKET_STATE_LABELS[keyof typeof TICKET_STATE_LABELS]
+/** The localized label for a state the host may have added since this panel was built; unknown states keep their raw name. */
+export const ticketStateLabel = (state: string): TicketStateLabel | undefined =>
+  Object.hasOwn(TICKET_STATE_LABELS, state) ? TICKET_STATE_LABELS[state as keyof typeof TICKET_STATE_LABELS] : undefined
+/** A state's visual tone: live work, a person's turn, finished history, or a hard stop. */
+export type TicketTone = 'live' | 'person' | 'done' | 'muted' | 'error' | 'idle'
+export function ticketTone(state: string): TicketTone {
+  if (state === 'stopped' || state === 'person/failed') return 'error'
+  if (state.startsWith('person/')) return 'person'
+  if (state === 'working' || state === 'working/queued') return 'live'
+  if (state === 'idle') return 'idle'
+  if (state === 'completed' || state === 'merged' || state === 'closed') return 'done'
+  if (state === 'dropped') return 'muted'
+  // A state the panel has never seen stays neutral rather than alarming; its raw name still shows.
+  return 'muted'
+}
+/** What a worker's latest assignment reported, in the panel's existing report vocabulary. */
+const REPORT_STATE_LABELS = {
+  queued: 'report.queued', running: 'report.running', progress: 'report.progress', waiting: 'report.waiting',
+  ready: 'report.ready', blocked: 'report.blocked', failed: 'report.failed', dropped: 'report.dropped',
+  completed: 'report.completed', merged: 'report.merged', closed: 'report.closed', stopped: 'report.stopped'
+} as const
+export type ReportStateLabel = typeof REPORT_STATE_LABELS[keyof typeof REPORT_STATE_LABELS]
+export const reportStateLabel = (state: string): ReportStateLabel | undefined =>
+  Object.hasOwn(REPORT_STATE_LABELS, state) ? REPORT_STATE_LABELS[state as keyof typeof REPORT_STATE_LABELS] : undefined

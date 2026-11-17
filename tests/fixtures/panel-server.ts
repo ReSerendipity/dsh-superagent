@@ -92,7 +92,7 @@ export interface PanelServer {
   joinError?: string
   settings: Settings; revisions: Record<string, number>
   prompts: PromptsView
-  tickets: { open: TicketRow[]; ended: TicketRow[] }; ticketDetails: Record<string, TicketPageView>
+  tickets: { open: TicketRow[]; ended: TicketRow[] }; ticketDetails: Record<string, TicketPageView>; team: ApiResponse<'GET team/board'>
   threads: ThreadRow[]
   threadPages: (key: string, query: { before?: string; around?: string }) => ThreadPageView | undefined
   person: TicketRow[]; search: Pick<ApiResponse<'GET search'>, 'items' | 'threads'>; history: HistoryView
@@ -250,6 +250,19 @@ function initial(): PanelServer {
   const reply = { source: 'feishu', url: 'https://applink.feishu.cn/client/chat/open?openChatId=oc_1', label: { zh: '飞书消息',
     en: 'Feishu message' } }
   const defaults = { revision: 0, previousRevision: null, savedAt: '', source: 'defaults' }
+  const teamCard = (id: string, state: ApiResponse<'GET team/board'>['roles'][number]['tickets'][number]['state'],
+    updatedAt: string, ended?: { at: string; outcome: 'completed' }): ApiResponse<'GET team/board'>['roles'][number]['tickets'][number] => ({
+    ticket_id: id, title: `团队工单 ${id}`, state, strength: 'explicit', preview: `${id} 的摘要`, read: `ticket/${id}`,
+    role: 'reviewer', role_name: '评审A', chat_session: 'chat-1', worker_session: `worker-${id}`, updated_at: updatedAt,
+    report_state: null, ...(ended ? { ended: { ...ended, by: 'human' as const, reason: ended.outcome } } : {}) })
+  const team = {
+    generated_at: '2026-09-23T00:00:00Z', enabled: true,
+    roles: [{ id: 'reviewer', name: '评审A', instruction: '只读审查改动，逐条列出风险。', model: null,
+      tickets: [teamCard('t2', 'working', '2026-09-22T10:00:00Z'), teamCard('t3', 'completed', '2026-09-22T09:00:00Z',
+        { at: '2026-09-22T09:00:00Z', outcome: 'completed' })],
+      total: 2, live: 1, done: 1, last_at: '2026-09-22T10:00:00Z' }],
+    unassigned: [teamCard('t9', 'working', '2026-09-22T08:00:00Z')], unassigned_total: 1, hidden: 0,
+    totals: { roles: 1, live: 2, done: 1, unassigned: 1 } }
   return {
     health: {}, down: false, pending: 0, opened: [], requests: [], misuse: [], queued: new Set(), dropped: [], failing: [],
     setup: { machine: MACHINE, problem: null, feishuProblem: null,
@@ -261,7 +274,7 @@ function initial(): PanelServer {
       defaults: defaultPrompts(), parts: Object.entries(builtInParts()).map(([key, part]) => ({ key, ...part, base: builtInBase(part.text) })),
       presets: PROMPT_PRESETS,
       defaultChanged: [], revisions: [{ ...defaults, changed: [] }], sessions: [], notificationPending: false, next_offset: null },
-    tickets: { open: [ticketSummary()], ended: [ended] }, ticketDetails: { t1: ticketDetail() },
+    tickets: { open: [ticketSummary()], ended: [ended] }, ticketDetails: { t1: ticketDetail() }, team,
     threads: [threadSummary()], threadPages: threadPage,
     person: [ticketSummary({ attention: { id: 'q1', question: '需要确认按钮颜色' }, note: { text: '需要确认按钮颜色', error: false }, reply },
       { stage: 'person', action: 'answer' }),
@@ -330,6 +343,7 @@ const ROUTES: { [K in keyof Api]: Route<K> } = {
   'POST decisions/:id/dismiss': { answer: ({ params }) => params.id === 'u1' ? { dismissed: true } : refuse(404,
     'Unavailable Eval not found') },
   'GET chatRouter/tasks': { answer: () => ({ items: [] }) },
+  'GET team/board': { answer: () => server.team },
   'GET tickets': { query: ['state', 'offset', 'limit'], answer: ({ query }) => page(server.tickets[query.state === 'ended' ? 'ended'
     : 'open']) },
   'GET tickets/:id': { answer: ({ params }) => server.ticketDetails[params.id] ?? refuse(404, 'Ticket not found') },
