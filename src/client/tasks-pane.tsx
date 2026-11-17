@@ -13,7 +13,16 @@ const CSS = `
 .dsh-tasks-head { display: flex; align-items: baseline; gap: 8px; }
 .dsh-tasks-title { font-size: 15px; font-weight: 600; margin: 0; }
 .dsh-tasks-count { font-size: 11px; opacity: .5; font-variant-numeric: tabular-nums; }
-.dsh-tasks-refresh { margin-left: auto; font-size: 13px; line-height: 1; padding: 4px 6px; border-radius: 6px; cursor: pointer;
+.dsh-tasks-counts { display: flex; gap: 4px; margin-left: auto; flex-wrap: wrap; }
+.dsh-tasks-count-chip { font: inherit; font-size: 10px; line-height: 1; padding: 3px 7px; border-radius: 999px; cursor: pointer;
+  color: inherit; opacity: .55; border: 1px solid color-mix(in srgb, currentColor 14%, transparent); background: transparent;
+  font-variant-numeric: tabular-nums; }
+.dsh-tasks-count-chip[data-tone="person"] { color: var(--dsw-alias-state-warn-primary, #a15c00); }
+.dsh-tasks-count-chip[data-tone="error"] { color: var(--dsw-alias-state-error-primary, #b42318); }
+.dsh-tasks-count-chip[data-active="true"] { opacity: 1; background: color-mix(in srgb, currentColor 10%, transparent);
+  border-color: color-mix(in srgb, currentColor 42%, transparent); }
+.dsh-tasks-count-chip:focus-visible { outline: 2px solid currentColor; outline-offset: 1px; }
+.dsh-tasks-refresh { font-size: 13px; line-height: 1; padding: 4px 6px; border-radius: 6px; cursor: pointer;
   border: 1px solid color-mix(in srgb, currentColor 18%, transparent); background: transparent; color: inherit; }
 .dsh-tasks-refresh:hover { border-color: currentColor; }
 .dsh-tasks-hint { font-size: 11px; opacity: .55; margin: 3px 0 4px; line-height: 1.5; }
@@ -31,8 +40,12 @@ const CSS = `
   color: inherit; outline: none; }
 .dsh-tasks-search input:focus { border-color: color-mix(in srgb, currentColor 45%, transparent); }
 .dsh-tasks-group { font-size: 11px; font-weight: 600; opacity: .45; letter-spacing: .4px; text-transform: uppercase; margin: 14px 0 7px; }
+.dsh-tasks-group[data-tone="person"] { color: var(--dsw-alias-state-warn-primary, #a15c00); opacity: .95; }
+.dsh-tasks-group[data-tone="error"] { color: var(--dsw-alias-state-error-primary, #b42318); opacity: .95; }
 .dsh-task { border: 1px solid color-mix(in srgb, currentColor 14%, transparent); border-radius: 9px; padding: 10px 12px;
   display: flex; flex-direction: column; gap: 6px; margin-bottom: 7px; transition: border-color .15s, background .15s; }
+.dsh-task[data-waiting="true"] { border-left: 3px solid var(--dsw-alias-state-warn-primary, #a15c00); padding-left: 10px; }
+.dsh-task[data-blocked="true"] { border-left-color: var(--dsw-alias-state-error-primary, #b42318); }
 .dsh-task:hover { border-color: color-mix(in srgb, currentColor 30%, transparent); background: color-mix(in srgb, currentColor 4%, transparent); }
 .dsh-task-top { display: flex; gap: 8px; align-items: flex-start; }
 .dsh-task-name { flex: 1; font-size: 13px; line-height: 1.45; word-break: break-word; cursor: pointer; }
@@ -74,7 +87,11 @@ const CSS = `
 
 /** Stages in which a ticket still has work ahead: anything else is history. */
 const liveState = (state: string) => state === 'working' || state === 'working/queued' || state === 'idle' || state.startsWith('person/')
-type Filter = 'all' | 'live' | 'done'
+/** A ticket whose next move belongs to a person, including one that is blocked or has failed. */
+const waitingState = (state: string) => state.startsWith('person/')
+/** A ticket that has stopped hard enough to need attention before anything else. */
+const blockedState = (state: string) => state === 'person/blocked' || state === 'person/failed'
+type Filter = 'all' | 'live' | 'done' | 'waiting' | 'blocked'
 type Item = { ticket_id: string; title: string; state: string; preview?: string; ended?: { at: string }; updated_at?: string
   worker_session: string; chat_session: string; report_state?: string | null; role?: string | null; role_name?: string | null
   dispatched?: boolean }
@@ -110,8 +127,18 @@ export function TasksPane({ t, call, openSession }: {
   const hasUnassigned = all.some(item => item.dispatched && !item.role)
   const needle = query.trim().toLowerCase()
   const searched = needle ? all.filter(item => `${item.title} ${item.preview ?? ''} ${item.role_name ?? ''}`.toLowerCase().includes(needle)) : all
-  const items = role === 'all' ? searched : role === 'unassigned' ? searched.filter(item => item.dispatched && !item.role) : searched.filter(item => item.role === role)
+  const scoped = role === 'all' ? searched : role === 'unassigned' ? searched.filter(item => item.dispatched && !item.role) : searched.filter(item => item.role === role)
+  // The counts are taken before the segmented filter so each chip links to exactly as many cards as it says.
+  const counts = {
+    waiting: scoped.filter(item => waitingState(item.state)).length,
+    blocked: scoped.filter(item => blockedState(item.state)).length,
+    live: scoped.filter(item => liveState(item.state)).length }
+  const items = filter === 'all' ? scoped : filter === 'waiting' ? scoped.filter(item => waitingState(item.state))
+    : filter === 'blocked' ? scoped.filter(item => blockedState(item.state))
+      : filter === 'live' ? scoped.filter(item => liveState(item.state)) : scoped.filter(item => !liveState(item.state))
   const live = items.filter(item => liveState(item.state))
+  const waiting = live.filter(item => waitingState(item.state))
+  const active = live.filter(item => !waitingState(item.state))
   const done = items.filter(item => !liveState(item.state))
   const toggle = (id: string) => setExpanded(previous => {
     const next = new Set(previous)
@@ -135,6 +162,7 @@ export function TasksPane({ t, call, openSession }: {
     const at = item.ended?.at ?? item.updated_at
     const report = item.report_state ? reportStateLabel(item.report_state) : undefined
     return <article key={item.ticket_id} className="dsh-task" aria-label={item.title}
+      data-waiting={waitingState(item.state) || undefined} data-blocked={blockedState(item.state) || undefined}
       onContextMenu={event => { event.preventDefault(); setMenu({ x: event.clientX, y: event.clientY, item }) }}>
       <div className="dsh-task-top">
         <span className="dsh-task-name" role="button" tabIndex={0} title={t('chatRouterExpand')}
@@ -155,12 +183,19 @@ export function TasksPane({ t, call, openSession }: {
       </div>
     </article>
   }
+  const countChip = (value: Filter, label: string, count: number, tone?: 'person' | 'error') =>
+    <button key={value} type="button" className="dsh-tasks-count-chip" data-tone={tone} data-active={filter === value}
+      aria-pressed={filter === value} onClick={() => setFilter(filter === value ? 'all' : value)}>{label} {count}</button>
   return <>
     <style>{CSS}</style>
     <div className="dsh-tasks" role="region" aria-label={t('chatRouterTasks')}>
       <div className="dsh-tasks-head">
         <h2 className="dsh-tasks-title">{t('chatRouterTasks')}</h2>
-        {items.length > 0 && <span className="dsh-tasks-count" aria-live="polite">{t('chatRouterCount', { live: live.length, total: items.length })}</span>}
+        {all.length > 0 && <div className="dsh-tasks-counts" role="group" aria-label={t('chatRouterTasks')} aria-live="polite">
+          {countChip('waiting', t('chatRouterWaiting'), counts.waiting, 'person')}
+          {countChip('blocked', t('chatRouterBlocked'), counts.blocked, 'error')}
+          {countChip('live', t('chatRouterActive'), counts.live)}
+        </div>}
         <button type="button" className="dsh-tasks-refresh" title={t('chatRouterRefresh')} aria-label={t('chatRouterRefresh')}
           onClick={refresh}>⟳</button>
       </div>
@@ -188,10 +223,18 @@ export function TasksPane({ t, call, openSession }: {
           <span className="dsh-tasks-empty-guide">{t('chatRouterEmptyGuide')}</span></div></div>
         : items.length === 0
           ? <div className="dsh-tasks-empty"><div>{t('chatRouterNoMatch')}</div></div>
-          : <>
-            {filter !== 'done' && live.length > 0 && <><h3 className="dsh-tasks-group">{t('chatRouterActive')}</h3>{live.map(card)}</>}
-            {filter !== 'live' && done.length > 0 && <><h3 className="dsh-tasks-group">{t('chatRouterDone')}</h3>{done.map(card)}</>}
-          </>}
+          : filter === 'waiting'
+            ? <><h3 className="dsh-tasks-group" data-tone="person">{t('chatRouterWaiting')} · {items.length}</h3>{items.map(card)}</>
+            : filter === 'blocked'
+              ? <><h3 className="dsh-tasks-group" data-tone="error">{t('chatRouterBlocked')} · {items.length}</h3>{items.map(card)}</>
+              : <>
+                {filter !== 'done' && waiting.length > 0 && <><h3 className="dsh-tasks-group" data-tone="person">
+                  {t('chatRouterWaiting')} · {waiting.length}</h3>{waiting.map(card)}</>}
+                {filter !== 'done' && active.length > 0 && <><h3 className="dsh-tasks-group">
+                  {t('chatRouterActive')} · {active.length}</h3>{active.map(card)}</>}
+                {filter !== 'live' && done.length > 0 && <><h3 className="dsh-tasks-group">
+                  {t('chatRouterDone')} · {done.length}</h3>{done.map(card)}</>}
+              </>}
     </div>
     {menu && <div className="dsh-task-menu" style={{ left: menu.x, top: menu.y }} onClick={event => event.stopPropagation()}>
       <button type="button" onClick={() => { void openSession(menu.item.worker_session).catch(error => setFailure(errorText(error))) }}>{t('openWorkerSession')}</button>

@@ -8,6 +8,7 @@ import { KV } from '../src/kv.ts'
 import { RESOURCES } from '../src/app/resources.ts'
 import { CliError, Commands } from '../src/infra/commands.ts'
 import { IM_WORDS, NOTE_WORDS } from '../src/infra/text.ts'
+import { objectOutput } from '../src/app/tools/tool.ts'
 import { CHAT, feishu, startRuntime, type Host } from './fixtures/host.ts'
 
 let h: Host
@@ -511,4 +512,15 @@ it('briefs the dispatching chat of an ended task even when a restart lost the in
   const prompt = vi.spyOn(h.runtime.sessions, 'prompt').mockResolvedValue(undefined)
   internals.reportToChat(ticket.id, 'completed', h.runtime.store.tickets.get(ticket.id), h.runtime.sessions)
   expect(prompt).toHaveBeenCalledWith('chat-x', `chat-brief:${ticket.id}`, expect.stringContaining(`Task ${ticket.id}`), 'queue')
+})
+
+it('keeps object tool output as it is and wraps primitives, arrays and absent values in a result field', () => {
+  const object = { ticket_id: 't1', image: { attachment: 'file-1' } }
+  expect(objectOutput(object)).toBe(object)
+  expect(objectOutput('done')).toEqual({ result: 'done' })
+  expect(objectOutput(0)).toEqual({ result: 0 })
+  expect(objectOutput(false)).toEqual({ result: false })
+  expect(objectOutput([1, 2])).toEqual({ result: [1, 2] })
+  expect(objectOutput(undefined)).toEqual({ result: null })
+  expect(objectOutput(null)).toEqual({ result: null })
 })
