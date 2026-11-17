@@ -1,5 +1,28 @@
 # DSH-Superagent Changelog
 
+## [0.2.10] — 2026-11-17
+
+团队角色、团队看板、工单时间线与工单动作条（PR #43 / #45 / #46 / #47 / #48）。
+
+### Added
+
+- **团队角色**：`chatRouter.team.roles` 新增具名角色名册（id、名称、指令、provider/model）；派单可带 `role`，角色指令与模型会注入 worker Session。未知角色只失败该任务并列出现有 id，不静默落到默认 worker；空名册保持原行为。面板可增删改角色，任务面板显示角色徽标并支持按角色名搜索。
+- **团队看板**：概览与来源之间新增「团队」页签，`GET team/board` 按角色聚合 live/done 工单、每角色最近八条与未指派通道；客户端提供角色卡、状态本地化、搜索、全部/进行中/已完成三态筛选、空名册引导与禁用提示。
+- **工单时间线**：工单详情把 Inputs、Assignments、报告、决定与结束事件合成一条按时间倒序的时间线，支持全部/消息/事件/报告筛选与更早一页，不新增服务端字段。
+- **工单顶部常驻动作条**：详情页标题下方新增 `dt-ticket-bar`，左侧状态，右侧按需显示去来源回答、打开 Session、重试与停止；`position: sticky; top: 0` 让长工单滚动时操作始终可见，停止说明收进 tooltip。
+- **任务面板优先级**：右栏把「等你处理」工单单独前置分组，并给出 waiting/blocked/live 可点击计数；零计数不占视觉噪音。
+
+### Fixed
+
+- **工具输出对象归一化**：所有 Session 工具声明了 object 输出，执行器此前会把字符串、数组或 undefined 原样返回，宿主严格校验时会报 invalid output；`objectOutput` 现在只透传对象（含图片附件），其他值统一包成 `{ result }`，缺失值为 `null`。
+- **面板任务列表**：工单/报告状态本地化、相对时间带完整时间标题、空态与错误态使用面板 token；working/queued 与 person/* 归为 live，不再误落到已结束。
+
+### Notes
+
+- 全量 `vitest run` 1367 passed / 49 skipped / 0 failed；`tsc --noEmit` 通过。
+- 真实宿主（主桌面，非虚拟桌面）冒烟：活动工单 `动作条冒烟-执行中300` 的详情动作条显示 `执行中` + `打开 Session` + `停止`，滚动后仍吸附；已结束工单基线截图见 `_reports/2026-11-17-master-plugin/90-actions-bar.md`。
+- 发布纪律：tag `v0.2.10`，GitHub Release 带插件 tarball 与 SHA-256；`src/core/**` 与上游保持逐字节一致。
+
 ## [0.2.9] — 2026-11-16
 
 参数级命令策略与审批闸门（PR #39）。
