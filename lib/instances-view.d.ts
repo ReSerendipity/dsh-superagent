@@ -1,5 +1,4 @@
-import { S as $strip, _ as output, a as ZodLiteral, c as ZodObject, d as ZodRecord, f as ZodString, i as ZodEnum, l as ZodOptional, n as ZodBoolean, o as ZodNullable, s as ZodNumber } from "./schemas-lx-F2nnt.js";
-//#region src/app/instance-status.d.ts
+import { S as $strip, _ as output, a as ZodLiteral, c as ZodObject, d as ZodRecord, f as ZodString, i as ZodEnum, l as ZodOptional, n as ZodBoolean, o as ZodNullable, s as ZodNumber } from "./schemas-2-UC6LY4.js";
 /**
  * The per-instance status file: the only write side of the cross-instance view.
  *
@@ -61,8 +60,6 @@ declare const InstanceStatusSchema: ZodObject<{
   configPath: ZodNullable<ZodString>;
 }, $strip>;
 type InstanceStatus = output<typeof InstanceStatusSchema>;
-//#endregion
-//#region src/app/instances-view.d.ts
 /**
  * The read side of the cross-instance view: one report per record in the instance registry `config/instances.json`, built only
  * from files another process already wrote. This module never writes, never opens the instance database, never takes
@@ -77,15 +74,15 @@ type InstanceStatus = output<typeof InstanceStatusSchema>;
  * Liveness is the status file's mtime, not `writtenAt`: the instance touches the mtime every interval and rewrites the
  * content only when it changed.
  */
-type InstanceState = 'running' | 'unresponsive' | 'dead' | 'stale-lock' | 'incompatible' | 'unknown';
-interface InstanceRecord {
+export type InstanceState = 'running' | 'unresponsive' | 'dead' | 'stale-lock' | 'incompatible' | 'unknown';
+export interface InstanceRecord {
   name: string;
   label?: string;
   profile?: string;
   stateDir?: string;
   port?: number;
 }
-interface InstanceReport {
+export interface InstanceReport {
   name: string;
   label: string | null;
   stateDir: string | null;
@@ -108,7 +105,7 @@ interface InstanceReport {
   tickets: InstanceStatus['tickets'] | null;
   configPath: string | null;
 }
-interface InstancesView {
+export interface InstancesView {
   schema: typeof INSTANCE_STATUS_SCHEMA;
   collectedAt: string;
   instances: InstanceReport[];
@@ -116,7 +113,7 @@ interface InstancesView {
   problem: string | null;
 }
 /** The filesystem seam: only reads. */
-interface ViewIo {
+export interface ViewIo {
   existsSync: (path: string) => boolean;
   readFileSync: (path: string, encoding: 'utf8') => string;
   statSync: (path: string) => {
@@ -124,7 +121,7 @@ interface ViewIo {
   };
 }
 /** An `GET state` answer, mapped into the same report fields. */
-interface ProbeReply {
+export interface ProbeReply {
   health?: Record<string, {
     state: string;
     detail: string;
@@ -144,7 +141,7 @@ interface ProbeReply {
     } | null;
   };
 }
-interface CollectOptions {
+export interface CollectOptions {
   /** Directory that holds `config/instances.json` (the install root the caller names). */
   installRoot?: string;
   /** Tests inject records directly; production reads them from `installRoot`. */
@@ -157,8 +154,7 @@ interface CollectOptions {
   probe?: (port: number) => Promise<ProbeReply | null>;
 }
 /** Builds the report list; the only exported behaviour, used by the CLI and by tests. */
-declare function collectInstances(options?: CollectOptions): Promise<InstancesView>;
+export declare function collectInstances(options?: CollectOptions): Promise<InstancesView>;
 /** The human table the `--instances-status` flag prints; the JSON form is the data layer items 8 and 12 consume. */
-declare function formatInstances(view: InstancesView): string;
-//#endregion
-export { CollectOptions, InstanceRecord, InstanceReport, InstanceState, InstancesView, ProbeReply, ViewIo, collectInstances, formatInstances };
+export declare function formatInstances(view: InstancesView): string;
+export {};

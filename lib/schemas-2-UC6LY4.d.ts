@@ -1,5 +1,5 @@
-//#region node_modules/.pnpm/zod@4.4.3/node_modules/zod/v4/core/json-schema.d.cts
 type _JSONSchema = boolean | JSONSchema;
+type SchemaType = "object" | "array" | "string" | "number" | "boolean" | "null" | "integer";
 type JSONSchema = {
   [k: string]: unknown;
   $schema?: "https://json-schema.org/draft/2020-12/schema" | "http://json-schema.org/draft-07/schema#" | "http://json-schema.org/draft-04/schema#";
@@ -11,7 +11,7 @@ type JSONSchema = {
   $vocabulary?: Record<string, boolean>;
   $comment?: string;
   $defs?: Record<string, JSONSchema>;
-  type?: "object" | "array" | "string" | "number" | "boolean" | "null" | "integer";
+  type?: SchemaType | SchemaType[];
   additionalItems?: _JSONSchema;
   unevaluatedItems?: _JSONSchema;
   prefixItems?: _JSONSchema[];
@@ -65,8 +65,6 @@ type JSONSchema = {
   _prefault?: unknown;
 };
 type BaseSchema = JSONSchema;
-//#endregion
-//#region node_modules/.pnpm/zod@4.4.3/node_modules/zod/v4/core/standard-schema.d.cts
 /** The Standard interface. */
 interface StandardTypedV1<Input = unknown, Output = Input> {
   /** The Standard properties. */
@@ -184,8 +182,6 @@ declare namespace StandardJSONSchemaV1 {
   type InferOutput<Schema extends StandardTypedV1> = StandardTypedV1.InferOutput<Schema>;
 }
 interface StandardSchemaWithJSONProps<Input = unknown, Output = Input> extends StandardSchemaV1.Props<Input, Output>, StandardJSONSchemaV1.Props<Input, Output> {}
-//#endregion
-//#region node_modules/.pnpm/zod@4.4.3/node_modules/zod/v4/core/registries.d.cts
 declare const $output: unique symbol;
 type $output = typeof $output;
 declare const $input: unique symbol;
@@ -211,9 +207,19 @@ interface JSONSchemaMeta {
   [k: string]: unknown;
 }
 interface GlobalMeta extends JSONSchemaMeta {}
-//#endregion
-//#region node_modules/.pnpm/zod@4.4.3/node_modules/zod/v4/core/to-json-schema.d.cts
 type Processor<T extends $ZodType = $ZodType> = (schema: T, ctx: ToJSONSchemaContext, json: BaseSchema, params: ProcessParams) => void;
+/**
+ * Called for each schema that has no JSON Schema equivalent. Return a JSON Schema to use in its
+ * place, `"any"` to fall back to the `unrepresentable: "any"` behavior, or `"throw"`/`undefined` to
+ * throw the default error. Throwing from the handler propagates, so custom errors work too.
+ */
+type UnrepresentableHandler<T extends $ZodType = $ZodType> = (ctx: {
+  zodSchema: T;
+  path: (string | number)[];
+  /** The error Zod would throw. Distinguishes sites that share a `zodSchema`, e.g. an `undefined`
+   *  vs a `bigint` member of the same literal. */
+  message: string;
+}) => BaseSchema | "throw" | "any" | undefined;
 interface JSONSchemaGeneratorParams {
   processors: Record<string, Processor>;
   /** A registry used to look up metadata for each schema. Any schema with an `id` property will be extracted as a $def.
@@ -227,8 +233,9 @@ interface JSONSchemaGeneratorParams {
   target?: "draft-04" | "draft-07" | "draft-2020-12" | "openapi-3.0" | ({} & string) | undefined;
   /** How to handle unrepresentable types.
    * - `"throw"` — Default. Unrepresentable types throw an error
-   * - `"any"` — Unrepresentable types become `{}` */
-  unrepresentable?: "throw" | "any";
+   * - `"any"` — Unrepresentable types become `{}`
+   * - A function — called once per unrepresentable schema; see {@link UnrepresentableHandler}. */
+  unrepresentable?: "throw" | "any" | UnrepresentableHandler<$ZodTypes>;
   /** Arbitrary custom logic that can be used to modify the generated JSON Schema. */
   override?: (ctx: {
     zodSchema: $ZodTypes;
@@ -277,7 +284,7 @@ interface ToJSONSchemaContext {
   processors: Record<string, Processor>;
   metadataRegistry: $ZodRegistry<Record<string, any>>;
   target: "draft-04" | "draft-07" | "draft-2020-12" | "openapi-3.0" | ({} & string);
-  unrepresentable: "throw" | "any";
+  unrepresentable: "throw" | "any" | UnrepresentableHandler;
   override: (ctx: {
     zodSchema: $ZodType;
     jsonSchema: BaseSchema;
@@ -286,8 +293,28 @@ interface ToJSONSchemaContext {
   io: "input" | "output";
   counter: number;
   seen: Map<$ZodType, Seen>;
+  /** Registry conversions share one `seen` map across every emitted schema. These hold the
+   * `external` the whole-map passes below last ran for, so the passes are not repeated once per
+   * schema — and still re-run if the map grows or `external` is swapped. `sharedEmitDoneFor`
+   * covers both passes in `finalize`: the ref flattening and the `$defs` build.
+   *
+   * The passes are valid only while nothing they read has changed, so both are cleared in
+   * `processSchema()` when the map grows, and in `JSONSchemaGenerator.emit()`, which can also change
+   * the `cycles` and `reused` they branch on.
+   *
+   * One case is deliberately not covered: an `override` callback that writes to
+   * `metadataRegistry` mid-conversion. It runs inside `finalize`, so a registry conversion has
+   * nowhere left to clear the guards, and later schemas keep the ids the first pass saw. That
+   * output was never coherent — before this, whether a shared subschema was inlined or extracted
+   * depended on which registry entry happened to be emitted when the callback fired. */
+  sharedDefsExtractedFor?: ToJSONSchemaContext["external"];
+  sharedEmitDoneFor?: ToJSONSchemaContext["external"];
   cycles: "ref" | "throw";
   reused: "ref" | "inline";
+  /** The `allOf` array of each intersection encountered during traversal, innermost first. `finalize` folds every emitted object holding one; see `foldIntersection`. */
+  intersections: BaseSchema[][];
+  /** Rewrites a processor deferred to `finalize`, where the flatten has resolved every ref and the union branches are in place. */
+  deferred: (() => void)[];
   external?: {
     registry: $ZodRegistry<{
       id?: string | undefined;
@@ -300,8 +327,6 @@ type ZodStandardSchemaWithJSON$1<T> = StandardSchemaWithJSONProps<input<T>, outp
 interface ZodStandardJSONSchemaPayload<T> extends BaseSchema {
   "~standard": ZodStandardSchemaWithJSON$1<T>;
 }
-//#endregion
-//#region node_modules/.pnpm/zod@4.4.3/node_modules/zod/v4/core/util.d.cts
 type JWTAlgorithm = "HS256" | "HS384" | "HS512" | "RS256" | "RS384" | "RS512" | "ES256" | "ES384" | "ES512" | "PS256" | "PS384" | "PS512" | "EdDSA" | (string & {});
 type MimeTypes = "application/json" | "application/xml" | "application/x-www-form-urlencoded" | "application/javascript" | "application/pdf" | "application/zip" | "application/vnd.ms-excel" | "application/vnd.openxmlformats-officedocument.spreadsheetml.sheet" | "application/msword" | "application/vnd.openxmlformats-officedocument.wordprocessingml.document" | "application/vnd.ms-powerpoint" | "application/vnd.openxmlformats-officedocument.presentationml.presentation" | "application/octet-stream" | "application/graphql" | "text/html" | "text/plain" | "text/css" | "text/javascript" | "text/csv" | "image/png" | "image/jpeg" | "image/gif" | "image/svg+xml" | "image/webp" | "audio/mpeg" | "audio/ogg" | "audio/wav" | "audio/webm" | "video/mp4" | "video/webm" | "video/ogg" | "font/woff" | "font/woff2" | "font/ttf" | "font/otf" | "multipart/form-data" | (string & {});
 type IsAny<T> = 0 extends 1 & T ? true : false;
@@ -341,15 +366,13 @@ type EmptyToNever<T> = keyof T extends never ? never : T;
 declare abstract class Class {
   constructor(..._args: any[]);
 }
-//#endregion
-//#region node_modules/.pnpm/zod@4.4.3/node_modules/zod/v4/core/versions.d.cts
+/** A trait's prototype members: a partial view of its own interface, with `this` typed as the instance. */
+type ProtoOf<T> = { [K in keyof T]?: (T[K] extends ((...args: infer A) => infer R) ? (...args: A) => R : T[K]) | undefined; } & ThisType<T>;
 declare const version: {
   readonly major: 4;
-  readonly minor: 4;
+  readonly minor: 6;
   readonly patch: number;
 };
-//#endregion
-//#region node_modules/.pnpm/zod@4.4.3/node_modules/zod/v4/core/schemas.d.cts
 interface ParseContext<T extends $ZodIssueBase = never> {
   /** Customize error messages. */
   readonly error?: $ZodErrorMap<T>;
@@ -363,17 +386,17 @@ interface ParseContextInternal<T extends $ZodIssueBase = never> extends ParseCon
   readonly async?: boolean | undefined;
   readonly direction?: "forward" | "backward";
   readonly skipChecks?: boolean;
+  /** Set only by `validate`/`validateAsync`. A container may stop before its next child, never inside one, so a map entry and a tuple's fixed items parse whole. */
+  readonly abortEarly?: boolean;
 }
 interface ParsePayload<T = unknown> {
   value: T;
   issues: $ZodRawIssue[];
   /** A way to mark a whole payload as aborted. Used in codecs/pipes. */
   aborted?: boolean;
-  /** @internal Marks a value as a fallback that an outer wrapper (e.g.
-   * $ZodOptional) may override with its own interpretation when input was
-   * undefined. Set by $ZodCatch when catchValue substitutes and by every
-   * $ZodTransform invocation. */
-  fallback?: boolean | undefined;
+  /** @internal Set when the value came from a repeat visit to a node still being
+   * parsed. Its checks run on the node itself, against the finished value. */
+  memo?: boolean | undefined;
 }
 type CheckFn<T> = (input: ParsePayload<T>) => MaybeAsync<void>;
 interface $ZodTypeDef {
@@ -398,8 +421,13 @@ interface _$ZodTypeInternals {
   /** @internal Indicates that a schema output type should be considered optional inside objects.
    * @default Required
    */
-  /** @internal */
-  optin?: "optional" | undefined;
+  /** @internal Three rungs, each strictly stronger than the last:
+   *   undefined    — required; the container may not omit this slot
+   *   "optional"   — the container may omit it; nothing is supplied in its place
+   *   "defaulted"  — the container may omit it AND this schema substitutes a value
+   * Consumers asking "may the slot be absent?" test `!== undefined`.
+   * $ZodOptional asks the stronger question and tests `=== "defaulted"`. */
+  optin?: "optional" | "defaulted" | undefined;
   /** @internal */
   optout?: "optional" | undefined;
   /** @internal The set of literal values that will pass validation. Must be an exhaustive set. Used to determine optionality in z.record().
@@ -461,6 +489,8 @@ interface $ZodStringInternals<Input> extends $ZodTypeInternals<string, Input> {
     patterns: Set<RegExp>;
     format: string;
     contentEncoding: string;
+    /** the pattern admits strings its `format` keyword forbids, so `toJSONSchema` must not emit it */
+    laxFormat: boolean;
   }>;
 }
 interface $ZodString<Input = unknown> extends _$ZodType<$ZodStringInternals<Input>> {}
@@ -510,7 +540,12 @@ interface $ZodEmoji extends $ZodType {
   _zod: $ZodEmojiInternals;
 }
 declare const $ZodEmoji: $constructor<$ZodEmoji>;
-interface $ZodNanoIDInternals extends $ZodStringFormatInternals<"nanoid"> {}
+interface $ZodNanoIDDef extends $ZodStringFormatDef<"nanoid"> {
+  length?: number | undefined;
+}
+interface $ZodNanoIDInternals extends $ZodStringFormatInternals<"nanoid"> {
+  def: $ZodNanoIDDef;
+}
 interface $ZodNanoID extends $ZodType {
   _zod: $ZodNanoIDInternals;
 }
@@ -825,11 +860,11 @@ type OptionalOutSchema = {
 };
 type OptionalInSchema = {
   _zod: {
-    optin: "optional";
+    optin: "optional" | "defaulted";
   };
 };
-type $InferObjectOutput<T extends $ZodLooseShape, Extra extends Record<string, unknown>> = string extends keyof T ? IsAny<T[keyof T]> extends true ? Record<string, unknown> : Record<string, output<T[keyof T]>> : keyof (T & Extra) extends never ? Record<string, never> : Prettify<{ -readonly [k in keyof T as T[k] extends OptionalOutSchema ? never : k]: T[k]["_zod"]["output"]; } & { -readonly [k in keyof T as T[k] extends OptionalOutSchema ? k : never]?: T[k]["_zod"]["output"]; } & Extra>;
-type $InferObjectInput<T extends $ZodLooseShape, Extra extends Record<string, unknown>> = string extends keyof T ? IsAny<T[keyof T]> extends true ? Record<string, unknown> : Record<string, input<T[keyof T]>> : keyof (T & Extra) extends never ? Record<string, never> : Prettify<{ -readonly [k in keyof T as T[k] extends OptionalInSchema ? never : k]: T[k]["_zod"]["input"]; } & { -readonly [k in keyof T as T[k] extends OptionalInSchema ? k : never]?: T[k]["_zod"]["input"]; } & Extra>;
+type $InferObjectOutput<T extends $ZodLooseShape, Extra extends Record<string, unknown>> = string extends keyof T ? IsAny<T[keyof T]> extends true ? Record<string, unknown> : { [k in string]: output<T[keyof T]>; } : keyof (T & Extra) extends never ? Record<string, never> : Prettify<{ -readonly [k in keyof T as T[k] extends OptionalOutSchema ? never : k]: T[k]["_zod"]["output"]; } & { -readonly [k in keyof T as T[k] extends OptionalOutSchema ? k : never]?: T[k]["_zod"]["output"]; } & Extra>;
+type $InferObjectInput<T extends $ZodLooseShape, Extra extends Record<string, unknown>> = string extends keyof T ? IsAny<T[keyof T]> extends true ? Record<string, unknown> : { [k in string]: input<T[keyof T]>; } : keyof (T & Extra) extends never ? Record<string, never> : Prettify<{ -readonly [k in keyof T as T[k] extends OptionalInSchema ? never : k]: T[k]["_zod"]["input"]; } & { -readonly [k in keyof T as T[k] extends OptionalInSchema ? k : never]?: T[k]["_zod"]["input"]; } & Extra>;
 type $ZodObjectConfig = {
   out: Record<string, unknown>;
   in: Record<string, unknown>;
@@ -895,7 +930,7 @@ interface $ZodUnionInternals<T extends readonly SomeType[] = readonly $ZodType[]
   values: T[number]["_zod"]["values"];
   output: $InferUnionOutput<T[number]>;
   input: $InferUnionInput<T[number]>;
-  optin: IsOptionalIn<T[number]> extends false ? "optional" | undefined : "optional";
+  optin: IsOptionalIn<T[number]> extends false ? "optional" | "defaulted" | undefined : "optional" | "defaulted";
   optout: IsOptionalOut<T[number]> extends false ? "optional" | undefined : "optional";
 }
 interface $ZodUnion<T extends readonly SomeType[] = readonly $ZodType[]> extends $ZodType<any, any, $ZodUnionInternals<T>> {
@@ -926,7 +961,7 @@ interface $ZodTupleDef<T extends TupleItems = readonly $ZodType[], Rest extends 
 }
 type $InferTupleInputType<T extends TupleItems, Rest extends SomeType | null> = [...TupleInputTypeWithOptionals<T>, ...(Rest extends SomeType ? input<Rest>[] : [])];
 type TupleInputTypeNoOptionals<T extends TupleItems> = { [k in keyof T]: input<T[k]>; };
-type TupleInputTypeWithOptionals<T extends TupleItems> = T extends readonly [...infer Prefix extends SomeType[], infer Tail extends SomeType] ? Tail["_zod"]["optin"] extends "optional" ? [...TupleInputTypeWithOptionals<Prefix>, input<Tail>?] : TupleInputTypeNoOptionals<T> : [];
+type TupleInputTypeWithOptionals<T extends TupleItems> = T extends readonly [...infer Prefix extends SomeType[], infer Tail extends SomeType] ? Tail["_zod"]["optin"] extends "optional" | "defaulted" ? [...TupleInputTypeWithOptionals<Prefix>, input<Tail>?] : TupleInputTypeNoOptionals<T> : [];
 type $InferTupleOutputType<T extends TupleItems, Rest extends SomeType | null> = [...TupleOutputTypeWithOptionals<T>, ...(Rest extends SomeType ? output<Rest>[] : [])];
 type TupleOutputTypeNoOptionals<T extends TupleItems> = { [k in keyof T]: output<T[k]>; };
 type TupleOutputTypeWithOptionals<T extends TupleItems> = T extends readonly [...infer Prefix extends SomeType[], infer Tail extends SomeType] ? Tail["_zod"]["optout"] extends "optional" ? [...TupleOutputTypeWithOptionals<Prefix>, output<Tail>?] : TupleOutputTypeNoOptionals<T> : [];
@@ -947,11 +982,14 @@ interface $ZodRecordDef<Key extends $ZodRecordKey = $ZodRecordKey, Value extends
   valueType: Value;
   /** @default "strict" - errors on keys not matching keyType. "loose" passes through non-matching keys unchanged. */
   mode?: "strict" | "loose";
+  partial?: boolean;
 }
 type $InferZodRecordOutput<Key extends $ZodRecordKey = $ZodRecordKey, Value extends SomeType = $ZodType> = Key extends $partial ? Partial<Record<output<Key>, output<Value>>> : Record<output<Key>, output<Value>>;
-type $InferZodRecordInput<Key extends $ZodRecordKey = $ZodRecordKey, Value extends SomeType = $ZodType> = Key extends $partial ? Partial<Record<input<Key> & PropertyKey, input<Value>>> : Record<input<Key> & PropertyKey, input<Value>>;
-interface $ZodRecordInternals<Key extends $ZodRecordKey = $ZodRecordKey, Value extends SomeType = $ZodType> extends $ZodTypeInternals<$InferZodRecordOutput<Key, Value>, $InferZodRecordInput<Key, Value>> {
+type $InferZodRecordInput<Key extends $ZodRecordKey = $ZodRecordKey, Value extends SomeType = $ZodType> = Key extends $partial ? Partial<Record<input<Key> & PropertyKey, input<Value>>> : [Value] extends [OptionalInSchema] ? Partial<Record<input<Key> & PropertyKey, input<Value>>> : Record<input<Key> & PropertyKey, input<Value>>;
+interface $ZodRecordInternals<Key extends $ZodRecordKey = $ZodRecordKey, Value extends SomeType = $ZodType> extends $ZodTypeInternals {
   def: $ZodRecordDef<Key, Value>;
+  output: $InferZodRecordOutput<Key, Value>;
+  input: $InferZodRecordInput<Key, Value>;
   isst: $ZodIssueInvalidType | $ZodIssueInvalidKey<Record<PropertyKey, unknown>>;
   optin?: "optional" | undefined;
   optout?: "optional" | undefined;
@@ -1068,7 +1106,7 @@ interface $ZodOptionalDef<T extends SomeType = $ZodType> extends $ZodTypeDef {
 }
 interface $ZodOptionalInternals<T extends SomeType = $ZodType> extends $ZodTypeInternals<output<T> | undefined, input<T> | undefined> {
   def: $ZodOptionalDef<T>;
-  optin: "optional";
+  optin: "optional" | "defaulted";
   optout: "optional";
   isst: never;
   values: T["_zod"]["values"];
@@ -1112,7 +1150,7 @@ interface $ZodDefaultDef<T extends SomeType = $ZodType> extends $ZodTypeDef {
 }
 interface $ZodDefaultInternals<T extends SomeType = $ZodType> extends $ZodTypeInternals<NoUndefined<output<T>>, input<T> | undefined> {
   def: $ZodDefaultDef<T>;
-  optin: "optional";
+  optin: "defaulted";
   optout?: "optional" | undefined;
   isst: never;
   values: T["_zod"]["values"];
@@ -1127,9 +1165,9 @@ interface $ZodPrefaultDef<T extends SomeType = $ZodType> extends $ZodTypeDef {
   /** The default value. May be a getter. */
   defaultValue: input<T>;
 }
-interface $ZodPrefaultInternals<T extends SomeType = $ZodType> extends $ZodTypeInternals<NoUndefined<output<T>>, input<T> | undefined> {
+interface $ZodPrefaultInternals<T extends SomeType = $ZodType> extends $ZodTypeInternals<output<T>, input<T> | undefined> {
   def: $ZodPrefaultDef<T>;
-  optin: "optional";
+  optin: "defaulted";
   optout?: "optional" | undefined;
   isst: never;
   values: T["_zod"]["values"];
@@ -1341,8 +1379,6 @@ interface $ZodCustom<O = unknown, I = unknown> extends $ZodType {
 }
 declare const $ZodCustom: $constructor<$ZodCustom>;
 type $ZodTypes = $ZodString | $ZodNumber | $ZodBigInt | $ZodBoolean | $ZodDate | $ZodSymbol | $ZodUndefined | $ZodNullable | $ZodNull | $ZodAny | $ZodUnknown | $ZodNever | $ZodVoid | $ZodArray | $ZodObject | $ZodUnion | $ZodIntersection | $ZodTuple | $ZodRecord | $ZodMap | $ZodSet | $ZodLiteral | $ZodEnum | $ZodFunction | $ZodPromise | $ZodLazy | $ZodOptional | $ZodDefault | $ZodPrefault | $ZodTemplateLiteral | $ZodCustom | $ZodTransform | $ZodNonOptional | $ZodReadonly | $ZodNaN | $ZodPipe | $ZodSuccess | $ZodCatch | $ZodFile;
-//#endregion
-//#region node_modules/.pnpm/zod@4.4.3/node_modules/zod/v4/core/checks.d.cts
 interface $ZodCheckDef {
   check: string;
   error?: $ZodErrorMap<never> | undefined;
@@ -1401,16 +1437,16 @@ interface $ZodCheckMultipleOf<T extends number | bigint = number | bigint> exten
 }
 declare const $ZodCheckMultipleOf: $constructor<$ZodCheckMultipleOf<number | bigint>>;
 type $ZodNumberFormats = "int32" | "uint32" | "float32" | "float64" | "safeint";
-interface $ZodCheckNumberFormatDef extends $ZodCheckDef {
+interface $ZodCheckNumberFormatDef<Format extends $ZodNumberFormats = $ZodNumberFormats> extends $ZodCheckDef {
   check: "number_format";
-  format: $ZodNumberFormats;
+  format: Format;
 }
-interface $ZodCheckNumberFormatInternals extends $ZodCheckInternals<number> {
-  def: $ZodCheckNumberFormatDef;
+interface $ZodCheckNumberFormatInternals<Format extends $ZodNumberFormats = $ZodNumberFormats> extends $ZodCheckInternals<number> {
+  def: $ZodCheckNumberFormatDef<Format>;
   issc: $ZodIssueInvalidType | $ZodIssueTooBig<"number"> | $ZodIssueTooSmall<"number">;
 }
-interface $ZodCheckNumberFormat extends $ZodCheck<number> {
-  _zod: $ZodCheckNumberFormatInternals;
+interface $ZodCheckNumberFormat<Format extends $ZodNumberFormats = $ZodNumberFormats> extends $ZodCheck<number> {
+  _zod: $ZodCheckNumberFormatInternals<Format>;
 }
 declare const $ZodCheckNumberFormat: $constructor<$ZodCheckNumberFormat>;
 interface $ZodCheckMaxLengthDef extends $ZodCheckDef {
@@ -1449,7 +1485,7 @@ interface $ZodCheckLengthEquals<T extends HasLength = HasLength> extends $ZodChe
   _zod: $ZodCheckLengthEqualsInternals<T>;
 }
 declare const $ZodCheckLengthEquals: $constructor<$ZodCheckLengthEquals>;
-type $ZodStringFormats = "email" | "url" | "emoji" | "uuid" | "guid" | "nanoid" | "cuid" | "cuid2" | "ulid" | "xid" | "ksuid" | "datetime" | "date" | "time" | "duration" | "ipv4" | "ipv6" | "cidrv4" | "cidrv6" | "base64" | "base64url" | "json_string" | "e164" | "lowercase" | "uppercase" | "regex" | "jwt" | "starts_with" | "ends_with" | "includes";
+type $ZodStringFormats = "email" | "url" | "emoji" | "uuid" | "guid" | "nanoid" | "cuid" | "cuid2" | "ulid" | "xid" | "ksuid" | "datetime" | "date" | "time" | "duration" | "ipv4" | "ipv6" | "cidrv4" | "cidrv6" | "base64" | "base64url" | "json_string" | "e164" | "credit_card" | "iban" | "lowercase" | "uppercase" | "regex" | "jwt" | "starts_with" | "ends_with" | "includes";
 interface $ZodCheckStringFormatDef<Format extends string = string> extends $ZodCheckDef {
   check: "string_format";
   format: Format;
@@ -1523,8 +1559,6 @@ interface $ZodCheckEndsWith extends $ZodCheckInternals<string> {
   _zod: $ZodCheckEndsWithInternals;
 }
 declare const $ZodCheckEndsWith: $constructor<$ZodCheckEndsWith>;
-//#endregion
-//#region node_modules/.pnpm/zod@4.4.3/node_modules/zod/v4/core/errors.d.cts
 interface $ZodIssueBase {
   readonly code?: string;
   readonly input?: unknown;
@@ -1585,6 +1619,8 @@ interface $ZodIssueInvalidUnionMultipleMatch extends $ZodIssueBase {
   readonly input?: unknown;
   readonly discriminator?: string | undefined;
   readonly inclusive: false;
+  /** Indices of the options that matched */
+  readonly matches: number[];
 }
 type $ZodIssueInvalidUnion = $ZodIssueInvalidUnionNoMatch | $ZodIssueInvalidUnionMultipleMatch;
 interface $ZodIssueInvalidKey<Input = unknown> extends $ZodIssueBase {
@@ -1617,6 +1653,8 @@ type RawIssue$1<T extends $ZodIssueBase> = T extends any ? Flatten<MakePartial<T
   readonly input: unknown;
   /** The schema or check that originated this issue. */
   readonly inst?: $ZodType | $ZodCheck;
+  /** The schema that owns the issue. Equal to `inst` when a schema originated the issue, and the schema the check was attached to when a check did. */
+  readonly schema?: $ZodType | undefined;
   /** If `true`, Zod will continue executing checks/refinements after this issue. */
   readonly continue?: boolean | undefined;
 } & Record<string, unknown>> : never;
@@ -1648,8 +1686,6 @@ type _ZodFormattedError<T, U = string> = T extends [any, ...any[]] ? { [K in key
 type $ZodFormattedError<T, U = string> = {
   _errors: U[];
 } & Flatten<_ZodFormattedError<T, U>>;
-//#endregion
-//#region node_modules/.pnpm/zod@4.4.3/node_modules/zod/v4/core/core.d.cts
 type ZodTrait = {
   _zod: {
     def: any;
@@ -1660,9 +1696,12 @@ interface $constructor<T extends ZodTrait, D = T["_zod"]["def"]> {
   new (def: D): T;
   init(inst: T, def: D): asserts inst is T;
 }
-declare function $constructor<T extends ZodTrait, D = T["_zod"]["def"]>(name: string, initializer: (inst: T, def: D) => void, params?: {
+interface $constructorParams {
   Parent?: typeof Class;
-}): $constructor<T, D>;
+}
+declare function $constructor<T extends ZodTrait, D = T["_zod"]["def"]>(name: string, initializer: (inst: T, def: D) => void,
+/** This trait's members, installed once on every prototype that composes it. They cannot be declared in the initializer above: that runs per instance, and the prototype is shared. */
+proto?: ProtoOf<T>, params?: $constructorParams): $constructor<T, D>;
 declare const $brand: unique symbol;
 type $brand<T extends string | number | symbol = string | number | symbol> = {
   [$brand]: { [k in T]: true; };
@@ -1691,8 +1730,6 @@ type output<T> = T extends {
     output: any;
   };
 } ? T["_zod"]["output"] : unknown;
-//#endregion
-//#region node_modules/.pnpm/zod@4.4.3/node_modules/zod/v4/core/api.d.cts
 type Params<T extends $ZodType | $ZodCheck, IssueTypes extends $ZodIssueBase, OmitKeys extends keyof T["_zod"]["def"] = never> = Flatten<Partial<EmptyToNever<Omit<T["_zod"]["def"], OmitKeys> & ([IssueTypes] extends [never] ? {} : {
   error?: string | $ZodErrorMap<IssueTypes> | undefined;
   /** @deprecated This parameter is deprecated. Use `error` instead. */
@@ -1701,8 +1738,8 @@ type Params<T extends $ZodType | $ZodCheck, IssueTypes extends $ZodIssueBase, Om
 type TypeParams<T extends $ZodType = $ZodType & {
   _isst: never;
 }, AlsoOmit extends Exclude<keyof T["_zod"]["def"], "type" | "checks" | "error"> = never> = Params<T, NonNullable<T["_zod"]["isst"]>, "type" | "checks" | "error" | AlsoOmit>;
-type CheckParams<T extends $ZodCheck = $ZodCheck // & { _issc: never },
-, AlsoOmit extends Exclude<keyof T["_zod"]["def"], "check" | "error"> = never> = Params<T, NonNullable<T["_zod"]["issc"]>, "check" | "error" | AlsoOmit>;
+type CheckParams<T extends $ZodCheck = $ZodCheck, // & { _issc: never },
+  AlsoOmit extends Exclude<keyof T["_zod"]["def"], "check" | "error"> = never> = Params<T, NonNullable<T["_zod"]["issc"]>, "check" | "error" | AlsoOmit>;
 type CheckStringFormatParams<T extends $ZodStringFormat = $ZodStringFormat, AlsoOmit extends Exclude<keyof T["_zod"]["def"], "type" | "coerce" | "checks" | "error" | "check" | "format"> = never> = Params<T, NonNullable<T["_zod"]["issc"]>, "type" | "coerce" | "checks" | "error" | "check" | "format" | AlsoOmit>;
 type CheckTypeParams<T extends $ZodType & $ZodCheck = $ZodType & $ZodCheck, AlsoOmit extends Exclude<keyof T["_zod"]["def"], "type" | "checks" | "error" | "check"> = never> = Params<T, NonNullable<T["_zod"]["isst"] | T["_zod"]["issc"]>, "type" | "checks" | "error" | "check" | AlsoOmit>;
 type $ZodCheckEmailParams = CheckStringFormatParams<$ZodEmail, "when">;
@@ -1710,7 +1747,7 @@ type $ZodCheckGUIDParams = CheckStringFormatParams<$ZodGUID, "pattern" | "when">
 type $ZodCheckUUIDParams = CheckStringFormatParams<$ZodUUID, "pattern" | "when">;
 type $ZodCheckURLParams = CheckStringFormatParams<$ZodURL, "when">;
 type $ZodCheckEmojiParams = CheckStringFormatParams<$ZodEmoji, "when">;
-type $ZodCheckNanoIDParams = CheckStringFormatParams<$ZodNanoID, "when">;
+type $ZodCheckNanoIDParams = CheckStringFormatParams<$ZodNanoID, "when" | "pattern">;
 /**
  * @deprecated CUID v1 is deprecated by its authors due to information leakage
  * (timestamps embedded in the id). Use {@link _cuid2} instead.
@@ -1763,8 +1800,6 @@ interface $ZodSuperRefineParams {
   /** If provided, the refinement runs only when this returns `true`. By default, it is skipped if prior parsing produced aborting issues. */
   when?: ((payload: ParsePayload) => boolean) | undefined;
 }
-//#endregion
-//#region node_modules/.pnpm/zod@4.4.3/node_modules/zod/v4/classic/errors.d.cts
 /** An Error-like class used to store Zod validation issues.  */
 interface ZodError<T = unknown> extends $ZodError<T> {
   /** @deprecated Use the `z.treeifyError(err)` function instead. */
@@ -1781,8 +1816,6 @@ interface ZodError<T = unknown> extends $ZodError<T> {
   isEmpty: boolean;
 }
 declare const ZodError: $constructor<ZodError>;
-//#endregion
-//#region node_modules/.pnpm/zod@4.4.3/node_modules/zod/v4/classic/parse.d.cts
 type ZodSafeParseResult<T> = ZodSafeParseSuccess<T> | ZodSafeParseError<T>;
 type ZodSafeParseSuccess<T> = {
   success: true;
@@ -1794,8 +1827,6 @@ type ZodSafeParseError<T> = {
   data?: never;
   error: ZodError<T>;
 };
-//#endregion
-//#region node_modules/.pnpm/zod@4.4.3/node_modules/zod/v4/classic/schemas.d.cts
 type ZodStandardSchemaWithJSON<T> = StandardSchemaWithJSONProps<input<T>, output<T>>;
 interface ZodType<out Output = unknown, out Input = unknown, out Internals extends $ZodTypeInternals<Output, Input> = $ZodTypeInternals<Output, Input>> extends $ZodType<Output, Input, Internals> {
   def: Internals["def"];
@@ -1821,6 +1852,8 @@ interface ZodType<out Output = unknown, out Input = unknown, out Internals exten
   parseAsync(data: unknown, params?: ParseContext<$ZodIssue>): Promise<output<this>>;
   safeParseAsync(data: unknown, params?: ParseContext<$ZodIssue>): Promise<ZodSafeParseResult<output<this>>>;
   spa: (data: unknown, params?: ParseContext<$ZodIssue>) => Promise<ZodSafeParseResult<output<this>>>;
+  validate(data: unknown, params?: ParseContext<$ZodIssue>): data is input<this>;
+  validateAsync(data: unknown, params?: ParseContext<$ZodIssue>): Promise<boolean>;
   encode(data: output<this>, params?: ParseContext<$ZodIssue>): input<this>;
   decode(data: input<this>, params?: ParseContext<$ZodIssue>): output<this>;
   encodeAsync(data: output<this>, params?: ParseContext<$ZodIssue>): Promise<input<this>>;
@@ -1873,7 +1906,7 @@ interface ZodType<out Output = unknown, out Input = unknown, out Internals exten
    * ```
    */
   isNullable(): boolean;
-  apply<T>(fn: (schema: this) => T): T;
+  apply<T, TArgs extends unknown[] = []>(fn: (schema: this, ...args: TArgs) => T, ...args: TArgs): T;
 }
 interface _ZodType<out Internals extends $ZodTypeInternals = $ZodTypeInternals> extends ZodType<any, any, Internals> {}
 declare const ZodType: $constructor<ZodType>;
@@ -2040,6 +2073,8 @@ out Shape extends $ZodShape = $ZodLooseShape, out Config extends $ZodObjectConfi
   omit<M extends Mask<keyof Shape>>(mask: M & Record<Exclude<keyof M, keyof Shape>, never>): ZodObject<Flatten<Omit<Shape, Extract<keyof Shape, keyof M>>>, Config>;
   partial(): ZodObject<{ -readonly [k in keyof Shape]: ZodOptional<Shape[k]>; }, Config>;
   partial<M extends Mask<keyof Shape>>(mask: M & Record<Exclude<keyof M, keyof Shape>, never>): ZodObject<{ -readonly [k in keyof Shape]: k extends keyof M ? ZodOptional<Shape[k]> : Shape[k]; }, Config>;
+  exactPartial(): ZodObject<{ -readonly [k in keyof Shape]: ZodExactOptional<Shape[k]>; }, Config>;
+  exactPartial<M extends Mask<keyof Shape>>(mask: M & Record<Exclude<keyof M, keyof Shape>, never>): ZodObject<{ -readonly [k in keyof Shape]: k extends keyof M ? ZodExactOptional<Shape[k]> : Shape[k]; }, Config>;
   required(): ZodObject<{ -readonly [k in keyof Shape]: ZodNonOptional<Shape[k]>; }, Config>;
   required<M extends Mask<keyof Shape>>(mask: M & Record<Exclude<keyof M, keyof Shape>, never>): ZodObject<{ -readonly [k in keyof Shape]: k extends keyof M ? ZodNonOptional<Shape[k]> : Shape[k]; }, Config>;
 }
@@ -2130,5 +2165,4 @@ interface ZodReadonly<T extends SomeType = $ZodType> extends _ZodType<$ZodReadon
   unwrap(): T;
 }
 declare const ZodReadonly: $constructor<ZodReadonly>;
-//#endregion
 export { $strip as S, output as _, ZodLiteral as a, $loose as b, ZodObject as c, ZodRecord as d, ZodString as f, ZodUnknown as g, ZodURL as h, ZodEnum as i, ZodOptional as l, ZodType as m, ZodBoolean as n, ZodNullable as o, ZodTransform as p, ZodDefault as r, ZodNumber as s, ZodArray as t, ZodPipe as u, $ZodTypeInternals as v, $strict as x, $catchall as y };
