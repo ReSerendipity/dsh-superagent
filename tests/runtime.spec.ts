@@ -1496,6 +1496,73 @@ it('relays the status-request hint when a worker\'s turn ends with no text and n
     summary: expect.stringContaining('orchestrator_ticket_request_status') })
 })
 
+describe('bounded worker length continuation', () => {
+  const configure = (count: number) => {
+    const settings = runtime.store.settings()
+    runtime.store.saveSettings({ ...settings, executor: { ...settings.executor, lengthContinuations: count } })
+  }
+  const end = (sessionId: string, seq: number, reason = 'max-tokens') => {
+    const agent = agents.get(sessionId)!
+    agent.inbox.nextTurn.length = 0; agent.inbox.nextStep.length = 0; agent.status = 'idle'
+    ;(runtime as unknown as { ctx: Context }).ctx.emit('session/event', { id: sessionId } as never,
+      { type: 'turn/end', seq, data: { turn: seq, reason: { kind: reason } } } as never)
+  }
+  it('keeps defaults off and ignores non-length endings when enabled', async () => {
+    const { sessionId } = await acceptedTicket()
+    deliveries.mockClear(); end(sessionId, 1); await runtime.effects.idle()
+    configure(2); end(sessionId, 2, 'completed'); await runtime.effects.idle()
+    end(sessionId, 3, 'aborted'); await runtime.effects.idle()
+    expect(deliveries).not.toHaveBeenCalled()
+  })
+  it('continues the same assignment at most twice and deduplicates the event', async () => {
+    configure(2)
+    const { ticket, sessionId } = await acceptedTicket(), assignment = ticket.assignments.at(-1)!.id
+    deliveries.mockClear(); end(sessionId, 10); end(sessionId, 10)
+    await runtime.effects.idle()
+    expect(deliveries.mock.calls.filter(([call]) => call.sessionId === sessionId)).toHaveLength(1)
+    expect(runtime.store.get(KV.executor.length(assignment))).toEqual({ count: 1, seq: 10 })
+    end(sessionId, 11); await runtime.effects.idle()
+    end(sessionId, 12); await runtime.effects.idle()
+    expect(deliveries.mock.calls.filter(([call]) => call.sessionId === sessionId)).toHaveLength(2)
+    expect(runtime.store.tickets.get(ticket.id)!.assignments.map(item => item.id)).toEqual([assignment])
+    expect(controller.create.mock.calls.filter(([options]) => options.sessionId === sessionId)).toHaveLength(1)
+  })
+  it('waits while paused and drops a continuation after the ticket is stopped', async () => {
+    configure(1)
+    const { ticket, sessionId } = await acceptedTicket()
+    runtime.store.saveSettings({ ...runtime.store.settings(), paused: true })
+    deliveries.mockClear(); end(sessionId, 20); await runtime.effects.idle()
+    expect(deliveries).not.toHaveBeenCalled()
+    runtime.engine.stopTicket(ticket.id)
+    runtime.store.saveSettings({ ...runtime.store.settings(), paused: false })
+    await runtime.effects.idle()
+    expect(deliveries).not.toHaveBeenCalled()
+  })
+  it('does not wake a worker after its ready report', async () => {
+    configure(1)
+    const { sessionId } = await acceptedTicket()
+    await runTool(sessionId, 'orchestrator_report', { state: 'ready', summary: 'Finished' })
+    deliveries.mockClear(); end(sessionId, 30); await runtime.effects.idle()
+    expect(deliveries).not.toHaveBeenCalled()
+  })
+  it.each(['new-input', 'human-question', 'disabled', 'queued-session'])('suppresses a queued continuation for %s', async reason => {
+    configure(1)
+    const { ticket, sessionId } = await acceptedTicket()
+    runtime.store.saveSettings({ ...runtime.store.settings(), paused: true })
+    end(sessionId, 40)
+    const current = runtime.store.tickets.get(ticket.id)!
+    if (reason === 'new-input') runtime.store.tickets.save({ ...current,
+      inputs: [...current.inputs, { id: 'new', kind: 'text', at: '', text: 'Superseding request' }] })
+    if (reason === 'human-question') runtime.store.tickets.save({ ...current, attention: { id: 'q', question: 'Need a person' } })
+    if (reason === 'disabled') configure(0)
+    if (reason === 'queued-session') agents.get(sessionId)!.inbox.nextTurn.push({ id: 'person', content: [], source: { kind: 'user' } } as never)
+    deliveries.mockClear()
+    runtime.store.saveSettings({ ...runtime.store.settings(), paused: false })
+    await runtime.effects.idle()
+    expect(deliveries.mock.calls.filter(([call]) => call.sessionId === sessionId)).toHaveLength(0)
+  })
+})
+
 it('fails a ticket at once on a worker error that is not passing, and relays it', async () => {
   const { ticket, sessionId } = await acceptedTicket()
   ;(runtime as unknown as { ctx: Context }).ctx.emit('agent/error', { agent: agents.get(sessionId), turn: 1, step: 1, error: new Error('Invalid tool schema') } as never)

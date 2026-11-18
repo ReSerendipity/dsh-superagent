@@ -119,6 +119,7 @@ declare const SettingsSchema: ZodObject<{
       reasoningEffort: ZodOptional<ZodString>;
     }, $strict>>>;
     maxWorkers: ZodDefault<ZodNumber>;
+    lengthContinuations: ZodDefault<ZodNumber>;
     directory: ZodDefault<ZodString>;
     prepare: ZodDefault<ZodString>;
     blockedCommands: ZodDefault<ZodArray<ZodString>>;
@@ -267,6 +268,7 @@ declare class SourceRegistry implements SourceScope {
         reasoningEffort?: string | undefined;
       } | null;
       maxWorkers: number;
+      lengthContinuations: number;
       directory: string;
       prepare: string;
       blockedCommands: string[];
@@ -361,6 +363,7 @@ declare class SourceRegistry implements SourceScope {
         reasoningEffort?: string | undefined;
       } | null;
       maxWorkers: number;
+      lengthContinuations: number;
       directory: string;
       prepare: string;
       blockedCommands: string[];
@@ -467,6 +470,7 @@ declare class SourceRegistry implements SourceScope {
         reasoningEffort?: string | undefined;
       } | null;
       maxWorkers: number;
+      lengthContinuations: number;
       directory: string;
       prepare: string;
       blockedCommands: string[];
@@ -568,6 +572,7 @@ declare class SourceRegistry implements SourceScope {
         reasoningEffort?: string | undefined;
       } | null;
       maxWorkers: number;
+      lengthContinuations: number;
       directory: string;
       prepare: string;
       blockedCommands: string[];
@@ -665,6 +670,7 @@ declare class SourceRegistry implements SourceScope {
         reasoningEffort?: string | undefined;
       } | null;
       maxWorkers: number;
+      lengthContinuations: number;
       directory: string;
       prepare: string;
       blockedCommands: string[];
@@ -775,6 +781,7 @@ declare class SourceRegistry implements SourceScope {
         reasoningEffort?: string | undefined;
       } | null;
       maxWorkers: number;
+      lengthContinuations: number;
       directory: string;
       prepare: string;
       blockedCommands: string[];
@@ -870,6 +877,7 @@ declare class SourceRegistry implements SourceScope {
         reasoningEffort?: string | undefined;
       } | null;
       maxWorkers: number;
+      lengthContinuations: number;
       directory: string;
       prepare: string;
       blockedCommands: string[];

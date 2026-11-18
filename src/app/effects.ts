@@ -9,6 +9,8 @@ import type { HealthBoard, HealthEntry } from '../infra/health.ts'
 import type { Store } from './store.ts'
 
 export interface EffectPayloads {
+  /** Continue the same worker after a length stop, once per persisted session event. */
+  'worker-length': { ticketId: string; assignmentId: string; eventSeq: number; inputs: string }
   /** Build an Eval's candidate card and relay it to the main Session; the key is the Eval ID. */
   assessment: { triggerId: string }
   /** Launch a pending Assignment; the key is the Assignment ID. */
