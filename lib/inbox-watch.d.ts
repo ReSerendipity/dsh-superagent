@@ -36,7 +36,7 @@ declare function inboxTrigger(file: InboxFile, config: InboxConfig, root: string
  */
 declare function sendInbox(_host: Pick<SourceContext, 'commands'>, message: OutboundMessage, delivered?: readonly DeliveredMessage[]): Promise<'sent' | 'gone'>;
 declare const inboxKind: SourceKind<InboxConfig>;
-/** Read pending files in the inbox once they have settled, take in each, and archive it under done/. The move is the cursor. */
+/** Claim settled files, admit immutable archived versions, and acknowledge only the claimed version. */
 declare function pollInbox(ctx: SourceContext, config: InboxConfig, signal: AbortSignal): Promise<{
   read: number;
   moved: number;

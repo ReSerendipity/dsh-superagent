@@ -2,19 +2,21 @@
  * Inbox source kind (Mode A, single operator): a local directory whose Markdown files become Triggers, so one GitHub
  * account is enough. Dropping `task.md` into the inbox is a direct request from the configured local actor; the reply
  * file `done/task.md.reply.md` next to the archived task file is rewritten from the delivery receipts on every send.
- * The archive move is the read cursor: a Trigger id
+ * A durable `.pending/` claim is the read cursor; `done/` holds immutable versions before admission. A Trigger id
  * names file + mtime + content hash, so replaying an unchanged file is `duplicate` and editing or re-dropping makes a
  * new event. Nothing in this module depends on GitHub notifications, so it is unaffected by the agent-account filter.
  */
 import type { Context } from '@deepseek-ai/cordis'
-import { appendFileSync, existsSync, mkdirSync, readFileSync, readdirSync, renameSync, statSync, writeFileSync } from 'node:fs'
+import { appendFileSync, mkdirSync, readFileSync, renameSync, writeFileSync } from 'node:fs'
 import { createHash } from 'node:crypto'
-import { basename, dirname, extname, join, resolve } from 'node:path'
+import { dirname, join, resolve } from 'node:path'
+import { pathToFileURL } from 'node:url'
 import { setTimeout as delay } from 'node:timers/promises'
 import { z } from 'zod'
 import { key, threadKey, type OutboundMessage, type ScopeResult, type Trigger } from '../core/index.ts'
 import { health, sourceContext, type SourceContext } from './host.ts'
 import type { DeliveredMessage, SourceKind } from './kind.ts'
+import { claimInboxFiles, finishInboxClaim, inboxSnapshot } from './inbox-files.ts'
 
 const SOURCE = 'inbox'
 const ARCHIVE = 'done'
@@ -40,7 +42,7 @@ export type InboxConfig = z.infer<typeof InboxConfigSchema>
 export function inboxDir(deployment: { stateDir: string }, config: InboxConfig): string {
   return config.inboxDir ? resolve(config.inboxDir) : join(deployment.stateDir, 'inbox')
 }
-const fileUrl = (path: string): string => `file:///${path.replaceAll('\\', '/').split('/').map(encodeURIComponent).join('/')}`
+const fileUrl = (path: string): string => pathToFileURL(path).href
 
 /** One pending task file as the poll sees it. */
 export interface InboxFile { path: string; relPath: string; content: string; mtimeMs: number }
@@ -143,35 +145,25 @@ export const inboxKind: SourceKind<InboxConfig> = {
   },
 }
 
-/** Read pending files in the inbox once they have settled, take in each, and archive it under done/. The move is the cursor. */
+/** Claim settled files, admit immutable archived versions, and acknowledge only the claimed version. */
 export async function pollInbox(ctx: SourceContext, config: InboxConfig, signal: AbortSignal): Promise<{ read: number; moved: number; failed: number; lastError?: string }> {
   const root = inboxDir(ctx.deployment, config)
-  if (!existsSync(root)) mkdirSync(root, { recursive: true })
-  const names = readdirSync(root, { withFileTypes: true }).filter(entry => entry.isFile() && entry.name.toLowerCase().endsWith('.md'))
-    .map(entry => entry.name).sort()
-  const archive = join(root, ARCHIVE)
+  const claims = claimInboxFiles(root, INBOX_STABILITY_MS)
   let read = 0, moved = 0, failed = 0, lastError: string | undefined
-  for (const name of names) {
+  for (const claim of claims) {
     if (signal.aborted) throw new Error('The inbox Source stopped during the read')
-    let file: InboxFile
+    let file: InboxFile | undefined
     try {
-      const path = join(root, name)
-      const st = statSync(path)
-      // A freshly dropped file waits for the next round instead of being taken in mid-write.
-      if (Date.now() - st.mtimeMs < INBOX_STABILITY_MS) continue
-      file = { path, relPath: name, content: readFileSync(path, 'utf8'), mtimeMs: st.mtimeMs }
+      file = inboxSnapshot(root, claim, INBOX_STABILITY_MS)
+      if (!file) continue
     } catch (error) { failed++; lastError = String(error); continue }
     read++
     try {
       const trigger = inboxTrigger(file, config, root)
       await ctx.receive(trigger)
       ctx.threads.describe(threadKey(trigger.threads[0]!), { url: trigger.url,
-        facts: { file: { label: { zh: '任务文件', en: 'Task file' }, value: name } } })
-      if (!existsSync(archive)) mkdirSync(archive, { recursive: true })
-      let target = join(archive, name)
-      if (existsSync(target)) target = join(archive, `${basename(name, extname(name))}-${Math.floor(file.mtimeMs)}${extname(name)}`)
-      if (existsSync(target)) target = join(archive, `${basename(name, extname(name))}-${Date.now()}${extname(name)}`)
-      renameSync(file.path, target)
+        facts: { file: { label: { zh: '任务文件', en: 'Task file' }, value: file.relPath } } })
+      finishInboxClaim(claim, file.content)
       moved++
     } catch (error) { failed++; lastError = error instanceof Error ? error.message : String(error) }
   }
