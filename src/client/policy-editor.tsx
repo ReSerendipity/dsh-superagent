@@ -5,7 +5,7 @@
  */
 import { useState } from 'react'
 import { ADMISSION_CELLS, ADMISSION_OPTIONS, admissionOf, cellAdmission, plainOf, plainOptions, plainQuestions, withCellAdmission,
-  type Admission, type AdmissionCell, type AdmissionTable, type PlainChoice, type PlainQuestion } from '../admission.ts'
+  type Admission, type AdmissionCell, type AdmissionTable as AdmissionTableSpec, type PlainChoice, type PlainQuestion } from '../admission.ts'
 import type { AdmissionRowView } from '../sources/kind.ts'
 import type { SourceView } from './api.ts'
 import type { DshSuperagentKey } from './locales.ts'
@@ -49,11 +49,11 @@ export function SourcePart({ source, part, saved, dirty, evalMode, onChange, rel
   const run = useAction(() => call('POST policy-sync/:id', { id: source.id }), { reload })
   // Syncing saves the Policy block, so require unsaved edits to be saved or discarded first.
   const syncNow = () => { if (dirty) notify(t('syncNeedsSave')); else void run.run() }
-  const table = (part.admission ?? {}) as AdmissionTable
+  const table = (part.admission ?? {}) as AdmissionTableSpec
   const rows = policy.rows ?? []
   const questions = plainQuestions(rows)
   const nameOf = (row: AdmissionRowView) => source.labels[row.id] ?? localized(t, row.label)
-  const edit = (next: AdmissionTable) => onChange({ ...part, admission: next })
+  const edit = (next: AdmissionTableSpec) => onChange({ ...part, admission: next })
   const ask = (question: PlainQuestion) => {
     const row = rows.find(item => item.id === question.row)!
     return <Question key={`${question.row}:${question.cell}`} cell={question.cell} value={plainOf(cellAdmission(table, question.row, question.cell))}
@@ -100,7 +100,7 @@ export function SourcePart({ source, part, saved, dirty, evalMode, onChange, rel
 }
 
 export function AdmissionTable({ rows, labels, table, onChange }: {
-  rows: AdmissionRowView[]; labels: Record<string, string>; table: AdmissionTable; onChange: (table: AdmissionTable) => void
+  rows: AdmissionRowView[]; labels: Record<string, string>; table: AdmissionTableSpec; onChange: (table: AdmissionTableSpec) => void
 }) {
   const { t } = usePanel()
   const name = (row: AdmissionRowView) => labels[row.id] ?? localized(t, row.label)

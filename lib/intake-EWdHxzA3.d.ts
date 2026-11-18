@@ -9,14 +9,14 @@ declare const Config: s<Schemastery.ObjectS<NoInfer<{
   promptMaxChars: s<number, number, "volatile-defined">;
   admissionContextMaxPages: s<number, number, "volatile-defined">;
   admissionContextTimeoutMs: s<number, number, "volatile-defined">;
-  mode: s<"local" | "github", "local" | "github", "defined">;
+  mode: s<"github" | "local", "github" | "local", "defined">;
 }>>, Schemastery.ObjectT<NoInfer<{
   stateDir: s<string, string, "plain">;
   configPath: s<string, string, "plain">;
   promptMaxChars: s<number, number, "volatile-defined">;
   admissionContextMaxPages: s<number, number, "volatile-defined">;
   admissionContextTimeoutMs: s<number, number, "volatile-defined">;
-  mode: s<"local" | "github", "local" | "github", "defined">;
+  mode: s<"github" | "local", "github" | "local", "defined">;
 }>>, "plain">;
 type DeploymentConfig = ReturnType<typeof Config>;
 interface Machine {
@@ -52,26 +52,26 @@ interface FeishuBot {
  * Policy gates and source scopes may also emit their own literal reason codes.
  */
 declare const REASONS: {
-  readonly said: "{text}";
-  readonly timeout: "Assessment timed out";
-  readonly policyChanged: "Policy changed during assessment";
-  readonly noAdmissible: "No admissible trigger";
-  readonly startedTicket: "Already started ticket {ticket}";
-  readonly acceptedBefore: "Trigger {trigger} was accepted before";
-  readonly routed: "Routed to ticket {ticket}";
-  readonly explicitRouted: "Explicit request from an allowed sender routed by the orchestrator";
-  readonly humanStop: "Human asked to stop";
-  readonly legacyImport: "Imported from the pre-domain-model task record";
-  readonly forwarded: "Forwarded to the worker of the Ticket already on this Thread";
-  readonly senderNotMember: "The sender is not on the Source's list";
-  readonly retried: "Retried by a person";
-  readonly hostRestarted: "dsh-superagent restarted";
-  readonly stopUnknown: "Stop target is unknown or already ended";
-  readonly stopNotExplicit: "A stop needs an explicit request from a sender on the list";
-  readonly directionUnsettled: "Implementation intent or target direction is not established, or a product/design decision is still required";
-  readonly noRuleMatched: "No enabled admission rule matched";
-  readonly ignoredFromCard: "Ignored from its card, without a rule assessment";
-  readonly observed: "Observe mode: would accept ({text})";
+  readonly said: '{text}';
+  readonly timeout: 'Assessment timed out';
+  readonly policyChanged: 'Policy changed during assessment';
+  readonly noAdmissible: 'No admissible trigger';
+  readonly startedTicket: 'Already started ticket {ticket}';
+  readonly acceptedBefore: 'Trigger {trigger} was accepted before';
+  readonly routed: 'Routed to ticket {ticket}';
+  readonly explicitRouted: 'Explicit request from an allowed sender routed by the orchestrator';
+  readonly humanStop: 'Human asked to stop';
+  readonly legacyImport: 'Imported from the pre-domain-model task record';
+  readonly forwarded: 'Forwarded to the worker of the Ticket already on this Thread';
+  readonly senderNotMember: 'The sender is not on the Source\'s list';
+  readonly retried: 'Retried by a person';
+  readonly hostRestarted: 'dsh-superagent restarted';
+  readonly stopUnknown: 'Stop target is unknown or already ended';
+  readonly stopNotExplicit: 'A stop needs an explicit request from a sender on the list';
+  readonly directionUnsettled: 'Implementation intent or target direction is not established, or a product/design decision is still required';
+  readonly noRuleMatched: 'No enabled admission rule matched';
+  readonly ignoredFromCard: 'Ignored from its card, without a rule assessment';
+  readonly observed: 'Observe mode: would accept ({text})';
 };
 type ReasonCode = keyof typeof REASONS;
 /** Reason code and template values; `triggerId` identifies the trigger in a batch that the reason applies to. */
@@ -175,7 +175,7 @@ declare function followupOwners(trigger: Pick<Trigger, 'id' | 'human' | 'threads
  * Whether a Decision settled what a person's message asks for: a stop on it, taken or refused, decides only that ticket's
  * work, routing it to a ticket leaves it to that ticket's worker, and an unavailable one decided nothing.
  */
-declare const settled: (decision: Pick<Decision, "kind" | "reason">) => boolean;
+declare const settled: (decision: Pick<Decision, 'kind' | 'reason'>) => boolean;
 type Strength = 'explicit' | 'inferred';
 /** The cells of a receiving scope's row in the admission table, by whether the sender is listed and addresses the agent. */
 type AdmissionCell = 'listedUnaddressed' | 'unlistedAddressed' | 'unlistedUnaddressed';
@@ -492,9 +492,9 @@ interface Execution {
   assignment: string;
 }
 /** Whether a ticket is open: it has not ended. */
-declare const liveTicket: (ticket: Pick<Ticket, "ended">) => boolean;
+declare const liveTicket: (ticket: Pick<Ticket, 'ended'>) => boolean;
 /** How a ticket ended. */
-declare const ticketOutcome: (ticket: Pick<Ticket, "ended">) => TicketOutcome | undefined;
+declare const ticketOutcome: (ticket: Pick<Ticket, 'ended'>) => TicketOutcome | undefined;
 declare const runningAssignment: (ticket: Ticket) => Assignment | undefined;
 /**
  * Whether a Trigger reached a ticket: it started the ticket, came to it as an Input, or is on a Thread the ticket subscribes
@@ -503,7 +503,7 @@ declare const runningAssignment: (ticket: Ticket) => Assignment | undefined;
 declare function reached(ticket: Ticket, trigger: Trigger, thread: (key: string) => Thread | undefined, context?: boolean): boolean;
 declare const latestAssignment: (ticket: Ticket) => Assignment | undefined;
 /** The latest report any of a ticket's Assignments made, which is what the ticket last said. */
-declare const latestReport: (ticket: Pick<Ticket, "assignments">) => Assignment["report"];
+declare const latestReport: (ticket: Pick<Ticket, 'assignments'>) => Assignment['report'];
 /**
  * Until when a ticket's worker had a turn to read what reached it: its latest report, but a progress report when `progress`
  * is false, or the end of its latest turn, whichever is later.

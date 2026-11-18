@@ -19,16 +19,16 @@ declare const InstanceStatusSchema: ZodObject<{
   startedAt: ZodString;
   writtenAt: ZodString;
   state: ZodEnum<{
-    starting: "starting";
     running: "running";
+    starting: "starting";
     stopping: "stopping";
   }>;
   health: ZodRecord<ZodString, ZodObject<{
     state: ZodEnum<{
       error: "error";
-      starting: "starting";
-      ready: "ready";
       paused: "paused";
+      ready: "ready";
+      starting: "starting";
     }>;
     detail: ZodString;
     at: ZodOptional<ZodString>;

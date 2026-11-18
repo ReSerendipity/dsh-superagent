@@ -1,5 +1,5 @@
 import { S as $strip, _ as output, b as $loose, c as ZodObject, d as ZodRecord, f as ZodString, g as ZodUnknown, i as ZodEnum, l as ZodOptional, m as ZodType, n as ZodBoolean, o as ZodNullable, p as ZodTransform, r as ZodDefault, s as ZodNumber, t as ZodArray, u as ZodPipe, v as $ZodTypeInternals, x as $strict, y as $catchall } from "./schemas-lx-F2nnt.js";
-import { F as Thread, I as ThreadFact, R as ThreadRef, S as ChannelRef, U as Trigger, h as SourceScope, l as OutboundMessage, lt as Deployment, m as ScopeResult, t as ReceiveResult, v as AdmissionCell, z as Ticket } from "./intake-OhnAYFN6.js";
+import { F as Thread, I as ThreadFact, R as ThreadRef, S as ChannelRef, U as Trigger, h as SourceScope, l as OutboundMessage, lt as Deployment, m as ScopeResult, t as ReceiveResult, v as AdmissionCell, z as Ticket } from "./intake-EWdHxzA3.js";
 import { Context } from "@deepseek-ai/cordis";
 import { DatabaseSync } from "node:sqlite";
 import { MessageId } from "@deepseek-ai/dsh-llm";
@@ -101,9 +101,9 @@ declare const SettingsSchema: ZodObject<{
   }, $strict>>;
   eval: ZodDefault<ZodObject<{
     mode: ZodDefault<ZodEnum<{
-      off: "off";
-      observe: "observe";
       auto: "auto";
+      observe: "observe";
+      off: "off";
     }>>;
     timeoutSeconds: ZodDefault<ZodNumber>;
     model: ZodDefault<ZodNullable<ZodObject<{
@@ -126,16 +126,16 @@ declare const SettingsSchema: ZodObject<{
       enforce: ZodDefault<ZodBoolean>;
       default: ZodDefault<ZodEnum<{
         allow: "allow";
-        prompt: "prompt";
         forbid: "forbid";
+        prompt: "prompt";
       }>>;
       rules: ZodDefault<ZodArray<ZodObject<{
         id: ZodString;
         match: ZodArray<ZodString>;
         decision: ZodEnum<{
           allow: "allow";
-          prompt: "prompt";
           forbid: "forbid";
+          prompt: "prompt";
         }>;
         reason: ZodOptional<ZodString>;
       }, $strict>>>;
@@ -154,8 +154,8 @@ declare const SettingsSchema: ZodObject<{
     tools: ZodDefault<ZodObject<{
       preset: ZodDefault<ZodEnum<{
         custom: "custom";
-        strict: "strict";
         standard: "standard";
+        strict: "strict";
       }>>;
       allow: ZodDefault<ZodArray<ZodString>>;
     }, $strip>>;
@@ -166,8 +166,8 @@ declare const SettingsSchema: ZodObject<{
     }, $strip>>;
     reply: ZodDefault<ZodObject<{
       mode: ZodDefault<ZodEnum<{
-        none: "none";
         brief: "brief";
+        none: "none";
       }>>;
       onProgress: ZodDefault<ZodBoolean>;
     }, $strip>>;
@@ -227,9 +227,9 @@ declare class SourceRegistry implements SourceScope {
   instances(settings?: {
     paused: boolean;
     sources: Record<string, {
+      kind?: string | undefined;
       enabled: boolean;
       config: Record<string, unknown>;
-      kind?: string | undefined;
     }>;
     policy: {
       rules: {
@@ -252,7 +252,7 @@ declare class SourceRegistry implements SourceScope {
       }>;
     };
     eval: {
-      mode: "off" | "observe" | "auto";
+      mode: "auto" | "observe" | "off";
       timeoutSeconds: number;
       model: {
         provider: string;
@@ -272,11 +272,11 @@ declare class SourceRegistry implements SourceScope {
       blockedCommands: string[];
       commandPolicy: {
         enforce: boolean;
-        default: "allow" | "prompt" | "forbid";
+        default: "allow" | "forbid" | "prompt";
         rules: {
           id: string;
           match: string[];
-          decision: "allow" | "prompt" | "forbid";
+          decision: "allow" | "forbid" | "prompt";
           reason?: string | undefined;
         }[];
         approvalTtlMinutes: number;
@@ -290,7 +290,7 @@ declare class SourceRegistry implements SourceScope {
       enabled: boolean;
       scope: "allNewChats";
       tools: {
-        preset: "custom" | "strict" | "standard";
+        preset: "custom" | "standard" | "strict";
         allow: string[];
       };
       forceDispatch: boolean;
@@ -299,7 +299,7 @@ declare class SourceRegistry implements SourceScope {
         maxParallel: number;
       };
       reply: {
-        mode: "none" | "brief";
+        mode: "brief" | "none";
         onProgress: boolean;
       };
       team: {
@@ -321,9 +321,9 @@ declare class SourceRegistry implements SourceScope {
   instance<C extends Record<string, unknown>>(id: string, settings?: {
     paused: boolean;
     sources: Record<string, {
+      kind?: string | undefined;
       enabled: boolean;
       config: Record<string, unknown>;
-      kind?: string | undefined;
     }>;
     policy: {
       rules: {
@@ -346,7 +346,7 @@ declare class SourceRegistry implements SourceScope {
       }>;
     };
     eval: {
-      mode: "off" | "observe" | "auto";
+      mode: "auto" | "observe" | "off";
       timeoutSeconds: number;
       model: {
         provider: string;
@@ -366,11 +366,11 @@ declare class SourceRegistry implements SourceScope {
       blockedCommands: string[];
       commandPolicy: {
         enforce: boolean;
-        default: "allow" | "prompt" | "forbid";
+        default: "allow" | "forbid" | "prompt";
         rules: {
           id: string;
           match: string[];
-          decision: "allow" | "prompt" | "forbid";
+          decision: "allow" | "forbid" | "prompt";
           reason?: string | undefined;
         }[];
         approvalTtlMinutes: number;
@@ -384,7 +384,7 @@ declare class SourceRegistry implements SourceScope {
       enabled: boolean;
       scope: "allNewChats";
       tools: {
-        preset: "custom" | "strict" | "standard";
+        preset: "custom" | "standard" | "strict";
         allow: string[];
       };
       forceDispatch: boolean;
@@ -393,7 +393,7 @@ declare class SourceRegistry implements SourceScope {
         maxParallel: number;
       };
       reply: {
-        mode: "none" | "brief";
+        mode: "brief" | "none";
         onProgress: boolean;
       };
       team: {
@@ -427,9 +427,9 @@ declare class SourceRegistry implements SourceScope {
   policyPart(id: string, settings?: {
     paused: boolean;
     sources: Record<string, {
+      kind?: string | undefined;
       enabled: boolean;
       config: Record<string, unknown>;
-      kind?: string | undefined;
     }>;
     policy: {
       rules: {
@@ -452,7 +452,7 @@ declare class SourceRegistry implements SourceScope {
       }>;
     };
     eval: {
-      mode: "off" | "observe" | "auto";
+      mode: "auto" | "observe" | "off";
       timeoutSeconds: number;
       model: {
         provider: string;
@@ -472,11 +472,11 @@ declare class SourceRegistry implements SourceScope {
       blockedCommands: string[];
       commandPolicy: {
         enforce: boolean;
-        default: "allow" | "prompt" | "forbid";
+        default: "allow" | "forbid" | "prompt";
         rules: {
           id: string;
           match: string[];
-          decision: "allow" | "prompt" | "forbid";
+          decision: "allow" | "forbid" | "prompt";
           reason?: string | undefined;
         }[];
         approvalTtlMinutes: number;
@@ -490,7 +490,7 @@ declare class SourceRegistry implements SourceScope {
       enabled: boolean;
       scope: "allNewChats";
       tools: {
-        preset: "custom" | "strict" | "standard";
+        preset: "custom" | "standard" | "strict";
         allow: string[];
       };
       forceDispatch: boolean;
@@ -499,7 +499,7 @@ declare class SourceRegistry implements SourceScope {
         maxParallel: number;
       };
       reply: {
-        mode: "none" | "brief";
+        mode: "brief" | "none";
         onProgress: boolean;
       };
       team: {
@@ -516,11 +516,11 @@ declare class SourceRegistry implements SourceScope {
       };
     };
   }): {
-    admission: Record<string, AdmissionRow>;
     allowed: {
       id: string;
       name?: string;
     }[];
+    admission: Record<string, AdmissionRow>;
   } | undefined;
   channelAllowed(channel: {
     source: string;
@@ -528,9 +528,9 @@ declare class SourceRegistry implements SourceScope {
   }, settings?: {
     paused: boolean;
     sources: Record<string, {
+      kind?: string | undefined;
       enabled: boolean;
       config: Record<string, unknown>;
-      kind?: string | undefined;
     }>;
     policy: {
       rules: {
@@ -553,7 +553,7 @@ declare class SourceRegistry implements SourceScope {
       }>;
     };
     eval: {
-      mode: "off" | "observe" | "auto";
+      mode: "auto" | "observe" | "off";
       timeoutSeconds: number;
       model: {
         provider: string;
@@ -573,11 +573,11 @@ declare class SourceRegistry implements SourceScope {
       blockedCommands: string[];
       commandPolicy: {
         enforce: boolean;
-        default: "allow" | "prompt" | "forbid";
+        default: "allow" | "forbid" | "prompt";
         rules: {
           id: string;
           match: string[];
-          decision: "allow" | "prompt" | "forbid";
+          decision: "allow" | "forbid" | "prompt";
           reason?: string | undefined;
         }[];
         approvalTtlMinutes: number;
@@ -591,7 +591,7 @@ declare class SourceRegistry implements SourceScope {
       enabled: boolean;
       scope: "allNewChats";
       tools: {
-        preset: "custom" | "strict" | "standard";
+        preset: "custom" | "standard" | "strict";
         allow: string[];
       };
       forceDispatch: boolean;
@@ -600,7 +600,7 @@ declare class SourceRegistry implements SourceScope {
         maxParallel: number;
       };
       reply: {
-        mode: "none" | "brief";
+        mode: "brief" | "none";
         onProgress: boolean;
       };
       team: {
@@ -625,9 +625,9 @@ declare class SourceRegistry implements SourceScope {
   environments(settings?: {
     paused: boolean;
     sources: Record<string, {
+      kind?: string | undefined;
       enabled: boolean;
       config: Record<string, unknown>;
-      kind?: string | undefined;
     }>;
     policy: {
       rules: {
@@ -650,7 +650,7 @@ declare class SourceRegistry implements SourceScope {
       }>;
     };
     eval: {
-      mode: "off" | "observe" | "auto";
+      mode: "auto" | "observe" | "off";
       timeoutSeconds: number;
       model: {
         provider: string;
@@ -670,11 +670,11 @@ declare class SourceRegistry implements SourceScope {
       blockedCommands: string[];
       commandPolicy: {
         enforce: boolean;
-        default: "allow" | "prompt" | "forbid";
+        default: "allow" | "forbid" | "prompt";
         rules: {
           id: string;
           match: string[];
-          decision: "allow" | "prompt" | "forbid";
+          decision: "allow" | "forbid" | "prompt";
           reason?: string | undefined;
         }[];
         approvalTtlMinutes: number;
@@ -688,7 +688,7 @@ declare class SourceRegistry implements SourceScope {
       enabled: boolean;
       scope: "allNewChats";
       tools: {
-        preset: "custom" | "strict" | "standard";
+        preset: "custom" | "standard" | "strict";
         allow: string[];
       };
       forceDispatch: boolean;
@@ -697,7 +697,7 @@ declare class SourceRegistry implements SourceScope {
         maxParallel: number;
       };
       reply: {
-        mode: "none" | "brief";
+        mode: "brief" | "none";
         onProgress: boolean;
       };
       team: {
@@ -735,9 +735,9 @@ declare class SourceRegistry implements SourceScope {
   threadContext(trigger: Trigger, settings?: {
     paused: boolean;
     sources: Record<string, {
+      kind?: string | undefined;
       enabled: boolean;
       config: Record<string, unknown>;
-      kind?: string | undefined;
     }>;
     policy: {
       rules: {
@@ -760,7 +760,7 @@ declare class SourceRegistry implements SourceScope {
       }>;
     };
     eval: {
-      mode: "off" | "observe" | "auto";
+      mode: "auto" | "observe" | "off";
       timeoutSeconds: number;
       model: {
         provider: string;
@@ -780,11 +780,11 @@ declare class SourceRegistry implements SourceScope {
       blockedCommands: string[];
       commandPolicy: {
         enforce: boolean;
-        default: "allow" | "prompt" | "forbid";
+        default: "allow" | "forbid" | "prompt";
         rules: {
           id: string;
           match: string[];
-          decision: "allow" | "prompt" | "forbid";
+          decision: "allow" | "forbid" | "prompt";
           reason?: string | undefined;
         }[];
         approvalTtlMinutes: number;
@@ -798,7 +798,7 @@ declare class SourceRegistry implements SourceScope {
       enabled: boolean;
       scope: "allNewChats";
       tools: {
-        preset: "custom" | "strict" | "standard";
+        preset: "custom" | "standard" | "strict";
         allow: string[];
       };
       forceDispatch: boolean;
@@ -807,7 +807,7 @@ declare class SourceRegistry implements SourceScope {
         maxParallel: number;
       };
       reply: {
-        mode: "none" | "brief";
+        mode: "brief" | "none";
         onProgress: boolean;
       };
       team: {
@@ -830,9 +830,9 @@ declare class SourceRegistry implements SourceScope {
   }, settings?: {
     paused: boolean;
     sources: Record<string, {
+      kind?: string | undefined;
       enabled: boolean;
       config: Record<string, unknown>;
-      kind?: string | undefined;
     }>;
     policy: {
       rules: {
@@ -855,7 +855,7 @@ declare class SourceRegistry implements SourceScope {
       }>;
     };
     eval: {
-      mode: "off" | "observe" | "auto";
+      mode: "auto" | "observe" | "off";
       timeoutSeconds: number;
       model: {
         provider: string;
@@ -875,11 +875,11 @@ declare class SourceRegistry implements SourceScope {
       blockedCommands: string[];
       commandPolicy: {
         enforce: boolean;
-        default: "allow" | "prompt" | "forbid";
+        default: "allow" | "forbid" | "prompt";
         rules: {
           id: string;
           match: string[];
-          decision: "allow" | "prompt" | "forbid";
+          decision: "allow" | "forbid" | "prompt";
           reason?: string | undefined;
         }[];
         approvalTtlMinutes: number;
@@ -893,7 +893,7 @@ declare class SourceRegistry implements SourceScope {
       enabled: boolean;
       scope: "allNewChats";
       tools: {
-        preset: "custom" | "strict" | "standard";
+        preset: "custom" | "standard" | "strict";
         allow: string[];
       };
       forceDispatch: boolean;
@@ -902,7 +902,7 @@ declare class SourceRegistry implements SourceScope {
         maxParallel: number;
       };
       reply: {
-        mode: "none" | "brief";
+        mode: "brief" | "none";
         onProgress: boolean;
       };
       team: {
@@ -1107,11 +1107,11 @@ type Family<V, A extends unknown[]> = ((...name: A) => Key<V>) & {
 //#region src/sources/host.d.ts
 /** Fixed English health templates (`{name}` placeholders); the panel localizes each `code` in the interface language. */
 declare const HEALTH_TEXT: {
-  readonly setupPending: "Waiting for the deployment check";
-  readonly sourceOff: "Off";
-  readonly feishuCliUnset: "The Source is on, and its bot lark-cli is not set";
-  readonly feishuBotMissing: "Waiting for the Feishu bot";
-  readonly pollFailures: "{count} consecutive failed polls; last: {error}";
+  readonly setupPending: 'Waiting for the deployment check';
+  readonly sourceOff: 'Off';
+  readonly feishuCliUnset: 'The Source is on, and its bot lark-cli is not set';
+  readonly feishuBotMissing: 'Waiting for the Feishu bot';
+  readonly pollFailures: '{count} consecutive failed polls; last: {error}';
 };
 type HealthCode = keyof typeof HEALTH_TEXT;
 type Health = {
@@ -1198,27 +1198,27 @@ interface FieldBase {
  * Configuration field specification; `rows` edits a list of records keyed by its first column, `choose` picks from
  * resolved source labels, and `fact` displays a read-only value from `facts`.
  */
-type FieldSpec = FieldBase & {
+type FieldSpec = (FieldBase & {
   type: 'switch';
-} | FieldBase & {
+}) | (FieldBase & {
   type: 'select';
   options: {
     value: string;
     label: Localized;
   }[];
-} | FieldBase & {
+}) | (FieldBase & {
   type: 'number';
   min: number;
   max: number;
-} | FieldBase & {
+}) | (FieldBase & {
   type: 'text';
   pattern?: string;
   readonly?: boolean;
   choose?: Localized;
-} | FieldBase & {
+}) | (FieldBase & {
   type: 'fact';
   settings?: 'deployment';
-} | FieldBase & {
+}) | (FieldBase & {
   type: 'rows';
   columns: ({
     key: string;
@@ -1237,7 +1237,7 @@ type FieldSpec = FieldBase & {
       label: Localized;
     }[];
   })[];
-};
+});
 interface VariableSpec {
   key: string;
   description: Localized;
