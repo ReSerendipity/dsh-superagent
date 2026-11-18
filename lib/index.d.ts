@@ -1,6 +1,6 @@
-import { $ as settled, A as MandateBasis, B as TicketEndBy, C as Decision, D as Follow, E as Execution, F as Thread, G as followupOwners, H as TicketOutcome, I as ThreadFact, J as latestReport, K as isoTime, L as ThreadFacts, M as ReportState, N as Strength, O as FollowupRecords, P as Text, Q as runningAssignment, R as ThreadRef, S as ChannelRef, T as Evaluation, U as Trigger, V as TicketInput, W as TriggerDisposition, X as reached, Y as liveTicket, Z as readUntil, _ as ActorRef, a as DomainEvent, at as ReasonCode, b as AssignmentState, c as GateResult, ct as Config, d as Policy, et as threadKey, f as ReplyStatus, g as AcceptMode, h as SourceScope, i as Candidate, it as Reason, j as PolicyEffect, k as Mandate, l as OutboundMessage, lt as Deployment, m as ScopeResult, n as AssessmentOutcome, nt as waitsForPerson, o as DomainEvents, ot as reasonText, p as Repositories, q as latestAssignment, r as Assessor, rt as REASONS, s as Executor, st as said, t as ReceiveResult, tt as ticketOutcome, u as Outbox, ut as DeploymentConfig, v as AdmissionCell, w as DecisionKind, x as Attention, y as Assignment, z as Ticket } from "./intake-EWdHxzA3.js";
+/** Main plugin entry: mounts the Runtime and provides its restart callback for deployment account changes. */
+import { $ as settled, A as MandateBasis, B as TicketEndBy, C as Decision, D as Follow, E as Execution, F as Thread, G as followupOwners, H as TicketOutcome, I as ThreadFact, J as latestReport, K as isoTime, L as ThreadFacts, M as ReportState, N as Strength, O as FollowupRecords, P as Text, Q as runningAssignment, R as ThreadRef, S as ChannelRef, T as Evaluation, U as Trigger, V as TicketInput, W as TriggerDisposition, X as reached, Y as liveTicket, Z as readUntil, _ as ActorRef, a as DomainEvent, at as ReasonCode, b as AssignmentState, c as GateResult, ct as Config, d as Policy, et as threadKey, f as ReplyStatus, g as AcceptMode, h as SourceScope, i as Candidate, it as Reason, j as PolicyEffect, k as Mandate, l as OutboundMessage, lt as Deployment, m as ScopeResult, n as AssessmentOutcome, nt as waitsForPerson, o as DomainEvents, ot as reasonText, p as Repositories, q as latestAssignment, r as Assessor, rt as REASONS, s as Executor, st as said, t as ReceiveResult, tt as ticketOutcome, u as Outbox, ut as DeploymentConfig, v as AdmissionCell, w as DecisionKind, x as Attention, y as Assignment, z as Ticket } from "./intake-HLlhGfwc.js";
 import { Context } from "@deepseek-ai/cordis";
-//#region src/core/part.d.ts
 interface EngineOptions {
   repo: Repositories;
   policy: () => Policy;
@@ -15,8 +15,6 @@ interface EngineOptions {
   now?: () => string;
   emit?: (event: DomainEvent) => void;
 }
-//#endregion
-//#region src/core/replies.d.ts
 /**
  * A message for a Channel, by purpose: an Executor's acknowledgement of a person's request it works on, the answer to a
  * person's question once the worker reported it, the result of a ticket that is `ready`, `completed`, `merged`, or `dropped`,
@@ -40,8 +38,6 @@ interface Reply {
   status: ReplyStatus;
   reused: boolean;
 }
-//#endregion
-//#region src/core/assignments.d.ts
 /** What an Assignment reports: a worker's report, or the Executor's own (`waiting` after an idle turn, `failed` after an error). */
 interface WorkerReport {
   state: ReportState;
@@ -53,20 +49,16 @@ interface WorkerReport {
   /** The person's question this report answers, which the worker thereby takes up; authorizes the main Session to send an answer reply. */
   answers?: string;
 }
-//#endregion
-//#region src/core/evals.d.ts
 /** An outcome for the Eval that holds a Trigger; `evalId` names the Eval it was judged for, so a later Eval refuses it. */
 type Outcome = AssessmentOutcome & {
   evalId?: string;
 };
-//#endregion
-//#region src/core/engine.d.ts
 /**
  * Single transactional entry point for mutating Triggers, Threads, Decisions, Tickets, and Assignments.
  * Coordinates Intake, Evals, Tickets, Assignments, and Replies inside synchronous repository transactions while queuing side
  * effects through ports. Callers receive role-scoped `Pick` interfaces rather than the full engine.
  */
-declare class Engine {
+export declare class Engine {
   private readonly options;
   private readonly repo;
   private readonly replies;
@@ -240,10 +232,8 @@ type EngineForPeople = Pick<Engine, 'stopTicket' | 'retryTicket' | 'reevaluate' 
 type EngineForSettings = Pick<Engine, 'policyChanged'>;
 /** What the Executor tells the Engine, and what its workers ask of it. */
 type EngineForExecutor = Pick<Engine, 'assignmentStarted' | 'inputsDelivered' | 'inputsRead' | 'turnEnded' | 'deliveryFailed' | 'assignmentInterrupted' | 'report' | 'markUnrelated' | 'handback' | 'followForContext' | 'reply'>;
-//#endregion
-//#region src/core/errors.d.ts
 /** User-facing error codes mapped to their category ('missing' or 'refused') and English message template. */
-declare const USER_ERRORS: {
+export declare const USER_ERRORS: {
   readonly unknownTicket: readonly ["missing", "Unknown ticket"];
   readonly unknownProblem: readonly ["missing", "Unavailable Eval not found"];
   readonly unknownTrigger: readonly ["missing", "Unknown trigger"];
@@ -294,19 +284,17 @@ type UserErrorCode = keyof typeof USER_ERRORS;
  * Structured error thrown by Engine parts and application services when a caller request is invalid or references missing state.
  * Tool handlers and HTTP routes inspect its code and missing flag to return appropriate status responses, while the web panel localizes the code.
  */
-declare class UserError extends Error {
+export declare class UserError extends Error {
   readonly code: UserErrorCode;
   readonly values: Record<string, string>;
   readonly missing: boolean;
   constructor(code: UserErrorCode, values?: Record<string, string>);
 }
-//#endregion
-//#region src/core/memory.d.ts
 /**
  * In-memory implementation of the Repositories port backed by cloned Map entries so caller mutations do not affect stored state.
  * Provides snapshot-based atomic rollback and matches the ordering semantics of the SQLite store for Engine tests.
  */
-declare class MemoryRepositories implements Repositories {
+export declare class MemoryRepositories implements Repositories {
   private readonly triggerRows;
   private readonly dispositions;
   private readonly threadRows;
@@ -339,8 +327,6 @@ declare class MemoryRepositories implements Repositories {
     byThread: (key: string) => Decision[];
   };
 }
-//#endregion
-//#region src/core/stage.d.ts
 /** High-level execution stage of a ticket: waiting on a person, actively working or queued, idle between turns, or ended. */
 type TicketStage = {
   stage: 'person';
@@ -354,16 +340,11 @@ type TicketStage = {
   stage: 'ended';
 };
 /** Classifies a ticket's stage; the rules follow the table in docs/003 in order, where the first matching row wins. */
-declare function ticketStage(ticket: Ticket): TicketStage;
+export declare function ticketStage(ticket: Ticket): TicketStage;
 /** True when an open ticket is stalled on a blocked/failed report without a newer human follow-up, or has a failed input delivery. */
-declare function canRetry(ticket: Ticket): boolean;
-//#endregion
-//#region src/core/ids.d.ts
-declare function key(...values: string[]): string;
-//#endregion
-//#region src/index.d.ts
-declare const name = "dsh-superagent";
-declare const inject: string[];
-declare function apply(ctx: Context, config: DeploymentConfig): Promise<void>;
-//#endregion
-export { AcceptMode, ActorRef, AdmissionCell, AssessmentOutcome, Assessor, Assignment, AssignmentState, Attention, Candidate, ChannelRef, Config, Decision, DecisionKind, type Deployment, type DeploymentConfig, DomainEvent, DomainEvents, Engine, type EngineForExecutor, type EngineForMainSession, type EngineForPeople, type EngineForSettings, type EngineForSources, type EngineOptions, Evaluation, Execution, Executor, Follow, FollowupRecords, GateResult, Mandate, MandateBasis, MemoryRepositories, OutboundMessage, Outbox, type Outcome, Policy, PolicyEffect, REASONS, type Reason, type ReasonCode, type ReceiveResult, type Reply, type ReplyRequest, ReplyStatus, ReportState, Repositories, ScopeResult, SourceScope, Strength, Text, Thread, ThreadFact, ThreadFacts, ThreadRef, Ticket, TicketEndBy, TicketInput, TicketOutcome, type TicketStage, Trigger, TriggerDisposition, USER_ERRORS, UserError, type UserErrorCode, type WorkerReport, apply, canRetry, followupOwners, inject, isoTime, key, latestAssignment, latestReport, liveTicket, name, reached, readUntil, reasonText, runningAssignment, said, settled, threadKey, ticketOutcome, ticketStage, waitsForPerson };
+export declare function canRetry(ticket: Ticket): boolean;
+export declare function key(...values: string[]): string;
+export declare const name = "dsh-superagent";
+export declare const inject: string[];
+export declare function apply(ctx: Context, config: DeploymentConfig): Promise<void>;
+export { AcceptMode, ActorRef, AdmissionCell, AssessmentOutcome, Assessor, Assignment, AssignmentState, Attention, Candidate, ChannelRef, Config, Decision, DecisionKind, type Deployment, type DeploymentConfig, DomainEvent, DomainEvents, type EngineForExecutor, type EngineForMainSession, type EngineForPeople, type EngineForSettings, type EngineForSources, type EngineOptions, Evaluation, Execution, Executor, Follow, FollowupRecords, GateResult, Mandate, MandateBasis, OutboundMessage, Outbox, type Outcome, Policy, PolicyEffect, REASONS, type Reason, type ReasonCode, type ReceiveResult, type Reply, type ReplyRequest, ReplyStatus, ReportState, Repositories, ScopeResult, SourceScope, Strength, Text, Thread, ThreadFact, ThreadFacts, ThreadRef, Ticket, TicketEndBy, TicketInput, TicketOutcome, type TicketStage, Trigger, TriggerDisposition, type UserErrorCode, type WorkerReport, followupOwners, isoTime, latestAssignment, latestReport, liveTicket, reached, readUntil, reasonText, runningAssignment, said, settled, threadKey, ticketOutcome, waitsForPerson };

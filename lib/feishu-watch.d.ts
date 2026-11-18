@@ -1,8 +1,8 @@
-import { S as $strip, _ as output, b as $loose, c as ZodObject, f as ZodString, h as ZodURL, i as ZodEnum, l as ZodOptional, n as ZodBoolean, r as ZodDefault, s as ZodNumber, t as ZodArray, x as $strict } from "./schemas-lx-F2nnt.js";
-import { F as Thread, U as Trigger } from "./intake-EWdHxzA3.js";
-import { _ as Tally, g as SourceRegistry, n as SourceKind, r as SourceContext } from "./kind-aEx65xov.js";
+/** Feishu source kind definition, policy synchronization, and Cordis plugin entry. */
+import { S as $strip, _ as output, b as $loose, c as ZodObject, f as ZodString, h as ZodURL, i as ZodEnum, l as ZodOptional, n as ZodBoolean, r as ZodDefault, s as ZodNumber, t as ZodArray, x as $strict } from "./schemas-2-UC6LY4.js";
+import { _ as Tally, g as SourceRegistry, n as SourceKind, r as SourceContext } from "./kind-CGceQI49.js";
+import { F as Thread, U as Trigger } from "./intake-HLlhGfwc.js";
 import { Context } from "@deepseek-ai/cordis";
-//#region src/sources/feishu-read.d.ts
 /** Retained source message reference anchoring context reads; `at` is the timestamp around which `chatAround` queries. */
 interface FeishuRef {
   triggerId: string;
@@ -10,9 +10,7 @@ interface FeishuRef {
   messageId: string;
   at?: string;
 }
-//#endregion
-//#region src/sources/feishu-trigger.d.ts
-declare const SOURCE = "feishu";
+export declare const SOURCE = "feishu";
 /** A message as the live event consumer prints it; the history and topic-page paths normalize what they read into this shape. */
 declare const EventSchema: ZodObject<{
   message_id: ZodString;
@@ -39,10 +37,10 @@ declare const EventSchema: ZodObject<{
   message_app_link: ZodOptional<ZodURL>;
 }, $strip>;
 type FeishuEvent = output<typeof EventSchema>;
-declare const feishuThreadId: (chatId: string, rootId: string | undefined, messageId: string) => string;
+export declare const feishuThreadId: (chatId: string, rootId: string | undefined, messageId: string) => string;
 /** Deterministic trigger ID for a Feishu message; every read path for this message produces the same ID. */
-declare const feishuTriggerId: (messageId: string) => string;
-declare const withMentionNames: (text: string, mentions: {
+export declare const feishuTriggerId: (messageId: string) => string;
+export declare const withMentionNames: (text: string, mentions: {
   key?: string | undefined;
   name?: string | undefined;
 }[]) => string;
@@ -52,10 +50,10 @@ declare const withMentionNames: (text: string, mentions: {
  * time zone - the zone the topic page rendered it in for this machine. Epoch values are exact everywhere; only the
  * topic-page string carries the zone ambiguity, and no client-side signal can resolve it.
  */
-declare function feishuTime(value: string): string;
+export declare function feishuTime(value: string): string;
 /** Converts a normalized Feishu event into a Trigger, returning undefined for messages sent by the bot itself. */
-declare function feishuTrigger(input: unknown, botId: string, botAppId: string): Trigger | undefined;
-declare function feishuRef(trigger: Trigger): FeishuRef | undefined;
+export declare function feishuTrigger(input: unknown, botId: string, botAppId: string): Trigger | undefined;
+export declare function feishuRef(trigger: Trigger): FeishuRef | undefined;
 /** A message from the history API; a deleted message may have no body/content. */
 declare const HistoricalMessageSchema: ZodObject<{
   message_id: ZodString;
@@ -80,24 +78,20 @@ declare const HistoricalMessageSchema: ZodObject<{
   }, $loose>>>;
 }, $loose>;
 type HistoricalMessage = output<typeof HistoricalMessageSchema>;
-declare function historyEvent(message: HistoricalMessage, chatId: string, direct: boolean): unknown;
-//#endregion
-//#region src/sources/feishu-loops.d.ts
+export declare function historyEvent(message: HistoricalMessage, chatId: string, direct: boolean): unknown;
 /** Wait before restarting the event consumer: 1s after a run that stayed up for a minute, otherwise exponential backoff up to 60s. */
-declare const consumerRetry: (previous: number | undefined, ranMs: number) => number;
+export declare const consumerRetry: (previous: number | undefined, ranMs: number) => number;
 /** Refreshes the map of joined chats (`chat_id -> name`); throws on failure so the previously stored list remains intact. */
-declare function refreshChatNames(ctx: SourceContext, signal?: AbortSignal): Promise<Record<string, string>>;
+export declare function refreshChatNames(ctx: SourceContext, signal?: AbortSignal): Promise<Record<string, string>>;
 /**
  * Backfills chat messages and active topic replies between `since` and `until` before the caller advances the chat cursor.
  * Topics are stored as `{ id: lastSeenAt }`, and unsubscribed topics older than the polling horizon are pruned.
  */
-declare function backfillChat(ctx: SourceContext, chatId: string, direct: boolean, since: string, until: string, signal: AbortSignal, tally?: Tally): Promise<void>;
+export declare function backfillChat(ctx: SourceContext, chatId: string, direct: boolean, since: string, until: string, signal: AbortSignal, tally?: Tally): Promise<void>;
 /** Resolves the retained source message reference for polling a subscribed thread. */
-declare function threadRef(ctx: SourceContext, thread: Thread): FeishuRef | undefined;
+export declare function threadRef(ctx: SourceContext, thread: Thread): FeishuRef | undefined;
 /** Polls subscribed Feishu threads within the polling horizon so replies missed by the live stream become triggers. */
-declare function pollThreads(ctx: SourceContext, signal?: AbortSignal, tally?: Tally): Promise<void>;
-//#endregion
-//#region src/sources/feishu.d.ts
+export declare function pollThreads(ctx: SourceContext, signal?: AbortSignal, tally?: Tally): Promise<void>;
 declare const FeishuConfigSchema: ZodObject<{
   cli: ZodDefault<ZodString>;
   readPageSize: ZodDefault<ZodNumber>;
@@ -116,12 +110,11 @@ declare const FeishuConfigSchema: ZodObject<{
     none: "none";
   }>>;
 }, $strict>;
-type FeishuConfig = output<typeof FeishuConfigSchema>;
-declare const feishuKind: SourceKind<FeishuConfig>;
+export type FeishuConfig = output<typeof FeishuConfigSchema>;
+export declare const feishuKind: SourceKind<FeishuConfig>;
 /** Returns the Feishu Source's settings, falling back to schema defaults while the Feishu plugin is disabled. */
-declare const feishuSettings: (sources: SourceRegistry) => FeishuConfig;
-declare const name = "dsh-superagent-feishu";
-declare const inject: string[];
-declare function apply(ctx: Context): void;
-//#endregion
-export { FeishuConfig, type FeishuEvent, SOURCE, apply, backfillChat, consumerRetry, feishuKind, feishuRef, feishuSettings, feishuThreadId, feishuTime, feishuTrigger, feishuTriggerId, historyEvent, inject, name, pollThreads, refreshChatNames, threadRef, withMentionNames };
+export declare const feishuSettings: (sources: SourceRegistry) => FeishuConfig;
+export declare const name = "dsh-superagent-feishu";
+export declare const inject: string[];
+export declare function apply(ctx: Context): void;
+export type { FeishuEvent };
