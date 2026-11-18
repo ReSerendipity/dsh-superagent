@@ -23,6 +23,12 @@ updates:
       interval: monthly
     cooldown:
       default-days: 7
+    # @deepseek-ai/schemastery >= 3.18 的声明含未导出 unique symbol（kSchema），
+    # 依赖方 tsc/tscdown 的 declaration emit 报 TS2883 无法命名（本仓 src/deployment.ts Config）。
+    # 上游导出该类型前忽略其升级；解除条件：schemastery 导出 Schema 类型或 kSchema 符号。
+    ignore:
+      - dependency-name: "@deepseek-ai/schemastery"
+        versions: [">= 3.18"]
     open-pull-requests-limit: 5
     labels: [dependencies]
     groups:
