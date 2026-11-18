@@ -263,6 +263,7 @@
         "lengthContinuations": 0,
         "directory": "",
         "prepare": "",
+        "verify": "",
         "blockedCommands": [],
         "commandPolicy": {
           "enforce": false,
@@ -355,6 +356,11 @@
           "type": "string"
         },
         "prepare": {
+          "default": "",
+          "type": "string",
+          "maxLength": 4000
+        },
+        "verify": {
           "default": "",
           "type": "string",
           "maxLength": 4000

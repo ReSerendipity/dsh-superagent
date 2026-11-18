@@ -122,6 +122,7 @@ declare const SettingsSchema: ZodObject<{
     lengthContinuations: ZodDefault<ZodNumber>;
     directory: ZodDefault<ZodString>;
     prepare: ZodDefault<ZodString>;
+    verify: ZodDefault<ZodString>;
     blockedCommands: ZodDefault<ZodArray<ZodString>>;
     commandPolicy: ZodDefault<ZodObject<{
       enforce: ZodDefault<ZodBoolean>;
@@ -271,6 +272,7 @@ declare class SourceRegistry implements SourceScope {
       lengthContinuations: number;
       directory: string;
       prepare: string;
+      verify: string;
       blockedCommands: string[];
       commandPolicy: {
         enforce: boolean;
@@ -366,6 +368,7 @@ declare class SourceRegistry implements SourceScope {
       lengthContinuations: number;
       directory: string;
       prepare: string;
+      verify: string;
       blockedCommands: string[];
       commandPolicy: {
         enforce: boolean;
@@ -473,6 +476,7 @@ declare class SourceRegistry implements SourceScope {
       lengthContinuations: number;
       directory: string;
       prepare: string;
+      verify: string;
       blockedCommands: string[];
       commandPolicy: {
         enforce: boolean;
@@ -575,6 +579,7 @@ declare class SourceRegistry implements SourceScope {
       lengthContinuations: number;
       directory: string;
       prepare: string;
+      verify: string;
       blockedCommands: string[];
       commandPolicy: {
         enforce: boolean;
@@ -673,6 +678,7 @@ declare class SourceRegistry implements SourceScope {
       lengthContinuations: number;
       directory: string;
       prepare: string;
+      verify: string;
       blockedCommands: string[];
       commandPolicy: {
         enforce: boolean;
@@ -784,6 +790,7 @@ declare class SourceRegistry implements SourceScope {
       lengthContinuations: number;
       directory: string;
       prepare: string;
+      verify: string;
       blockedCommands: string[];
       commandPolicy: {
         enforce: boolean;
@@ -880,6 +887,7 @@ declare class SourceRegistry implements SourceScope {
       lengthContinuations: number;
       directory: string;
       prepare: string;
+      verify: string;
       blockedCommands: string[];
       commandPolicy: {
         enforce: boolean;

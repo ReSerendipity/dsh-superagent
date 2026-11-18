@@ -54,7 +54,11 @@ it('saves the Eval block on the Policy settings and the Executor with its execut
     'worker-model'); await type(effort as HTMLInputElement, 'high')
   expect([...document.querySelectorAll('#dt-worker-model-efforts option')].map(option => option.getAttribute('value'))).toEqual(['high'])
   await click(zh.save)
+<<<<<<< HEAD
   expect(server.settings.executor).toEqual({ maxWorkers: 5, lengthContinuations: 0, directory: '/srv/work',
+=======
+  expect(server.settings.executor).toEqual({ maxWorkers: 5, verify: '', directory: '/srv/work',
+>>>>>>> d4f9455f7c5e6bad0a71bc5776f064cf28932aa7
     prepare: 'git worktree add "$DSH_SUPERAGENT_DIR"', blockedCommands: ['gh-personal', 'gh.other'], commandPolicy: DEFAULT_COMMAND_POLICY,
     model: { provider: 'worker-provider',
       model: 'worker-model', reasoningEffort: 'high' }, watchdogMinutes: 30, watchdogStallMinutes: 45, watchdogGuidance: '', routerShards: 1 })
