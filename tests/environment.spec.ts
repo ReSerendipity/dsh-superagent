@@ -16,6 +16,14 @@ import { gitEnv } from './fixtures/git.ts'
 // (batch shims, GH_CONFIG_DIR) and tests/windows-port.spec.ts covers that shape instead.
 const WINDOWS = process.platform === 'win32'
 
+it('refuses lossy verification captures while preserving the default worker capture behaviour', async () => {
+  const subprocess = { spawn: () => ({ done: Promise.resolve({ exitCode: 0 }),
+    collected: { stdout: { readFrom: () => ({ text: 'partial', nextOffset: 100, lossy: true }) } } }) } as unknown as SubprocessRuntime
+  const signal = new AbortController().signal
+  await expect(runAsWorker(subprocess, ['git', 'ls-files'], '.', signal, undefined, true)).rejects.toThrow('capture limit')
+  expect(await runAsWorker(subprocess, ['git', 'ls-files'], '.', signal)).toBe('partial')
+})
+
 // Git and shell subprocesses can exceed the 5s default timeout when the test suite runs in parallel.
 vi.setConfig({ testTimeout: 30_000 })
 const exec = promisify(execFile)

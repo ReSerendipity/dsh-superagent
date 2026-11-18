@@ -1,4 +1,4 @@
-import { S as $strip, _ as output, b as $loose, c as ZodObject, d as ZodRecord, f as ZodString, g as ZodUnknown, i as ZodEnum, l as ZodOptional, m as ZodType, n as ZodBoolean, o as ZodNullable, p as ZodTransform, r as ZodDefault, s as ZodNumber, t as ZodArray, u as ZodPipe, v as $ZodTypeInternals, x as $strict, y as $catchall } from "./schemas-lx-F2nnt.js";
+import { S as $strip, _ as output, b as $loose, c as ZodObject, d as ZodRecord, f as ZodString, g as ZodUnknown, i as ZodEnum, l as ZodOptional, m as ZodType, n as ZodBoolean, o as ZodNullable, p as ZodTransform, r as ZodDefault, s as ZodNumber, t as ZodArray, u as ZodPipe, v as $ZodTypeInternals, x as $strict, y as $catchall } from "./schemas-DDhxJeHQ.js";
 import { F as Thread, I as ThreadFact, R as ThreadRef, S as ChannelRef, U as Trigger, h as SourceScope, l as OutboundMessage, lt as Deployment, m as ScopeResult, t as ReceiveResult, v as AdmissionCell, z as Ticket } from "./intake-EWdHxzA3.js";
 import { Context } from "@deepseek-ai/cordis";
 import { DatabaseSync } from "node:sqlite";
@@ -121,6 +121,7 @@ declare const SettingsSchema: ZodObject<{
     maxWorkers: ZodDefault<ZodNumber>;
     directory: ZodDefault<ZodString>;
     prepare: ZodDefault<ZodString>;
+    verify: ZodDefault<ZodString>;
     blockedCommands: ZodDefault<ZodArray<ZodString>>;
     commandPolicy: ZodDefault<ZodObject<{
       enforce: ZodDefault<ZodBoolean>;
@@ -269,6 +270,7 @@ declare class SourceRegistry implements SourceScope {
       maxWorkers: number;
       directory: string;
       prepare: string;
+      verify: string;
       blockedCommands: string[];
       commandPolicy: {
         enforce: boolean;
@@ -363,6 +365,7 @@ declare class SourceRegistry implements SourceScope {
       maxWorkers: number;
       directory: string;
       prepare: string;
+      verify: string;
       blockedCommands: string[];
       commandPolicy: {
         enforce: boolean;
@@ -469,6 +472,7 @@ declare class SourceRegistry implements SourceScope {
       maxWorkers: number;
       directory: string;
       prepare: string;
+      verify: string;
       blockedCommands: string[];
       commandPolicy: {
         enforce: boolean;
@@ -570,6 +574,7 @@ declare class SourceRegistry implements SourceScope {
       maxWorkers: number;
       directory: string;
       prepare: string;
+      verify: string;
       blockedCommands: string[];
       commandPolicy: {
         enforce: boolean;
@@ -667,6 +672,7 @@ declare class SourceRegistry implements SourceScope {
       maxWorkers: number;
       directory: string;
       prepare: string;
+      verify: string;
       blockedCommands: string[];
       commandPolicy: {
         enforce: boolean;
@@ -777,6 +783,7 @@ declare class SourceRegistry implements SourceScope {
       maxWorkers: number;
       directory: string;
       prepare: string;
+      verify: string;
       blockedCommands: string[];
       commandPolicy: {
         enforce: boolean;
@@ -872,6 +879,7 @@ declare class SourceRegistry implements SourceScope {
       maxWorkers: number;
       directory: string;
       prepare: string;
+      verify: string;
       blockedCommands: string[];
       commandPolicy: {
         enforce: boolean;

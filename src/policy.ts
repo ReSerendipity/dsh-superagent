@@ -102,6 +102,8 @@ export const ExecutorConfigSchema = z.object({
   maxWorkers: z.number().int().min(LIMITS.maxWorkers.min).max(LIMITS.maxWorkers.max).default(3),
   directory: z.string().trim().refine(path => path === '' || ABSOLUTE_PATH.test(path), 'An absolute path, or empty for <stateDir>/work').default(''),
   prepare: z.string().max(LIMITS.prepareCommand).default(''),
+  /** Operator-owned verification command; empty preserves the existing report flow. */
+  verify: z.string().max(LIMITS.prepareCommand).default(''),
   blockedCommands: z.array(CommandNameSchema).default([]),
   // Record-only by default: rules are evaluated and audited; nothing is blocked until `enforce` is turned on.
   commandPolicy: CommandPolicySchema.default(DEFAULT_COMMAND_POLICY),

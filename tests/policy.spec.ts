@@ -255,7 +255,7 @@ describe('settings migration', () => {
       sources: { feishu: feishuSource({ chats: [{ chatId: CHAT, listen: 'mentions' }, { chatId: OBSERVED, listen: 'all' }], directMessages: false }), github: { enabled: true, config: { pollSeconds: 120 } } },
       policy: { rules: [], sources: { feishu: { allowed: [{ id: MEMBER, name: 'A' }], admission: {} }, github: { allowed: [{ id: 'a' }], admission: {} } } },
       eval: { mode: 'auto', timeoutSeconds: 90, model: { provider: 'p', model: 'm' } },
-      executor: { model: null, maxWorkers: 5, directory: '', prepare: '', blockedCommands: [], commandPolicy: DEFAULT_COMMAND_POLICY,
+      executor: { model: null, maxWorkers: 5, directory: '', prepare: '', verify: '', blockedCommands: [], commandPolicy: DEFAULT_COMMAND_POLICY,
         watchdogMinutes: 30, watchdogStallMinutes: 45, watchdogGuidance: '', routerShards: 1 },
       chatRouter: { enabled: false, scope: 'allNewChats', tools: { preset: 'standard', allow: [] }, forceDispatch: true,
         worker: { preset: 'standard', maxParallel: 3 }, reply: { mode: 'brief', onProgress: false }, team: { roles: [] } },
