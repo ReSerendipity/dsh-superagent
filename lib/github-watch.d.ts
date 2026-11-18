@@ -1,2 +1,3 @@
-import { a as Retry, c as inject, d as pollRound, f as pollThreads, h as commentTrigger, i as GithubConfig, l as name, m as GithubComment, o as apply, p as pollTicketPulls, s as githubKind, u as pollFailure } from "./kind-k2Vol02W.js";
+/** GitHub source kind definition, notification and repository polling loops, and Cordis plugin entry. */
+import { a as Retry, c as inject, d as pollRound, f as pollThreads, h as commentTrigger, i as GithubConfig, l as name, m as GithubComment, o as apply, p as pollTicketPulls, s as githubKind, u as pollFailure } from "./kind-Lg2vGmIC.js";
 export { type GithubComment, GithubConfig, Retry, apply, commentTrigger, githubKind, inject, name, pollFailure, pollRound, pollThreads, pollTicketPulls };
