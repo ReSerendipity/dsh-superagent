@@ -89,7 +89,7 @@ function ProblemLine({ problem, onChanged }: { problem: Problem; onChanged: () =
  * The in-app way to ask for work: the panel writes an ordinary inbox file, so a person who never leaves
  * DeepSeek Harness still dispatches through the same Source path as a dropped .md.
  */
-function DispatchCard({ inputRef }: { inputRef?: RefObject<HTMLInputElement> }) {
+function DispatchCard({ inputRef }: { inputRef?: RefObject<HTMLInputElement | null> }) {
   const { t, call } = usePanel()
   const [title, setTitle] = useState('')
   const [detail, setDetail] = useState('')
