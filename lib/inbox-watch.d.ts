@@ -1,10 +1,6 @@
 import { _ as output, c as ZodObject, f as ZodString, r as ZodDefault, s as ZodNumber, x as $strict } from "./schemas-lx-F2nnt.js";
 import { U as Trigger, l as OutboundMessage } from "./intake-EWdHxzA3.js";
-<<<<<<< HEAD
-import { n as SourceKind, r as SourceContext, t as DeliveredMessage } from "./kind-BTl0L41g.js";
-=======
-import { n as SourceKind, r as SourceContext, t as DeliveredMessage } from "./kind-CUegIPoP.js";
->>>>>>> d4f9455f7c5e6bad0a71bc5776f064cf28932aa7
+import { n as SourceKind, r as SourceContext, t as DeliveredMessage } from "./kind-k2Vol02W.js";
 import { Context } from "@deepseek-ai/cordis";
 //#region src/sources/inbox.d.ts
 /**
