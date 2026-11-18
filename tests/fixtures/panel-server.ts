@@ -309,6 +309,7 @@ const ticketOf = (id: string) =>
 const SourceSave = z.object({ enabled: z.boolean(), config: z.unknown() })
 
 const ROUTES: { [K in keyof Api]: Route<K> } = {
+  'GET tickets/:id/diagnostic': { answer: () => refuse(404, 'Diagnostic export is not simulated by the panel fixture') },
   'GET state': { answer: stateView },
   'GET overview': { answer: overviewView },
   'GET search': { query: ['q'], answer: async ({ query }) => {

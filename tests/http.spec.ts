@@ -25,6 +25,17 @@ function serve(runtime: Partial<Record<keyof HttpHost, unknown>>, host = '127.0.
   }
 }
 
+it('serves the diagnostic through existing loopback checks and returns 404 for an unknown ticket', async () => {
+  const call = serve({ store: { tickets: { get: (id: string) => id === 't1' ? {
+    id, title: 'PRIVATE_CANARY', assignments: [], inputs: [], undelivered: [], channels: [],
+  } : undefined } } })
+  expect(await call('GET', 'tickets/missing/diagnostic')).toMatchObject({ status: 404 })
+  const result = await call('GET', 'tickets/t1/diagnostic')
+  expect(result).toMatchObject({ status: 200, body: { schema: 'dsh-superagent-diagnostic/v1', inputCount: 0 } })
+  expect(JSON.stringify(result)).not.toContain('PRIVATE_CANARY')
+  expect(await call('GET', 'tickets/t1/diagnostic', undefined, { origin: 'http://untrusted.example' })).toMatchObject({ status: 403 })
+})
+
 it('answers each kind of failure with its own status', async () => {
   const saves: unknown[] = []
   const call = serve({
