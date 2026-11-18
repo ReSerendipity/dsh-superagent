@@ -1496,71 +1496,6 @@ it('relays the status-request hint when a worker\'s turn ends with no text and n
     summary: expect.stringContaining('orchestrator_ticket_request_status') })
 })
 
-describe('bounded worker length continuation', () => {
-  const configure = (count: number) => {
-    const settings = runtime.store.settings()
-    runtime.store.saveSettings({ ...settings, executor: { ...settings.executor, lengthContinuations: count } })
-  }
-  const end = (sessionId: string, seq: number, reason = 'max-tokens') => {
-    const agent = agents.get(sessionId)!
-    agent.inbox.nextTurn.length = 0; agent.inbox.nextStep.length = 0; agent.status = 'idle'
-    ;(runtime as unknown as { ctx: Context }).ctx.emit('session/event', { id: sessionId } as never,
-      { type: 'turn/end', seq, data: { turn: seq, reason: { kind: reason } } } as never)
-  }
-  it('keeps defaults off and ignores non-length endings when enabled', async () => {
-    const { sessionId } = await acceptedTicket()
-    deliveries.mockClear(); end(sessionId, 1); await runtime.effects.idle()
-    configure(2); end(sessionId, 2, 'completed'); await runtime.effects.idle()
-    end(sessionId, 3, 'aborted'); await runtime.effects.idle()
-    expect(deliveries).not.toHaveBeenCalled()
-  })
-  it('continues the same assignment at most twice and deduplicates the event', async () => {
-    configure(2)
-    const { ticket, sessionId } = await acceptedTicket(), assignment = ticket.assignments.at(-1)!.id
-    deliveries.mockClear(); end(sessionId, 10); end(sessionId, 10)
-    await runtime.effects.idle()
-    expect(deliveries.mock.calls.filter(([call]) => call.sessionId === sessionId)).toHaveLength(1)
-    expect(runtime.store.get(KV.executor.length(assignment))).toEqual({ count: 1, seq: 10 })
-    end(sessionId, 11); await runtime.effects.idle()
-    end(sessionId, 12); await runtime.effects.idle()
-    expect(deliveries.mock.calls.filter(([call]) => call.sessionId === sessionId)).toHaveLength(2)
-    expect(runtime.store.tickets.get(ticket.id)!.assignments.map(item => item.id)).toEqual([assignment])
-    expect(controller.create.mock.calls.filter(([options]) => options.sessionId === sessionId)).toHaveLength(1)
-  })
-  it('waits while paused and drops a continuation after the ticket is stopped', async () => {
-    configure(1)
-    const { ticket, sessionId } = await acceptedTicket()
-    runtime.store.saveSettings({ ...runtime.store.settings(), paused: true })
-    deliveries.mockClear(); end(sessionId, 20); await runtime.effects.idle()
-    expect(deliveries).not.toHaveBeenCalled()
-    runtime.engine.stopTicket(ticket.id)
-    runtime.store.saveSettings({ ...runtime.store.settings(), paused: false })
-    await runtime.effects.idle()
-    expect(deliveries).not.toHaveBeenCalled()
-  })
-  it('does not wake a worker after its ready report', async () => {
-    configure(1)
-    const { sessionId } = await acceptedTicket()
-    await runTool(sessionId, 'orchestrator_report', { state: 'ready', summary: 'Finished' })
-    deliveries.mockClear(); end(sessionId, 30); await runtime.effects.idle()
-    expect(deliveries).not.toHaveBeenCalled()
-  })
-  it.each(['new-input', 'human-question', 'disabled', 'queued-session'])('suppresses a queued continuation for %s', async reason => {
-    configure(1)
-    const { ticket, sessionId } = await acceptedTicket()
-    runtime.store.saveSettings({ ...runtime.store.settings(), paused: true })
-    end(sessionId, 40)
-    const current = runtime.store.tickets.get(ticket.id)!
-    if (reason === 'new-input') runtime.store.tickets.save({ ...current,
-      inputs: [...current.inputs, { id: 'new', kind: 'text', at: '', text: 'Superseding request' }] })
-    if (reason === 'human-question') runtime.store.tickets.save({ ...current, attention: { id: 'q', question: 'Need a person' } })
-    if (reason === 'disabled') configure(0)
-    if (reason === 'queued-session') agents.get(sessionId)!.inbox.nextTurn.push({ id: 'person', content: [], source: { kind: 'user' } } as never)
-    deliveries.mockClear()
-    runtime.store.saveSettings({ ...runtime.store.settings(), paused: false })
-    await runtime.effects.idle()
-    expect(deliveries.mock.calls.filter(([call]) => call.sessionId === sessionId)).toHaveLength(0)
-  })
 it('gates ready on host verification when configured, and keeps reports unchanged on refusal', async () => {
   const settings = runtime.store.settings()
   runtime.store.saveSettings({ ...settings, executor: { ...settings.executor, verify: 'fixture-check' } })
@@ -1572,3 +1507,389 @@ it('gates ready on host verification when configured, and keeps reports unchange
   expect(runtime.store.tickets.get(ticket.id)!.assignments.at(-1)!.report).toEqual(before)
   expect(await runTool(sessionId, 'orchestrator_verify', {})).toMatchObject({ verified: true })
   expect(await runTool(sessionId, 'orchestrator_report', { state: 'ready', summary: 'Checked' })).toMatchObject({ reported: true })
+})
+
+it('fails a ticket at once on a worker error that is not passing, and relays it', async () => {
+  const { ticket, sessionId } = await acceptedTicket()
+  ;(runtime as unknown as { ctx: Context }).ctx.emit('agent/error', { agent: agents.get(sessionId), turn: 1, step: 1, error: new Error('Invalid tool schema') } as never)
+  await vi.waitFor(() => expect(runtime.store.tickets.get(ticket.id)!.assignments.at(-1)!.report).toMatchObject({ state: 'failed', summary: expect.stringContaining('Invalid tool schema') }))
+  expect(relays(runtime.masterId).at(-1)).toMatchObject({ kind: 'worker_report', ticket: { ticket_id: ticket.id }, state: 'failed' })
+})
+
+it('refuses the main Session a bash command that runs sleep and a long job wait, as reports arrive by themselves, and no worker', async () => {
+  const bash = (command: string) => ({ name: 'bash', arguments: { command, description: 'x' } })
+  const main = guards.get(runtime.masterId)!
+  for (const command of ['sleep 60; echo done', 'cd x && sleep 5', 'gh pr checks 7 || sleep 30', 'echo a\nsleep 90', 'while true; do sleep 30; done',
+    '(sleep 5)', '/bin/sleep 240', 'while sleep 30; do gh pr checks 7; done', 'if sleep 5; then gh pr view 7; fi', '{ sleep 60; }', '! sleep 5',
+    'nohup sleep 60', 'exec sleep 60', 'time sleep 60', 'until sleep 1; do :; done', 'command sleep 5', 'env sleep 5'])
+    expect(main(bash(command)), command).toMatch(/^Reports, follow_up notices, new candidates and a background job's end/)
+  // A command that names sleep as data, not at a command position, runs.
+  for (const command of ['gh api repos/acme/widgets/pulls', 'echo "sleep"', 'grep sleep file', 'sleeper --help', 'command -v sleep'])
+    expect(main(bash(command)), command).toBeUndefined()
+  // A command that asks to hold the step longer than 30 seconds, however it waits, under any preset.
+  const timed = (command: string, args: { timeoutMs?: number; run_in_background?: boolean } = {}) =>
+    ({ name: 'bash', arguments: { command, description: 'x', ...args } })
+  expect(main(timed('gh api repos/acme/widgets/pulls', { timeoutMs: 120_000 }))).toMatch(/^Reports/)
+  expect(main(timed("python3 -c 'import time;time.sleep(240)'", { timeoutMs: 600_000 }))).toMatch(/^Reports/)
+  expect(main(timed('gh api repos/acme/widgets/pulls', { timeoutMs: 20_000 }))).toBeUndefined()
+  // Under the router preset, the shell moves a command without a timeout to a background job after 5 seconds, and a job
+  // wait without one ends after 5 seconds too; a longer job wait waits for nothing that arrives that way.
+  expect(main(timed('gh pr checks 7 --watch'))).toBeUndefined()
+  expect(main({ name: 'job_output', arguments: { job_id: 'j', wait: true } })).toBeUndefined()
+  expect(main({ name: 'job_output', arguments: { job_id: 'j', wait: true, timeout_ms: 30_000 } })).toMatch(/^Reports/)
+  expect(main({ name: 'job_output', arguments: { job_id: 'j', wait: true, timeout_ms: 5_000 } })).toBeUndefined()
+  expect(main({ name: 'job_output', arguments: { job_id: 'j' } })).toBeUndefined()
+  // A main Session created before runs under standard, whose shell waits 60 seconds by default and whose job waits last 30:
+  // a command without a timeout runs in the background or names one, and a job wait names one.
+  ;(agents.get(runtime.masterId) as unknown as { session: { header: { agentPreset: string } } }).session.header = { agentPreset: 'standard' }
+  expect(main(timed('gh pr checks 7 --watch'))).toMatch(/^This shell waits up to 60 seconds by default: pass timeoutMs of at most 30000/)
+  expect(main(timed('gh pr checks 7 --watch', { run_in_background: true }))).toBeUndefined()
+  expect(main(timed('gh api repos/acme/widgets/pulls', { timeoutMs: 20_000 }))).toBeUndefined()
+  expect(main({ name: 'job_output', arguments: { job_id: 'j', wait: true } })).toMatch(/^Reports/)
+  expect(main({ name: 'job_output', arguments: { job_id: 'j', wait: true, timeout_ms: 5_000 } })).toBeUndefined()
+  // A worker waits for its own work as it needs.
+  const { sessionId } = await acceptedTicket()
+  expect(guards.get(sessionId)!(bash('sleep 60'))).toBeUndefined()
+  // The main Session's role says so.
+  expect(masterPrompt).toContain('Worker reports, follow_up notices, new candidates and a background job\'s end, with its output, arrive by themselves as messages')
+})
+
+it('reads the main Session\'s preset from a registry with or without presetForSession, and takes standard\'s caps when it cannot', async () => {
+  const watch = { name: 'bash', arguments: { command: 'gh pr checks 7 --watch', description: 'x' } }
+  const route = { name: 'orchestrator_route', arguments: { decisions: [] } }
+  const guard = async (registry: Record<string, unknown>, projections?: Record<string, unknown>) => {
+    services.agentPresets = registry
+    if (projections) services.sessionProjections = projections; else delete services.sessionProjections
+    await (await restart()).ready
+    return guards.get(runtime.masterId)!
+  }
+  // A released DSH's registry has no presetForSession: the projection says standard, so standard's caps apply, and the
+  // other tools run.
+  let main = await guard({ select: vi.fn() }, { stateOf: vi.fn((_session: unknown, key: string) => key === 'agentPreset' ? 'standard' : undefined) })
+  expect(main(route)).toBeUndefined()
+  expect(main(watch)).toMatch(/^This shell waits up to 60 seconds by default/)
+  // Without the projection either, the preset it was created with counts: the router preset.
+  main = await guard({ select: vi.fn() })
+  expect([main(route), main(watch)]).toEqual([undefined, undefined])
+  // The registry says standard though the Session was created with the router preset: standard's caps apply.
+  main = await guard({ select: vi.fn(), presetForSession: () => 'standard' })
+  expect(main(watch)).toMatch(/^This shell waits up to 60 seconds by default/)
+  // A registry that fails is read as standard, the safer caps, and the guard does not throw.
+  main = await guard({ select: vi.fn(), presetForSession: () => { throw new Error('no projection') } })
+  expect(main(route)).toBeUndefined()
+  expect(main(watch)).toMatch(/^This shell waits up to 60 seconds by default/)
+})
+
+it('refuses an ended ticket\'s worker its tools, and restricts the main Session to the tools it may use', async () => {
+  const { ticket, sessionId } = await acceptedTicket()
+  expect(guards.get(sessionId)!()).toBeUndefined()
+  runtime.engine.stopTicket(ticket.id)
+  expect(guards.get(sessionId)!()).toBe('Ticket ended; new work needs a new authorized ticket')
+  expect(restricts.get(runtime.masterId)).toEqual([{ allow: ['skill', 'bash', 'read', 'read_image', 'job_output', 'job_list', 'job_kill'] }])
+  // A worker keeps only the profile's work tools: none that ask a person, change the profile, schedule or start work outside
+  // the worker slots, reach other Sessions or edit documents, whenever they were registered.
+  expect(restricts.get(sessionId)).toEqual([{ allow: ['read', 'read_image', 'grep', 'bash', 'job_output', 'job_list', 'job_kill', 'web_search', 'skill'] }])
+})
+
+it('gives an explicit ticket\'s worker a prompt without the limits of an inferred Mandate', async () => {
+  const { sessionId } = await acceptedTicket()
+  await runtime.idle()
+  expect(sections.get(sessionId)!.text({})).not.toContain(mandateInstructions({ strength: 'inferred' }))
+})
+
+it.skipIf(WINDOWS)('runs a launch that fails for a passing reason again on the launch backoff three times, then fails its ticket; a failed prepare fails at once', async () => {
+  const original = controller.resolveAgent.getMockImplementation()! as (id: string) => Promise<unknown>
+  const later = async (now: number) => {
+    vi.useFakeTimers({ toFake: ['Date'], now })
+    try { await runtime.pump(); await runtime.idle() } finally { vi.useRealTimers() }
+  }
+  for (const [index, error] of [Object.assign(new Error('Service Unavailable'), { status: 503 }), Object.assign(new Error('read ECONNRESET'), { code: 'ECONNRESET' })].entries()) {
+    let tries = 0
+    controller.resolveAgent.mockImplementation(async (id: string) => {
+      if (String(id).startsWith('worker-')) { tries++; throw error }
+      return original(id)
+    })
+    const { ticket } = await acceptedTicket(feishu(String(30 + index), `@bot 修 ${index}`, { root_id: undefined }))
+    await runtime.idle()
+    let now = Date.now()
+    for (let attempt = 0; attempt < 3; attempt++) {
+      expect(runtime.store.tickets.get(ticket.id)!.assignments.at(-1)!.report).toBeUndefined()
+      now += 5000 * 2 ** attempt + 1000
+      await later(now)
+    }
+    expect(tries).toBe(4)
+    expect(runtime.store.tickets.get(ticket.id)!.assignments.at(-1)!.report).toMatchObject({ state: 'failed' })
+    controller.resolveAgent.mockImplementation(original)
+  }
+  // A prepare command whose output names a passing failure is not run again on its own.
+  const runs = () => subprocess.spawn.mock.calls.filter(([spec]) => (spec as { argv: string[] }).argv[0] === PREPARE_SHELL).length
+  runtime.store.saveSettings({ ...runtime.store.settings(), executor: { ...runtime.store.settings().executor, prepare: 'exit 3' } })
+  answers['sh -c exit 3'] = new Error('fatal: unable to access: The requested URL returned error: 503')
+  const before = runs()
+  const prepared = await acceptedTicket(feishu('40', '@bot 修 prepare', { root_id: undefined }))
+  await runtime.idle()
+  expect(runtime.store.tickets.get(prepared.ticket.id)!.assignments.at(-1)!.report).toMatchObject({ state: 'failed', summary: expect.stringContaining('503') })
+  expect(runs()).toBe(before + 1)
+  // A retry runs the prepare command again, for the directory it left empty was removed; resuming relaunches no failed launch.
+  delete answers['sh -c exit 3']
+  runtime.executor.resume()
+  await runtime.idle()
+  expect(runs()).toBe(before + 1)
+  runtime.engine.retryTicket(prepared.ticket.id)
+  await runtime.idle()
+  expect(runs()).toBe(before + 2)
+  expect(runtime.store.tickets.get(prepared.ticket.id)!.assignments.at(-1)).toMatchObject({ state: 'running' })
+})
+
+it.skipIf(WINDOWS)('launches a queued Assignment once when the host resumes, and gives a failed launch\'s slot back', async () => {
+  runtime.store.saveSettings({ ...runtime.store.settings(), executor: { ...runtime.store.settings().executor, maxWorkers: 1, prepare: 'exit 3' } })
+  answers['sh -c exit 3'] = new Error('fatal: no such clone')
+  const failed = await acceptedTicket(feishu('50', '@bot 修 一', { root_id: undefined }))
+  await runtime.idle()
+  expect(runtime.store.tickets.get(failed.ticket.id)!.assignments.at(-1)!.report).toMatchObject({ state: 'failed' })
+  // The failed launch holds no slot: the next ticket launches in the only one.
+  delete answers['sh -c exit 3']
+  const next = await acceptedTicket(feishu('51', '@bot 修 二', { root_id: undefined }))
+  await runtime.idle()
+  expect(runtime.store.tickets.get(next.ticket.id)!.assignments.at(-1)).toMatchObject({ state: 'running' })
+  // A third waits for the slot; resuming queues its launch again, which runs once the slot frees.
+  const queued = await acceptedTicket(feishu('52', '@bot 修 三', { root_id: undefined }))
+  await runtime.idle()
+  expect(runtime.store.tickets.get(queued.ticket.id)!.assignments.at(-1)).toMatchObject({ state: 'pending' })
+  runtime.executor.resume(); runtime.executor.resume()
+  const launches = () => deliveries.mock.calls.filter(([call]) => call.sessionId === queued.sessionId).length
+  ;(agents.get(next.sessionId)! as { status: string }).status = 'idle'
+  await runtime.pump(); await runtime.idle()
+  await vi.waitFor(() => expect(runtime.store.tickets.get(queued.ticket.id)!.assignments.at(-1)).toMatchObject({ state: 'running' }))
+  expect(launches()).toBe(1)
+})
+
+it('shows the settings history when one revision holds values its Source kind no longer accepts, without that revision\'s changes', async () => {
+  const settings = runtime.store.settings()
+  await runtime.settings.save('executor', { ...settings.executor, maxWorkers: 4 }, runtime.store.blockRevision('executor'), 'panel')
+  await runtime.settings.save('executor', { ...runtime.store.settings().executor, maxWorkers: 5 }, runtime.store.blockRevision('executor'), 'panel')
+  // A revision the migration left as an earlier version wrote it, which the Feishu kind's schema rejects.
+  const revision = runtime.store.get(KV.settings.revision)!
+  const stored = runtime.store.get(KV.settings.version(revision - 1))!
+  runtime.store.set(KV.settings.version(revision - 1), { ...stored, settings: { ...stored.settings,
+    sources: { ...stored.settings.sources, feishu: { enabled: true, config: { readPageSize: 'many' } } } } })
+  const history = policyHistory(runtime.store, runtime.sources, policyVersion(runtime.store.settings()))
+  expect(history.items.slice(0, 2)).toEqual([expect.objectContaining({ revision, changes: null }), expect.objectContaining({ revision: revision - 1, changes: null })])
+  expect(history.items[2]).toMatchObject({ revision: revision - 2 })
+})
+
+it('restarts a worker whose shell job the host stop ended with the recovery note, as a worker mid-work', async () => {
+  const { ticket, sessionId } = await acceptedTicket()
+  await runTool(sessionId, 'orchestrator_report', { state: 'progress', summary: 'running the tests' })
+  // Its turn ended with a test run in the background, so it is busy, not waiting.
+  jobs.run(sessionId)
+  const agent = agents.get(sessionId)! as { status: string }
+  agent.status = 'idle'
+  ;(runtime as unknown as { ctx: Context }).ctx.emit('agent/status', { agent, status: 'idle' } as never)
+  await runtime.idle()
+  expect(runtime.store.tickets.get(ticket.id)!.assignments.at(-1)!.report).toMatchObject({ state: 'progress' })
+  // The host stops, and its jobs end with it.
+  jobs = jobRegistry(); services.jobs = jobs.service
+  const next = await restart()
+  await next.ready
+  const recovered = next.store.tickets.get(ticket.id)!
+  expect(recovered.assignments.map(item => item.state)).toEqual(['ended', expect.stringMatching(/^(pending|running)$/)])
+  expect(recovered.inputs).toEqual([expect.objectContaining({ kind: 'text', text: expect.stringContaining('host restarted') })])
+})
+
+it('creates an Executor Session under the bundle\'s worker preset, and the main Session under its router preset', async () => {
+  const { sessionId } = await acceptedTicket()
+  const created = controller.create.mock.calls.map(([options]) => options as { sessionId: string; agentPreset: string })
+  expect(created.find(options => options.sessionId === sessionId)).toMatchObject({ agentPreset: 'dsh-superagent-worker' })
+  expect(created.find(options => options.sessionId === runtime.masterId)).toMatchObject({ agentPreset: 'dsh-superagent-router' })
+})
+
+it('selects its own preset again for a main Session or worker a person switched before its first turn, and not after it', async () => {
+  const { sessionId } = await acceptedTicket()
+  // DSH's preset registry, which takes a selection only before a Session's first turn.
+  const started = new Set<string>()
+  const presets = { select: vi.fn(async (agent: { id: string }, preset: string) => {
+    if (started.has(agent.id)) throw Object.assign(new Error('This session has already started'), { code: 'agent-preset/locked' })
+    return preset
+  }) }
+  services.agentPresets = presets
+  await (await restart()).ready
+  const emit = (sessionId: string, preset: string) => (runtime as unknown as { ctx: Context }).ctx.emit('agent-preset/selected', sessionId, preset)
+  // A person opened the blank main Session in DSH's Web UI, which selected the default preset for it.
+  emit(runtime.masterId, 'standard')
+  await vi.waitFor(() => expect(presets.select).toHaveBeenCalledWith(agents.get(runtime.masterId), 'dsh-superagent-router'))
+  // Its own preset, which that selection announces the same way, is left alone.
+  presets.select.mockClear()
+  emit(runtime.masterId, 'dsh-superagent-router'); await Promise.resolve()
+  expect(presets.select).not.toHaveBeenCalled()
+  emit(sessionId, 'standard')
+  await vi.waitFor(() => expect(presets.select).toHaveBeenCalledWith(agents.get(sessionId), 'dsh-superagent-worker'))
+  // Another Session is not one of dsh-superagent's.
+  presets.select.mockClear()
+  emit('someone-else', 'standard'); emit('worker-nothing', 'standard'); await Promise.resolve()
+  expect(presets.select).not.toHaveBeenCalled()
+  // After its first turn the registry refuses any selection, which changes nothing and is not an error.
+  started.add(runtime.masterId)
+  emit(runtime.masterId, 'standard')
+  await vi.waitFor(() => expect(presets.select).toHaveBeenCalledTimes(1))
+  await expect(presets.select.mock.results[0]!.value).rejects.toMatchObject({ code: 'agent-preset/locked' })
+})
+
+it('gives a subagent of a worker only the worker\'s work tools, and none once the ticket ended', async () => {
+  const { ticket, sessionId } = await acceptedTicket()
+  // DSH creates the subagent under the standard preset, with the worker's Session as its parent.
+  await (controller.create as (options: { sessionId: string }) => Promise<void>)({ sessionId: 'child-1' })
+  const child = agents.get('child-1')! as unknown as { session: { header: { parentSession?: string } } }
+  child.session.header = { parentSession: sessionId }
+  await (runtime as unknown as { ctx: Context }).ctx.parallel('agent/created', { agent: child } as never)
+  expect(restricts.get('child-1')).toEqual([{ allow: ['read', 'read_image', 'grep', 'bash', 'job_output', 'job_list', 'job_kill', 'web_search', 'skill'] }])
+  expect(guards.get('child-1')!()).toBeUndefined()
+  runtime.engine.stopTicket(ticket.id)
+  expect(guards.get('child-1')!()).toBe('Ticket ended; new work needs a new authorized ticket')
+  // Another Session's subagent is left as it is.
+  await (controller.create as (options: { sessionId: string }) => Promise<void>)({ sessionId: 'child-2' })
+  const other = agents.get('child-2')! as unknown as { session: { header: { parentSession?: string } } }
+  other.session.header = { parentSession: 'someone-else' }
+  await (runtime as unknown as { ctx: Context }).ctx.parallel('agent/created', { agent: other } as never)
+  expect(restricts.get('child-2')).toBeUndefined()
+})
+
+it('gives a subagent of a worker\'s subagent the same work tools and guard', async () => {
+  const { ticket, sessionId } = await acceptedTicket()
+  const create = controller.create as (options: { sessionId: string }) => Promise<void>
+  const created = (runtime as unknown as { ctx: Context }).ctx
+  for (const [id, parent] of [['child-1', sessionId], ['grandchild-1', 'child-1']] as const) {
+    await create({ sessionId: id })
+    const agent = agents.get(id)! as unknown as { session: { header: { parentSession?: string } } }
+    agent.session.header = { parentSession: parent }
+    await created.parallel('agent/created', { agent } as never)
+  }
+  expect(restricts.get('grandchild-1')).toEqual([{ allow: ['read', 'read_image', 'grep', 'bash', 'job_output', 'job_list', 'job_kill', 'web_search', 'skill'] }])
+  runtime.engine.stopTicket(ticket.id)
+  expect(guards.get('grandchild-1')!()).toBe('Ticket ended; new work needs a new authorized ticket')
+})
+
+it('gives the Assignment a restart starts the messages the replaced one had delivered but no step took, once', async () => {
+  const { ticket, sessionId } = await acceptedTicket()
+  // A follow-up reaches the worker mid-turn, and the process stops before a step took it: DSH disposes the worker's agent
+  // with its inbox.
+  await receive(feishu('2', '另外改一下按钮', { root_id: 'om_1' }))
+  const sent = () => deliveries.mock.calls.filter(([call]) => call.sessionId === sessionId && call.text.includes('另外改一下按钮')).length
+  expect(sent()).toBe(1)
+  const inbox = (agents.get(sessionId)! as unknown as { inbox: { nextTurn: unknown[]; nextStep: unknown[] } }).inbox
+  inbox.nextTurn.length = 0; inbox.nextStep.length = 0
+  const next = await restart()
+  await next.ready; await next.idle()
+  expect(next.store.tickets.get(ticket.id)!.assignments.map(item => item.state)).toEqual(['ended', 'running'])
+  expect(sent()).toBe(2)
+})
+
+it('ends the main Session\'s prompt with its Policy section, each rule on one line, and says orchestrator_eval holds no rules', async () => {
+  const settings = runtime.store.settings()
+  const rules = settings.policy.rules.map(rule => rule.id === 'copy'
+    ? { ...rule, name: 'Copy\nfixes', instruction: 'Fix typos.\n- Keep the tone.\n\n## Not a heading' } : rule)
+  await runtime.settings.save('policy', { ...settings.policy, rules }, runtime.store.blockRevision('policy'), 'panel')
+  const prompt = (sections.get(runtime.masterId)!.text as (context: object) => string)({})
+  const policy = prompt.slice(prompt.indexOf('## Policy'))
+  // Nothing follows the section, whose lines after its head are exactly the enabled rules.
+  expect(policy.trimEnd().split('\n').slice(2)).toEqual(runtime.store.settings().policy.rules.filter(rule => rule.enabled)
+    .map(rule => rule.id === 'copy' ? '- Copy fixes (copy): Fix typos. - Keep the tone. ## Not a heading' : `- ${rule.name} (${rule.id}): ${rule.instruction}`))
+  expect(prompt.indexOf('## Policy')).toBeGreaterThan(prompt.indexOf('Execution environment'))
+  expect((tools.get(runtime.masterId)!.get('orchestrator_eval') as unknown as { description: string }).description).not.toMatch(/rules/)
+})
+
+it('keeps the Policy the main Session judges by in its prompt, after admission and the rest, as the latest save left it', async () => {
+  const prompt = () => (sections.get(runtime.masterId)!.text as (context: object) => string)({})
+  const policy = () => { const text = prompt(), at = text.indexOf('## Policy'); return text.slice(at, text.indexOf('\n\n', at)) }
+  const settings = runtime.store.settings()
+  const line = (rule: { id: string; name: string; instruction: string }) => `- ${rule.name} (${rule.id}): ${rule.instruction}`
+  expect(prompt().indexOf('## Policy')).toBeGreaterThan(prompt().indexOf('Assess proactive candidates yourself'))
+  expect(policy().split('\n').filter(item => item.startsWith('- '))).toEqual(settings.policy.rules.filter(rule => rule.enabled).map(line))
+  expect(policy()).toContain(`Policy version ${policyVersion(settings)}; accept mode ${settings.eval.mode}.`)
+  // The rules govern proactive candidates only; read beside an explicit request, they must not be taken to refuse it.
+  expect(policy()).toContain('The accept mode and the rules decide proactive candidates only: an explicit request is routed as dispatch says, in any mode and whatever the rules.')
+  // A save changes it from the next request: one rule disabled, the other's instruction changed.
+  const rules = settings.policy.rules.map(rule => rule.id === 'copy' ? { ...rule, instruction: `${rule.instruction} Keep it short.` } : { ...rule, enabled: false })
+  await runtime.settings.save('policy', { ...settings.policy, rules }, runtime.store.blockRevision('policy'), 'panel')
+  const saved = runtime.store.settings()
+  expect(policy()).toContain(`Policy version ${policyVersion(saved)}`)
+  expect(policy().split('\n').filter(item => item.startsWith('- '))).toEqual(rules.filter(rule => rule.enabled).map(line))
+  // With no rule enabled, a proactive candidate can only be ignored.
+  await runtime.settings.save('policy', { ...saved.policy, rules: rules.map(rule => ({ ...rule, enabled: false })) }, runtime.store.blockRevision('policy'), 'panel')
+  expect(policy()).toContain('No rule is enabled: a proactive candidate can only be ignored.')
+  expect(policy()).toContain('The accept mode and the rules decide proactive candidates only')
+})
+
+// The in-app way to ask for work: the panel writes an ordinary inbox file, and refuses when no inbox Source is enabled.
+it('writes a panel-dispatched ticket into the inbox Source, and refuses while none is enabled', async () => {
+  const refused = await api('POST', 'tickets', { title: '没有收件目录' })
+  expect(refused.status).toBe(400)
+  const inbox = mkdtempSync(join(tmpdir(), 'panel-dispatch-'))
+  runtime.sources.register(inboxKind)
+  await runtime.settings.save('source:inbox', { kind: 'inbox', enabled: true,
+    config: { inboxDir: inbox, actor: 'local', pollSeconds: 10 } }, runtime.store.blockRevision('source:inbox'), 'panel')
+  const created = await api('POST', 'tickets', { title: '把主按钮改成蓝色', body: '只改颜色，不动布局' })
+  expect(created.status).toBe(200)
+  const file = (created.body as { file: string }).file
+  expect(readdirSync(inbox)).toContain(file)
+  expect(readFileSync(join(inbox, file), 'utf8')).toContain('只改颜色，不动布局')
+})
+
+// A team role chosen at dispatch travels to the worker Session: its model seeds that Session and its instruction joins
+// the worker's system prompt, while an unknown id is refused before any Trigger exists.
+it('carries a dispatched team role into the worker Session, and refuses an unknown role', async () => {
+  const inbox = mkdtempSync(join(tmpdir(), 'team-role-inbox-'))
+  runtime.sources.register(inboxKind)
+  const settings = runtime.store.settings()
+  await runtime.settings.save('chatRouter', { ...settings.chatRouter, enabled: true, team: { roles: [
+    { id: 'reviewer', name: 'Reviewer', instruction: 'Review the change and name every unverified gap.',
+      model: { provider: 'team-fake', model: 'team-review' } }] } }, runtime.store.blockRevision('chatRouter'), 'panel')
+  await runtime.settings.save('source:inbox', { kind: 'inbox', enabled: true,
+    config: { inboxDir: inbox, actor: 'local', pollSeconds: 10 } }, runtime.store.blockRevision('source:inbox'), 'panel')
+  // Admit the inbox Source's local actor, the same policy a person would save for a working inbox Source.
+  const policy = runtime.store.settings().policy
+  await runtime.settings.save('policy', { ...policy, sources: { ...policy.sources,
+    inbox: { allowed: [{ id: 'local', name: 'Local' }] } } }, runtime.store.blockRevision('policy'), 'panel')
+  // An ordinary main chat becomes the chief of staff and learns the roster from its own prompt.
+  await runtime.sessions.ensure('session-chief', join(directory, 'chat'), 'Chat', 'orchestrator')
+  const chief = (sections.get('session-chief')!.text as (context: object) => string)({})
+  expect(chief).toContain('reviewer (Reviewer)')
+  expect(chief).toContain('Review the change and name every unverified gap.')
+
+  // An unknown role fails that task only, before anything is stored: no silent fallback to a default worker.
+  const refused = await runTool('session-chief', 'chat_dispatch', { tasks: [{ title: 'Ghost', request: 'Do it', role: 'ghost' }] })
+  expect(refused).toMatchObject({ results: [{ status: 'failed' }] })
+  expect(String((refused.results as { error: string }[])[0]!.error)).toContain('Unknown team role')
+  expect(runtime.store.tickets.list()).toHaveLength(0)
+
+  const dispatched = await runTool('session-chief', 'chat_dispatch', { tasks: [{ title: 'Review the diff',
+    request: 'Review the change in this repository.', role: 'reviewer' }] })
+  expect(dispatched).toMatchObject({ results: [{ status: 'created', role: 'reviewer' }] })
+  const ticketId = String((dispatched.results as { ticket_id: string }[])[0]!.ticket_id)
+  const ticket = runtime.store.tickets.get(ticketId)!
+  const trigger = runtime.store.triggers.get(ticket.origin.triggerId)!
+  expect(trigger.meta).toMatchObject({ role: 'reviewer', roleName: 'Reviewer' })
+  const worker = `worker-${ticketId}`
+  // The fixture records the Session's appended events, which is where the seeded model selection shows up.
+  const events = (agents.get(worker) as unknown as { session: { snapshotEvents: () => { type: string; data: unknown }[] } })
+    .session.snapshotEvents()
+  expect(events).toContainEqual({ type: 'model/selection', data: { provider: 'team-fake', model: 'team-review' } })
+  expect((sections.get(worker)!.text as (context: object) => string)({})).toContain('## Team role: Reviewer')
+  expect((sections.get(worker)!.text as (context: object) => string)({})).toContain('Review the change and name every unverified gap.')
+
+  // A role without a model must keep the executor's model, the same fallback an anonymous worker had: this is the
+  // one seam where a missing value could silently drop the Session to the host default instead of the configured one.
+  await runtime.settings.save('executor', { ...runtime.store.settings().executor,
+    model: { provider: 'exec-fake', model: 'exec-model' } }, runtime.store.blockRevision('executor'), 'panel')
+  await runtime.settings.save('chatRouter', { ...runtime.store.settings().chatRouter, team: { roles: [
+    ...runtime.store.settings().chatRouter.team.roles,
+    { id: 'writer', name: 'Writer', instruction: 'Draft the words a person will read.', model: null }] } },
+  runtime.store.blockRevision('chatRouter'), 'panel')
+  const written = await runTool('session-chief', 'chat_dispatch', { tasks: [{ title: 'Write the note', request: 'Write it.', role: 'writer' }] })
+  expect(written).toMatchObject({ results: [{ status: 'created', role: 'writer' }] })
+  const writerTicket = String((written.results as { ticket_id: string }[])[0]!.ticket_id)
+  const writerEvents = (agents.get(`worker-${writerTicket}`) as unknown as { session: { snapshotEvents: () => { type: string; data: unknown }[] } })
+    .session.snapshotEvents()
+  expect(writerEvents).toContainEqual({ type: 'model/selection', data: { provider: 'exec-fake', model: 'exec-model' } })
+  expect((sections.get(`worker-${writerTicket}`)!.text as (context: object) => string)({})).toContain('## Team role: Writer')
+})

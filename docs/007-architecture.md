@@ -372,6 +372,7 @@ Some generic modules still refer directly to GitHub or Feishu:
 | `src/app/views/settings.ts` | The settings page's view: each block with its revision, each Source's settings with its kind's form, and the execution environment |
 | `src/app/views/overview.ts` | The overview: Tickets that need a person, problems, the last day's flow and the Executor's load |
 | `src/executor/dsh.ts` | The DshExecutor, `WorkerSlots`, `ticketExecution`, `inputMessage` and `mandateInstructions` |
+| `src/executor/verification.ts` | Optional operator-owned checks and persisted ready-report receipts bound to the current assignment, request and Git contents |
 | `src/executor/background.ts` | A worker's background work in DeepSeek Harness, the shell jobs its Session owns (`ctx.jobs`) and its subagents (`ctx.subagents`): `runningJobs`, `untilQuiet`, `killJobs`, `collectJobs`, `stopSubagents`, `stopBackground`, `until`, and `cancelled`, the workers whose turn a stop of their subagents cancelled |
 | `src/executor/local-workspace.ts` | The built-in workspace of a `mode: local` Ticket with no `executor.prepare`: `usesLocalWorkspace` decides (local delivery and a blank command, so `github` is untouched), `localWorkspaceCommands` is the remote-free git sequence (init on `main`, the placeholder identity, an empty base commit, `agent/<name>`), and `initLocalWorkspace` runs it |
 | `src/infra/commands.ts` | `Commands`, the CLI transport: `run`; `api` and `pages`, limited to the configured repository and validated; `lark` as the bot; `git`. `CliError` carries the code a command's output reports, such as a GitHub HTTP status, and a command that prints nothing fails with how it ended, never with its arguments; `validItems` skips and counts the malformed items of a list |
@@ -397,12 +398,8 @@ Some generic modules still refer directly to GitHub or Feishu:
 | `src/sources/feishu-read.ts` | The `feishu/` reads of a Trigger's message, its root, parent and topic, and `feishuThreadContext`, which gives them to assessments with their images |
 | `src/sources/admission-context.ts` | The bounded window an assessment starts from: the first pages of a Trigger's Thread, read through its kind, and the messages around the Trigger |
 | `src/sources/feishu-image.ts` | Reads a Feishu message's image as an attachment for the assessing Session |
-| `src/sources/inbox.ts` | The Mode A inbox kind and plugin entry, exported as `./inbox-watch`: claims task files, admits archived versions as Triggers, and writes reply receipts under `done/` |
-| `src/sources/inbox-files.ts` | Durable single-poller file claims and immutable snapshots; retries retain the admitted version and leave replacement inputs untouched |
 | `src/sources/inbox.ts` | The Mode A inbox kind and plugin entry, exported as `./inbox-watch`: task files in a local directory become Triggers, the archive move is the cursor, and replies append to a file under `done/` |
-<<<<<<< HEAD
-| `src/executor/verification.ts` | Optional operator-owned checks and persisted ready-report receipts bound to the current assignment, request and Git contents |
-=======
+| `src/sources/inbox-files.ts` | Durable single-poller file claims and immutable snapshots; retries retain the admitted version and leave replacement inputs untouched |
 | `src/app/diagnostics.ts` | Explicit allowlist export of ticket lifecycle facts and counts without task text or machine configuration |
 | `src/client/index.tsx` | The client plugin entry: the sidebar entry, the main panel and the page in DeepSeek Harness's Plugin Manager |
 | `src/client/app.tsx` | The panel: header, search, glossary, tabs and the page of the current route |
@@ -493,6 +490,7 @@ Some generic modules still refer directly to GitHub or Feishu:
 | `tests/runtime-concurrency.spec.ts` | Work that overlaps: Triggers during a pass, Tickets that change during deliveries and launches |
 | `tests/http.spec.ts` | The same-origin and loopback checks, the status of each kind of failure, the body limit, path parameters and queries |
 | `tests/diagnostics.spec.ts` | Allowlist diagnostic facts exclude private task content, identifiers, paths and newly added fields |
+| `tests/verification.spec.ts` | Real Git workspaces and commands verify receipt reuse, nonzero exits, source/request changes, denied commands and commit-time guards |
 | `tests/settings.spec.ts` | Settings saves that race a model or account check, a Policy sync that a save outran, and the refusals of the pause, a sync and a block |
 | `tests/views.spec.ts` | What the management views derive from the Store, such as the Thread a dropped message belongs to |
 | `tests/team.spec.ts` | The team board's grouping by role, its live/done/unassigned counts, the eight-ticket cap per card, and the dispatches a deleted role hides |
@@ -697,4 +695,3 @@ Point `DSH_HOME` at a temporary directory and create a new profile there. Copy t
 
 - Trust: which Trigger fields are trusted, such as the Source's actor and Thread membership, and which are not, such as the body and quotes.
 - Deployment isolation: the agent's profile on its own pinned DeepSeek Harness installation, so upgrading DeepSeek Harness elsewhere does not break it.
->>>>>>> 13c4a3b5e63bcc445c8381e7ce5aa46470b4f436
