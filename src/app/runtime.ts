@@ -22,6 +22,8 @@ import { WatchdogLoop, assignmentStates, quietMinutes, stalledIds, watchdogDiges
 import { shardSessionIds, triggerSessionId } from './shards.ts'
 import type { SetupProblem } from '../setup.ts'
 import { DshExecutor, sourceTrigger, triggerMessage, workerSessionId } from '../executor/dsh.ts'
+import { Verification } from '../executor/verification.ts'
+import { runAsWorker } from '../infra/environment.ts'
 import { ticketCard } from './cards.ts'
 import { MasterAssessor } from './assessment.ts'
 import { KV } from '../kv.ts'
@@ -222,6 +224,8 @@ export class Runtime extends Service implements SourceHost {
       const audit = new CommandAudit(commandAuditFile(this.machine.stateDir))
       const approvals = new Approvals({ file: approvalsFile(this.machine.stateDir), audit })
       this.commandGate = new CommandGate({ settings: () => store.settings(), audit, approvals })
+      const verification = new Verification({ store, gate: this.commandGate,
+        run: (argv, cwd, signal) => runAsWorker(ctx.subprocess, argv, cwd, AbortSignal.any([signal, this.lifetime]), undefined, true) })
       this.executor = new DshExecutor({ context: ctx, get engine() { return runtime.engine }, store, effects, health: board.claim('worker'), machine,
         lifetime: this.lifetime, sessions, closing: () => this.closing(), paused: () => this.paused(), environment, sourceLink: link,
         repliedTo: trigger => repliedTo({ store, sources }, trigger),
@@ -271,7 +275,7 @@ export class Runtime extends Service implements SourceHost {
         configured: () => setup.configured(),
         get setupProblem() { return setup.problem }, problemFor: instance => setup.problemFor(instance),
         get feishuProblem() { return setup.feishuProblem }, receive: trigger => passes.receive(trigger) }
-      this.toolHost = { context: ctx, engine, store, prompts, sessions, settings: this.settings, assessor, resources, commandGate: this.commandGate,
+      this.toolHost = { context: ctx, engine, store, prompts, sessions, settings: this.settings, assessor, resources, commandGate: this.commandGate, verification,
         get github() { return runtime.context({ kind: 'github', health: ['github'] }) },
         requestPass: () => { passes.request() }, sendReplies: () => outbox.sent(),
         quietly: run => { this.quiet++; try { return run() } finally { this.quiet-- } } }

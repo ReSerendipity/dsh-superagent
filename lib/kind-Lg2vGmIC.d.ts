@@ -111,8 +111,10 @@ declare const SettingsSchema: ZodObject<{
       reasoningEffort: ZodOptional<ZodString>;
     }, $strict>>>;
     maxWorkers: ZodDefault<ZodNumber>;
+    lengthContinuations: ZodDefault<ZodNumber>;
     directory: ZodDefault<ZodString>;
     prepare: ZodDefault<ZodString>;
+    verify: ZodDefault<ZodString>;
     blockedCommands: ZodDefault<ZodArray<ZodString>>;
     commandPolicy: ZodDefault<ZodObject<{
       enforce: ZodDefault<ZodBoolean>;
@@ -257,8 +259,10 @@ declare class SourceRegistry implements SourceScope {
         reasoningEffort?: string | undefined;
       } | null;
       maxWorkers: number;
+      lengthContinuations: number;
       directory: string;
       prepare: string;
+      verify: string;
       blockedCommands: string[];
       commandPolicy: {
         enforce: boolean;
@@ -351,8 +355,10 @@ declare class SourceRegistry implements SourceScope {
         reasoningEffort?: string | undefined;
       } | null;
       maxWorkers: number;
+      lengthContinuations: number;
       directory: string;
       prepare: string;
+      verify: string;
       blockedCommands: string[];
       commandPolicy: {
         enforce: boolean;
@@ -457,8 +463,10 @@ declare class SourceRegistry implements SourceScope {
         reasoningEffort?: string | undefined;
       } | null;
       maxWorkers: number;
+      lengthContinuations: number;
       directory: string;
       prepare: string;
+      verify: string;
       blockedCommands: string[];
       commandPolicy: {
         enforce: boolean;
@@ -558,8 +566,10 @@ declare class SourceRegistry implements SourceScope {
         reasoningEffort?: string | undefined;
       } | null;
       maxWorkers: number;
+      lengthContinuations: number;
       directory: string;
       prepare: string;
+      verify: string;
       blockedCommands: string[];
       commandPolicy: {
         enforce: boolean;
@@ -655,8 +665,10 @@ declare class SourceRegistry implements SourceScope {
         reasoningEffort?: string | undefined;
       } | null;
       maxWorkers: number;
+      lengthContinuations: number;
       directory: string;
       prepare: string;
+      verify: string;
       blockedCommands: string[];
       commandPolicy: {
         enforce: boolean;
@@ -765,8 +777,10 @@ declare class SourceRegistry implements SourceScope {
         reasoningEffort?: string | undefined;
       } | null;
       maxWorkers: number;
+      lengthContinuations: number;
       directory: string;
       prepare: string;
+      verify: string;
       blockedCommands: string[];
       commandPolicy: {
         enforce: boolean;
@@ -860,8 +874,10 @@ declare class SourceRegistry implements SourceScope {
         reasoningEffort?: string | undefined;
       } | null;
       maxWorkers: number;
+      lengthContinuations: number;
       directory: string;
       prepare: string;
+      verify: string;
       blockedCommands: string[];
       commandPolicy: {
         enforce: boolean;

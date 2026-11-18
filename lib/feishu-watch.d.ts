@@ -1,6 +1,6 @@
 /** Feishu source kind definition, policy synchronization, and Cordis plugin entry. */
 import { S as $strip, _ as output, b as $loose, c as ZodObject, f as ZodString, h as ZodURL, i as ZodEnum, l as ZodOptional, n as ZodBoolean, r as ZodDefault, s as ZodNumber, t as ZodArray, x as $strict } from "./schemas-2-UC6LY4.js";
-import { _ as Tally, g as SourceRegistry, n as SourceKind, r as SourceContext } from "./kind-CGceQI49.js";
+import { _ as Tally, g as SourceRegistry, n as SourceKind, r as SourceContext } from "./kind-Lg2vGmIC.js";
 import { F as Thread, U as Trigger } from "./intake-HLlhGfwc.js";
 import { Context } from "@deepseek-ai/cordis";
 /** Retained source message reference anchoring context reads; `at` is the timestamp around which `chatAround` queries. */

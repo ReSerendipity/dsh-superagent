@@ -179,7 +179,7 @@ export function applyEnvironment(variables: Record<string, string | undefined>, 
 }
 
 /** Spawns a command through the DSH subprocess runtime, which strips credential-shaped environment variables. */
-export async function runAsWorker(subprocess: SubprocessRuntime, argv: string[], cwd: string, signal: AbortSignal, env?: Record<string, string>): Promise<string> {
+export async function runAsWorker(subprocess: SubprocessRuntime, argv: string[], cwd: string, signal: AbortSignal, env?: Record<string, string>, requireCompleteOutput = false): Promise<string> {
   // `runtimeArgv` hands a batch wrapper CLI to cmd.exe (Node refuses to spawn `.cmd`/`.bat` directly - the
   // CVE-2024-27980 hardening) with the program and its arguments as SEPARATE argv entries: Node then quotes
   // each one for cmd, whereas joining them into one command line lets cmd re-parse the quotes and hand the
@@ -187,7 +187,11 @@ export async function runAsWorker(subprocess: SubprocessRuntime, argv: string[],
   const spawnArgv = runtimeArgv(argv[0] ?? '', argv.slice(1))
   const handle = subprocess.spawn({ argv: spawnArgv, cwd, graceMs: 2000, signal, ...env ? { env } : {}, stdio: { stdin: 'ignore', stdout: { maxBytes: 1 << 20 }, stderr: { maxBytes: 1 << 16 } } })
   const { exitCode } = await handle.done
-  const read = (reader: SubprocessOutputReader | undefined): string => reader?.readFrom(0).text ?? ''
+  const read = (reader: SubprocessOutputReader | undefined): string => {
+    const result = reader?.readFrom(0)
+    if (requireCompleteOutput && result?.lossy) throw new Error('Worker command output exceeded its capture limit; verification is incomplete')
+    return result?.text ?? ''
+  }
   if (exitCode === 0) return read(handle.collected.stdout)
   const ended = exitCode === null ? 'was stopped before it finished' : `exited with ${exitCode}`
   // Only the program and the ending: argv may carry message text or a URL with credentials, which `commandError` never echoes.

@@ -3,6 +3,7 @@ import { describe, expect, it, vi, type Mock } from 'vitest'
 import { existsSync, mkdirSync, mkdtempSync, readFileSync, readdirSync, statSync, utimesSync, writeFileSync } from 'node:fs'
 import { tmpdir } from 'node:os'
 import { join, resolve } from 'node:path'
+import { fileURLToPath } from 'node:url'
 import { Engine, key, threadKey, type OutboundMessage, type Trigger } from '../src/core/index.ts'
 import { INBOX_STABILITY_MS, inboxDir, inboxKind, inboxTrigger, pollInbox, sendInbox } from '../src/sources/inbox.ts'
 import { SourceRegistry } from '../src/sources/registry.ts'
@@ -108,9 +109,39 @@ describe('pollInbox', () => {
     const h = host({ receive: vi.fn(async () => { throw new Error('engine down') }) })
     drop(h.dir, 'task.md', 'x')
     expect(await pollInbox(h, CONFIG, new AbortController().signal)).toEqual({ read: 1, moved: 0, failed: 1, lastError: 'engine down' })
-    // The file stays in the inbox, so the next round retries it.
-    expect(existsSync(join(h.dir, 'inbox', 'task.md'))).toBe(true)
+    // The durable claim survives admission failure and is retried next round.
+    expect(readdirSync(join(h.dir, 'inbox', '.pending'))).toHaveLength(1)
     h.store.close()
+  })
+  it('does not archive a newer same-name input that arrives during admission', async () => {
+    const h = host(), receive = h.receive
+    drop(h.dir, 'task.md', 'version one')
+    h.receive = async trigger => { const result = await receive(trigger); drop(h.dir, 'task.md', 'version two'); return result }
+    expect(await pollInbox(h, CONFIG, new AbortController().signal)).toMatchObject({ moved: 1, failed: 0 })
+    expect(readFileSync(join(h.dir, 'inbox', 'task.md'), 'utf8')).toBe('version two')
+    h.receive = receive
+    await pollInbox(h, CONFIG, new AbortController().signal)
+    expect((receive as Mock).mock.calls.map(([trigger]) => trigger.text)).toEqual(['version one', 'version two'])
+    h.store.close()
+  })
+  it('keeps each admitted version readable before and after archiving, including repeated names', async () => {
+    const h = host(), receive = h.receive, urls: string[] = []
+    h.receive = async trigger => {
+      expect(readFileSync(fileURLToPath(trigger.url!), 'utf8')).toBe(trigger.text)
+      urls.push(trigger.url!); return receive(trigger)
+    }
+    for (const text of ['one', 'two']) { drop(h.dir, 'task.md', text); await pollInbox(h, CONFIG, new AbortController().signal) }
+    expect(urls.map(url => readFileSync(fileURLToPath(url), 'utf8'))).toEqual(['one', 'two'])
+    expect(urls[0]).not.toBe(urls[1]); h.store.close()
+  })
+  it('reopens the same claim and trigger after an uncertain admission failure', async () => {
+    const h = host(), receive = h.receive, seen: Trigger[] = []; let first = true
+    h.receive = async trigger => { seen.push(trigger); const result = await receive(trigger); if (first) { first = false; throw Error('lost response') } return result }
+    drop(h.dir, 'task.md', 'one')
+    expect(await pollInbox(h, CONFIG, new AbortController().signal)).toMatchObject({ failed: 1 })
+    expect(await pollInbox(h, CONFIG, new AbortController().signal)).toMatchObject({ moved: 1, failed: 0 })
+    expect(seen[0]!.id).toBe(seen[1]!.id); expect(seen[0]!.url).toBe(seen[1]!.url)
+    expect(readdirSync(join(h.dir, 'inbox', '.pending'))).toEqual([]); h.store.close()
   })
   it('waits out a file that is still being written, then takes it in whole on a later round', async () => {
     const h = host()

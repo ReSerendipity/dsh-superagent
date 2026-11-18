@@ -1496,6 +1496,19 @@ it('relays the status-request hint when a worker\'s turn ends with no text and n
     summary: expect.stringContaining('orchestrator_ticket_request_status') })
 })
 
+it('gates ready on host verification when configured, and keeps reports unchanged on refusal', async () => {
+  const settings = runtime.store.settings()
+  runtime.store.saveSettings({ ...settings, executor: { ...settings.executor, verify: 'fixture-check' } })
+  answers['git rev-parse HEAD'] = 'a'.repeat(40)
+  const { ticket, sessionId } = await acceptedTicket()
+  const before = runtime.store.tickets.get(ticket.id)!.assignments.at(-1)!.report
+  await expect(runTool(sessionId, 'orchestrator_report', { state: 'ready', summary: 'Claimed without checks' }))
+    .rejects.toThrow('orchestrator_verify')
+  expect(runtime.store.tickets.get(ticket.id)!.assignments.at(-1)!.report).toEqual(before)
+  expect(await runTool(sessionId, 'orchestrator_verify', {})).toMatchObject({ verified: true })
+  expect(await runTool(sessionId, 'orchestrator_report', { state: 'ready', summary: 'Checked' })).toMatchObject({ reported: true })
+})
+
 it('fails a ticket at once on a worker error that is not passing, and relays it', async () => {
   const { ticket, sessionId } = await acceptedTicket()
   ;(runtime as unknown as { ctx: Context }).ctx.emit('agent/error', { agent: agents.get(sessionId), turn: 1, step: 1, error: new Error('Invalid tool schema') } as never)

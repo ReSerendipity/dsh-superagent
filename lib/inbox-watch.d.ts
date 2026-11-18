@@ -2,13 +2,13 @@
  * Inbox source kind (Mode A, single operator): a local directory whose Markdown files become Triggers, so one GitHub
  * account is enough. Dropping `task.md` into the inbox is a direct request from the configured local actor; the reply
  * file `done/task.md.reply.md` next to the archived task file is rewritten from the delivery receipts on every send.
- * The archive move is the read cursor: a Trigger id
+ * A durable `.pending/` claim is the read cursor; `done/` holds immutable versions before admission. A Trigger id
  * names file + mtime + content hash, so replaying an unchanged file is `duplicate` and editing or re-dropping makes a
  * new event. Nothing in this module depends on GitHub notifications, so it is unaffected by the agent-account filter.
  */
 import { _ as output, c as ZodObject, f as ZodString, r as ZodDefault, s as ZodNumber, x as $strict } from "./schemas-2-UC6LY4.js";
 import { U as Trigger, l as OutboundMessage } from "./intake-HLlhGfwc.js";
-import { n as SourceKind, r as SourceContext, t as DeliveredMessage } from "./kind-CGceQI49.js";
+import { n as SourceKind, r as SourceContext, t as DeliveredMessage } from "./kind-Lg2vGmIC.js";
 import { Context } from "@deepseek-ai/cordis";
 /**
  * A pending file younger than this may still be being written (a cloud-sync drop, a slow copy): taking it in would
@@ -43,7 +43,7 @@ export declare function inboxTrigger(file: InboxFile, config: InboxConfig, root:
  */
 export declare function sendInbox(_host: Pick<SourceContext, 'commands'>, message: OutboundMessage, delivered?: readonly DeliveredMessage[]): Promise<'sent' | 'gone'>;
 export declare const inboxKind: SourceKind<InboxConfig>;
-/** Read pending files in the inbox once they have settled, take in each, and archive it under done/. The move is the cursor. */
+/** Claim settled files, admit immutable archived versions, and acknowledge only the claimed version. */
 export declare function pollInbox(ctx: SourceContext, config: InboxConfig, signal: AbortSignal): Promise<{
   read: number;
   moved: number;

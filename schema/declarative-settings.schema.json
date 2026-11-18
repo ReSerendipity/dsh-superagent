@@ -260,8 +260,10 @@
       "default": {
         "model": null,
         "maxWorkers": 3,
+        "lengthContinuations": 0,
         "directory": "",
         "prepare": "",
+        "verify": "",
         "blockedCommands": [],
         "commandPolicy": {
           "enforce": false,
@@ -343,11 +345,22 @@
           "minimum": 1,
           "maximum": 16
         },
+        "lengthContinuations": {
+          "default": 0,
+          "type": "integer",
+          "minimum": 0,
+          "maximum": 2
+        },
         "directory": {
           "default": "",
           "type": "string"
         },
         "prepare": {
+          "default": "",
+          "type": "string",
+          "maxLength": 4000
+        },
+        "verify": {
           "default": "",
           "type": "string",
           "maxLength": 4000
