@@ -34,6 +34,7 @@ import { sourcesStatus, type SetupState } from './views/sources.ts'
 import { decisionList, search, threadDetail, threadList } from './views/threads.ts'
 import { teamBoard } from './views/team.ts'
 import { chatRouterTasks, executorLoad, ticketDetail, ticketList } from './views/tickets.ts'
+import { ticketDiagnostic } from './diagnostics.ts'
 
 export interface HttpHost {
   readonly store: Store
@@ -162,6 +163,7 @@ function routes(runtime: HttpHost): Routes {
   const ticket = (id: string) => { if (!store.tickets.get(id)) throw new RouteError(404, 'Ticket not found'); return id }
   const promptBody = (input: { body: (maxBytes?: number) => Promise<unknown> }) => input.body(4 * runtime.machine.promptMaxChars.get() + 4096)
   return {
+    'GET tickets/:id/diagnostic': ({ params }) => ticketDiagnostic(store.tickets.get(ticket(params.id))!),
     'GET state': () => stateView(runtime),
     'GET overview': () => overview(views(runtime), runtime.health, policyVersion(store.settings()),
       executorLoad(store, runtime.executor.activeCount()), runtime.setupProblem ?? runtime.feishuProblem),
