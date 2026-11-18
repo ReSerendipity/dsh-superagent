@@ -24,6 +24,7 @@ import { evaluateCommand, splitCommandLine } from '../command-policy.ts'
 import type { HealthEntry } from '../infra/health.ts'
 import { cancelled, collectJob, killJobs, runningJobs, stopBackground, stopSubagents, until, untilQuiet } from './background.ts'
 import { initLocalWorkspace, usesLocalWorkspace } from './local-workspace.ts'
+import { KV } from '../kv.ts'
 
 const now = (): string => new Date().toISOString()
 /** Returns the worker session ID (`worker-<ticketId>`) for a ticket. */
@@ -70,7 +71,7 @@ export interface ExecutorHost {
   /** Where the Executor reports what happened to Assignments and Inputs. */
   readonly engine: Pick<EngineForExecutor, 'assignmentStarted' | 'inputsDelivered' | 'inputsRead' | 'turnEnded' | 'deliveryFailed' | 'report'
     | 'assignmentInterrupted'>
-  readonly store: Pick<Store, 'tickets' | 'triggers' | 'set' | 'settings' | 'atomic' | 'afterCommit'>
+  readonly store: Pick<Store, 'tickets' | 'triggers' | 'get' | 'set' | 'settings' | 'atomic' | 'afterCommit'>
   /** Durable effect queue through which launches and input deliveries run. */
   readonly effects: Pick<Effects, 'enqueue' | 'handle'>
   /** The `worker` health entry, which reports whether background worker event handling failed. */
@@ -250,6 +251,7 @@ export class DshExecutor implements Executor {
       retry: [5000, 300_000] })
     // Failed input deliveries are recorded on the ticket itself rather than reported through the `delivery` effect health entry (`quiet: true`).
     host.effects.handle('delivery', payload => this.deliverQueued(payload.ticketId), { limit: () => host.paused() ? 0 : 4, quiet: true })
+    host.effects.handle('worker-length', payload => this.continueLength(payload), { limit: () => host.paused() ? 0 : 1, quiet: true })
   }
   /** Populates a newly accepted ticket's `execution` attributes (worktree name, workspace directory, and assignment text). */
   prepare(ticket: Ticket, outcome: Extract<AssessmentOutcome, { kind: 'accept' }>): Ticket {
@@ -540,6 +542,9 @@ export class DshExecutor implements Executor {
       // before dispatch instead (`gated`), where the real outcome is known; a second after-the-fact record would claim
       // the command ran when it was denied, so it is skipped.
       if (event.type === 'tool/call') { this.auditCommand(ticketId, event.data.name, event.data.arguments); return }
+      if (event.type === 'turn/end' && event.data.reason.kind === 'max-tokens') {
+        this.lengthStopped(ticketId, event.seq); return
+      }
       if (event.type !== 'user/message' || event.data.source.kind !== 'dsh-superagent') return
       const message = event.data
       void this.background(Promise.resolve().then(() => {
@@ -662,6 +667,52 @@ export class DshExecutor implements Executor {
     const timer = setTimeout(() => { this.timers.delete(timer); then() }, ms)
     timer.unref?.()
     this.timers.add(timer)
+  }
+  /** Persist the budget and effect together; duplicate event delivery cannot buy another turn. */
+  private lengthStopped(ticketId: string, seq: number): void {
+    const ticket = this.host.store.tickets.get(ticketId), assignment = ticket && runningAssignment(ticket)
+    const limit = this.host.store.settings().executor.lengthContinuations
+    if (!limit || !ticket || !assignment || !liveTicket(ticket) || ticket.attention || waitsForPerson(ticket)
+      || assignment.report?.state === 'ready') return
+    const previous = this.host.store.get(KV.executor.length(assignment.id)) ?? { count: 0, seq: -1 }
+    if (previous.seq >= seq || previous.count >= limit) return
+    this.resuming.add(assignment.id)
+    this.host.store.atomic(() => {
+      this.host.store.set(KV.executor.length(assignment.id), { count: previous.count + 1, seq })
+      this.host.effects.enqueue('worker-length', `${assignment.id}:${seq}`, { ticketId, assignmentId: assignment.id, eventSeq: seq,
+        inputs: JSON.stringify(ticket.inputs.map(input => input.id)) })
+    })
+  }
+  /** Resume the existing session/worktree, never launch another coding assignment. */
+  private async continueLength(payload: { ticketId: string; assignmentId: string; eventSeq: number; inputs: string }): Promise<void> {
+    const { ticketId, assignmentId, eventSeq } = payload
+    const eligible = () => {
+      const ticket = this.host.store.tickets.get(ticketId), assignment = ticket && runningAssignment(ticket)
+      return !!ticket && liveTicket(ticket) && assignment?.id === assignmentId && !ticket.attention && !waitsForPerson(ticket)
+        && assignment.report?.state !== 'ready' && JSON.stringify(ticket.inputs.map(input => input.id)) === payload.inputs
+        && this.host.store.settings().executor.lengthContinuations > 0
+    }
+    const agent = this.host.context.agents.get(workerSessionId(ticketId) as SessionId)
+    let reserved = false, deferred = false
+    try {
+      if (!agent || !eligible()) return
+      await until(agent.whenIdle(), this.host.lifetime)
+      if (this.host.closing() || this.host.paused()) throw new Later('Worker continuation is paused')
+      if (!eligible() || agent.inbox.nextTurn.length || agent.inbox.nextStep.length) return
+      this.slots.reserve(ticketId, 'wake'); reserved = true
+      await this.host.sessions.prompt(agent.id, `length:${assignmentId}:${eventSeq}`,
+        'The previous turn reached its output-length limit. Continue from the current session and existing worktree. '
+        + 'Inspect saved artifacts and tool results first; finish only the incomplete work. Do not repeat completed coding or tests, '
+        + 'claim success without evidence, change the mandate, or bypass a pending question. Report the actual result with orchestrator_report.',
+        'queue', () => { if (!eligible() || this.host.closing() || this.host.paused()) throw new Later('Continuation authorization changed') })
+    } catch (error) { deferred = error instanceof Later; throw error } finally {
+      if (reserved) this.slots.free(ticketId)
+      if (!deferred) this.resuming.delete(assignmentId)
+      // A superseding input or a completed report must still get normal idle reconciliation.
+      const ticket = this.host.store.tickets.get(ticketId), assignment = ticket && runningAssignment(ticket)
+      if (!deferred && agent?.status === 'idle' && ticket && assignment?.id === assignmentId && !this.host.closing() && !this.host.paused())
+        void this.background(this.workerIdle(ticket, assignment, agent))
+    }
   }
   /**
    * A worker that handed off to a person frees its slot: its subagents stop, and its shell jobs, such as a server for the

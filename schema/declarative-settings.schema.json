@@ -260,6 +260,7 @@
       "default": {
         "model": null,
         "maxWorkers": 3,
+        "lengthContinuations": 0,
         "directory": "",
         "prepare": "",
         "blockedCommands": [],
@@ -342,6 +343,12 @@
           "type": "integer",
           "minimum": 1,
           "maximum": 16
+        },
+        "lengthContinuations": {
+          "default": 0,
+          "type": "integer",
+          "minimum": 0,
+          "maximum": 2
         },
         "directory": {
           "default": "",
